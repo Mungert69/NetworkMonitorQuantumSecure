@@ -1,0 +1,1 @@
+ dotnet publish .\QuantumSecure.csproj  -f net8.0-windows10.0.19041.0   /p:RuntimeIdentifierOverride=win10-x64

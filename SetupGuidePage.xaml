@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="QuantumSecure.SetupGuidePage"
+             Title="Setup Guide">
+
+    <ScrollView>
+        <StackLayout Spacing="20" Padding="15">
+                <Label Text="Setup Guide" FontSize="Large" HorizontalOptions="Center"/>
+                <Label Text="Welcome to Quantum Secure Agent. This App provides a proxy to send network monitoring analytics from its location to the Quantum Secure Service. The management and display of the network monitoring data are performed via the Quantum Secure Service dashboard at https://freenetworkmonitor.click/dashboard."/>
+                <Label Text="In order for your device to function as an agent, it first needs to be authorized."/>
+                <Label Text="Start by clicking the 'Authorize' button on the main page to begin the authentication process."/>
+                <Label Text="Follow the on-screen instructions to log in to your account. If you don't have an account, you can create one during the authentication process."/>
+                <Label Text="Once you have successfully logged in and authenticated your agent, visit the website https://freenetworkmonitor.click/dashboard and, again, log in with the same email address you used to authorize your agent. It is from here that you will view and manage network monitoring."/>
+                <Label Text="Once logged into the Quantum Secure site, go to the dashboard and add a host that you want to monitor, click the flashing edit icon. You might wish to monitor a local router at the IP address 192.168.1.1 using the endpoint type 'icmp' to ping the local router, thereby monitoring its availability."/>
+                <Label Text="You can choose either predefined remote agents or your local agent. However, in the case of the example router at 192.168.1.1, you would need to choose 'your email address - agent id' when selecting a monitor location in order to select your local agent. When done adding hosts, click save."/>
+                <Label Text="Click the edit icon to toggle between view and edit modes. In view mode, after about 2 mins, host monitoring data should start appearing. For detailed response data, click the chart icon next to the host."/>
+                <Label Text="Alerts will be sent to your email address if the host is detected as down. Weekly reports are also sent to your email address with an analysis of your hosts' performance. Note that you must verify your email address to receive email alerts and reports. If you don't receive the verification email, exclude support@mahadeva.co.uk from your spam filter."/>
+                <Label Text="You can manage your account by clicking the profile icon."/>
+                <Label Text="We hope you find this service helpful and would love to hear your feedback or answer any support queries you may have. Feel free to email us at support@mahadeva.co.uk. We're always here to help!"/>
+                   </StackLayout>
+
+          
+    </ScrollView>
+</ContentPage>
