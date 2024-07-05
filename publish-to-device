@@ -1,0 +1,2 @@
+dotnet build NetworkMonitorQuantumSecure-Android.csproj  -t:Run -f net8.0-android
+
