@@ -30,7 +30,7 @@ namespace QuantumSecure.Services
         private IMonitorPingInfoView _monitorPingInfoView;
         private LocalProcessorStates _processorStates;
         private LocalScanProcessorStates _scanProcessorStates;
-        public BackgroundService(ILogger logger, NetConnectConfig netConfig, ILoggerFactory loggerFactory, IRabbitRepo rabbitRepo, IFileRepo fileRepo, LocalProcessorStates processorStates, IMonitorPingInfoView monitorPingInfoView,LocalScanProcessorStates scanProcessorStates)
+        public BackgroundService(ILogger logger, NetConnectConfig netConfig, ILoggerFactory loggerFactory, IRabbitRepo rabbitRepo, IFileRepo fileRepo, LocalProcessorStates processorStates, IMonitorPingInfoView monitorPingInfoView, LocalScanProcessorStates scanProcessorStates)
         {
             _logger = logger;
             _netConfig = netConfig;
@@ -49,16 +49,17 @@ namespace QuantumSecure.Services
             {
                 result = await _rabbitRepo.ConnectAndSetUp();
                 if (!result.Success) return result;
-                if (!_netConfig.OqsProviderPath.Contains(FileSystem.AppDataDirectory)) {
-                string[] pathComponents = _netConfig.OqsProviderPath.Trim('/').Split('/');
-
-                string fullPath = FileSystem.AppDataDirectory;
-                foreach (var component in pathComponents)
+                if (!_netConfig.OqsProviderPath.Contains(FileSystem.AppDataDirectory))
                 {
-                    fullPath = Path.Combine(fullPath, component);
-                }
-                _netConfig.OqsProviderPath = fullPath;
-                System.Diagnostics.Debug.WriteLine($"Setting OqsProviderPath : {_netConfig.OqsProviderPath}");
+                    string[] pathComponents = _netConfig.OqsProviderPath.Trim('/').Split('/');
+
+                    string fullPath = FileSystem.AppDataDirectory;
+                    foreach (var component in pathComponents)
+                    {
+                        fullPath = Path.Combine(fullPath, component);
+                    }
+                    _netConfig.OqsProviderPath = fullPath;
+                    System.Diagnostics.Debug.WriteLine($"Setting OqsProviderPath : {_netConfig.OqsProviderPath}");
                 }
                 var _connectFactory = new NetworkMonitor.Connection.ConnectFactory(_loggerFactory.CreateLogger<ConnectFactory>(), isLoadAlogTable: true, oqsProviderPath: _netConfig.OqsProviderPath);
                 _scanProcessor = new ScanProcessor(_loggerFactory.CreateLogger<ScanProcessor>(), _scanProcessorStates, _rabbitRepo, _netConfig);
