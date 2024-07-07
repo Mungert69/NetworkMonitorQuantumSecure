@@ -7,9 +7,6 @@
 			"path": "../NetworkMonitor"
 		},
 		{
-			"path": "../NetworkMonitorApi"
-		},
-		{
 			"path": "../NetworkMonitorProcessor"
 		}
 	],
