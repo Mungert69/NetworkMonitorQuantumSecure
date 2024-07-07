@@ -102,13 +102,9 @@ namespace QuantumSecure
           {
               var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
               var configuration = provider.GetRequiredService<IConfiguration>();
-              return new ApiService(loggerFactory, configuration);
+              return new ApiService(loggerFactory, configuration,FileSystem.AppDataDirectory);
           });
-           builder.Services.AddSingleton(provider =>
-            {
-                 var apiService = provider.GetRequiredService<IApiService>();
-                return new NetworkMonitorViewModel(apiService);
-            });
+
 
 
             builder.Services.AddSingleton<IMonitorPingInfoView>(provider =>
@@ -244,6 +240,11 @@ namespace QuantumSecure
                 var logger = provider.GetRequiredService<ILogger<ScanPage>>();
                 return new ScanPage(logger, scanProcessorStatesViewModel);
             });
+            builder.Services.AddSingleton(provider =>
+           {
+               var apiService = provider.GetRequiredService<IApiService>();
+               return new NetworkMonitorPage(apiService);
+           });
             builder.Services.AddSingleton<ConfigPage>();
             builder.Services.AddSingleton<DateViewPage>();
             var app = builder.Build();

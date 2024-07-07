@@ -3,9 +3,11 @@ using QuantumSecure.ViewModels;
 namespace QuantumSecure;
 public partial class NetworkMonitorPage : ContentPage
 {
-    public NetworkMonitorPage(NetworkMonitorViewModel networkMonitorViewModel)
+    public NetworkMonitorPage(IApiService apiService)
     {
         InitializeComponent();
-        BindingContext = networkMonitorViewModel;
+        BindingContext = new NetworkMonitorViewModel(apiService);
+
+
     }
 }
