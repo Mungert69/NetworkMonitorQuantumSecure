@@ -12,7 +12,7 @@ namespace QuantumSecure.ViewModels
         private readonly IApiService _apiService;
         private string _selectedEndpointType;
         private string _address;
-        private int _port;
+        private ushort _port;
         private bool _isBusy;
         private bool _hasResult;
         private string _resultMessage;
@@ -33,7 +33,7 @@ namespace QuantumSecure.ViewModels
             set { _address = value; OnPropertyChanged(); }
         }
 
-        public int Port
+        public ushort Port
         {
             get => _port;
             set { _port = value; OnPropertyChanged(); }

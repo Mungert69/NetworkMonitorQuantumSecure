@@ -5,6 +5,7 @@ using NetworkMonitor.Connection;
 using NetworkMonitor.DTOs;
 using NetworkMonitor.Objects.Repository;
 using NetworkMonitor.Processor.Services;
+using NetworkMonitor.Api.Services;
 using QuantumSecure.Services;
 using NetworkMonitor.Objects.ServiceMessage;
 using NetworkMonitor.Objects;
@@ -97,7 +98,7 @@ namespace QuantumSecure
            {
                return new LocalScanProcessorStates();
            });
-            builder.Services.AddSingleton<IApiService,>(provider =>
+            builder.Services.AddSingleton<IApiService>(provider =>
           {
               var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
               var configuration = provider.GetRequiredService<IConfiguration>();
