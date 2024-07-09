@@ -5,6 +5,7 @@ using NetworkMonitor.Connection;
 using NetworkMonitor.DTOs;
 using NetworkMonitor.Objects.Repository;
 using NetworkMonitor.Processor.Services;
+using NetworkMonitor.Api.Services;
 using QuantumSecure.Services;
 using NetworkMonitor.Objects.ServiceMessage;
 using NetworkMonitor.Objects;
@@ -97,6 +98,15 @@ namespace QuantumSecure
            {
                return new LocalScanProcessorStates();
            });
+            builder.Services.AddSingleton<IApiService>(provider =>
+          {
+              var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
+              var configuration = provider.GetRequiredService<IConfiguration>();
+              return new ApiService(loggerFactory, configuration,FileSystem.AppDataDirectory);
+          });
+
+
+
             builder.Services.AddSingleton<IMonitorPingInfoView>(provider =>
             {
                 return new MonitorPingInfoView();
@@ -193,13 +203,13 @@ namespace QuantumSecure
                 // Choose the appropriate constructor
                 return new ProcessorStatesViewModel(logger, processorStates);
             });
-             builder.Services.AddSingleton(provider =>
-            {
-                var logger = provider.GetRequiredService<ILogger<ScanProcessorStatesViewModel>>();
-                var scanProcessorStates = provider.GetRequiredService<LocalScanProcessorStates>();
-                // Choose the appropriate constructor
-                return new ScanProcessorStatesViewModel(logger, scanProcessorStates);
-            });
+            builder.Services.AddSingleton(provider =>
+           {
+               var logger = provider.GetRequiredService<ILogger<ScanProcessorStatesViewModel>>();
+               var scanProcessorStates = provider.GetRequiredService<LocalScanProcessorStates>();
+               // Choose the appropriate constructor
+               return new ScanProcessorStatesViewModel(logger, scanProcessorStates);
+           });
 
             builder.Services.AddSingleton(provider =>
             {
@@ -230,6 +240,11 @@ namespace QuantumSecure
                 var logger = provider.GetRequiredService<ILogger<ScanPage>>();
                 return new ScanPage(logger, scanProcessorStatesViewModel);
             });
+            builder.Services.AddSingleton(provider =>
+           {
+               var apiService = provider.GetRequiredService<IApiService>();
+               return new NetworkMonitorPage(apiService);
+           });
             builder.Services.AddSingleton<ConfigPage>();
             builder.Services.AddSingleton<DateViewPage>();
             var app = builder.Build();
