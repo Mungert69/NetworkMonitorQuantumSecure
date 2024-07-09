@@ -6,6 +6,9 @@
     <FlyoutItem Title="Home" Route="Home">
         <ShellContent ContentTemplate="{DataTemplate local:MainPage}" />
     </FlyoutItem>
+     <FlyoutItem Title="Check Host" Route="Check">
+        <ShellContent ContentTemplate="{DataTemplate local:NetworkMonitorPage}" />
+    </FlyoutItem>
     <FlyoutItem Title="Host Data" Route="Data">
         <ShellContent ContentTemplate="{DataTemplate local:DateViewPage}" />
     </FlyoutItem>
