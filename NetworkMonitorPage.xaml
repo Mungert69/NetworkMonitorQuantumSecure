@@ -8,8 +8,15 @@
     <ScrollView>
         <VerticalStackLayout Spacing="15" Padding="5" VerticalOptions="Center">
 
-            <Frame BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Gray950}}" Padding="20" CornerRadius="10" HorizontalOptions="FillAndExpand">
-                <Label Text="Network Monitor" FontSize="22" HorizontalOptions="Center" TextColor="{DynamicResource Primary}" />
+            <Frame BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Gray950}}"  Padding="20" CornerRadius="10" HorizontalOptions="FillAndExpand">
+                <VerticalStackLayout Spacing="10">
+                    <Image Source="logo.png" SemanticProperties.Description="Quantum Secure Logo. " HeightRequest="100" HorizontalOptions="Center" />
+                    <Label Text="Quantum Secure" FontSize="22" HorizontalOptions="Center" TextColor="{DynamicResource Primary}" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <Frame BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Gray950}}" Padding="20" CornerRadius="10" HorizontalOptions="FillAndExpand" Margin="0,0,0,10">
+                <Label Text="Check Host" FontSize="16" HorizontalOptions="Center" TextColor="{DynamicResource Primary}"/>
             </Frame>
 
             <Frame BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Gray950}}" Padding="20" CornerRadius="10" HorizontalOptions="FillAndExpand">
