@@ -38,7 +38,8 @@ namespace QuantumSecure.ViewModels
         public async Task Scan() {
             string endPointType = "icmp";
             IsPopupVisible = true;
-            await _scanProcessorStates.Scan(endPointType);
+            _scanProcessorStates.EndPointType = endPointType;
+            await _scanProcessorStates.Scan();
         }
         public async Task Cancel() {
             await _scanProcessorStates.Cancel();
