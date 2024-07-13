@@ -23,7 +23,7 @@ namespace QuantumSecure.Services
         private NetConnectConfig _netConfig;
         private ILoggerFactory _loggerFactory;
         private MonitorPingProcessor _monitorPingProcessor;
-        private ScanProcessor _scanProcessor;
+        private IScanProcessor _scanProcessor;
         private IRabbitRepo _rabbitRepo;
         private IRabbitListener _rabbitListener;
         private IFileRepo _fileRepo;
