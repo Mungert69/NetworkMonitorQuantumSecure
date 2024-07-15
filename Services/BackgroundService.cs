@@ -62,9 +62,10 @@ namespace QuantumSecure.Services
                     System.Diagnostics.Debug.WriteLine($"Setting OqsProviderPath : {_netConfig.OqsProviderPath}");
                 }
                 var _connectFactory = new NetworkMonitor.Connection.ConnectFactory(_loggerFactory.CreateLogger<ConnectFactory>(), isLoadAlogTable: true, oqsProviderPath: _netConfig.OqsProviderPath);
-                _scanProcessor = new ScanProcessor(_loggerFactory.CreateLogger<ScanProcessor>(), _scanProcessorStates, _rabbitRepo, _netConfig);
+                _scanProcessor = new NmapScanProcessor(_loggerFactory.CreateLogger<ScanProcessor>(), _scanProcessorStates, _rabbitRepo, _netConfig);
+                _scanProcessor.UseDefaultEndpoint = true;
                 _monitorPingProcessor = new MonitorPingProcessor(_loggerFactory.CreateLogger<MonitorPingProcessor>(), _netConfig, _connectFactory, _fileRepo, _rabbitRepo, _processorStates, _monitorPingInfoView);
-                _rabbitListener = new RabbitListener(_monitorPingProcessor, _loggerFactory.CreateLogger<RabbitListener>(), _netConfig, _processorStates);
+                _rabbitListener = new RabbitListener(_monitorPingProcessor, _loggerFactory.CreateLogger<RabbitListener>(), _netConfig, _processorStates, _scanProcessor);
                 var resultListener = await _rabbitListener.SetupListener();
                 var resultProcessor = await _monitorPingProcessor.Init(new ProcessorInitObj());
                 result.Message += resultListener.Message + resultProcessor.Message;
