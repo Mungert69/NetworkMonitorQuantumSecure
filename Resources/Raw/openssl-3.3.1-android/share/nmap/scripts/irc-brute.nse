@@ -1,8 +1,10 @@
 local brute = require "brute"
 local comm = require "comm"
 local creds = require "creds"
-local shortport = require "shortport"
+local match = require "match"
+local irc = require "irc"
 local stdnse = require "stdnse"
+local rand = require "rand"
 
 description=[[
 Performs brute force password auditing against IRC (Internet Relay Chat) servers.
@@ -32,7 +34,7 @@ author = "Patrik Karlsson"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
 categories={"brute","intrusive"}
 
-portrule = shortport.port_or_service({6666,6667,6697,6679},{"irc","ircs"})
+portrule = irc.portrule
 
 Driver = {
 
@@ -69,7 +71,7 @@ Driver = {
     end
 
     repeat
-      local status, response = self.socket:receive_buf("\r?\n", false)
+      local status, response = self.socket:receive_buf(match.pattern_limit("\r?\n", 2048), false)
       -- we check for the RPL_WELCOME message, if we don't see it,
       -- we failed to authenticate
       if ( status and response:match("^:.-%s(%d*)%s") == "001" ) then
@@ -86,17 +88,13 @@ Driver = {
   disconnect = function(self) return self.socket:close() end,
 }
 
-local function random_nick()
-  return stdnse.generate_random_string(9, "abcdefghijklmnopqrstuvwxyz")
-end
-
 local function needsPassword(host, port)
-  local msg = ("NICK %s\r\nUSER anonymous 0 * :Nmap brute\r\n"):format(random_nick())
+  local msg = ("NICK %s\r\nUSER anonymous 0 * :Nmap brute\r\n"):format(rand.random_alpha(9))
   local s, r, opts, _ = comm.tryssl(host, port, msg, { timeout = 15000 } )
   local err, code
 
   repeat
-    local status, response = s:receive_buf("\r?\n", false)
+    local status, response = s:receive_buf(match.pattern_limit("\r?\n", 2048), false)
     if ( status ) then
       code = tonumber(response:match("^:.-%s(%d*)%s"))
       -- break after first code

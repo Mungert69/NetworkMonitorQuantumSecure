@@ -2,6 +2,7 @@ local ipOps = require "ipOps"
 local nmap = require "nmap"
 local stdnse = require "stdnse"
 local string = require "string"
+local stringaux = require "stringaux"
 local target = require "target"
 local datafiles = require "datafiles"
 local table = require "table"
@@ -48,7 +49,7 @@ categories = {
 }
 
 local function split_prefix (net)
-  local split = stdnse.strsplit("/", net)
+  local split = stringaux.strsplit("/", net)
   return split[1], tonumber(split[2])
 end
 
@@ -65,7 +66,7 @@ end
 -- @param   User_Segs      Number of segments to search.
 -- @param   User_Right     Boolean for fill right or left (Default)
 -- @return  Boolean        True if was successful the operation
--- @return  Number         Total of successfuly nodes added to the scan list.
+-- @return  Number         Total of successfully nodes added to the scan list.
 -- @return  Error          Any error generated, default: "" not nil.
 local CrearRangoHosts = function (Direccion, Prefijo, TablaPalabras,
     User_Segs, User_Right)

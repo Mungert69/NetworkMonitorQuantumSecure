@@ -1,10 +1,34 @@
-local coroutine = require "coroutine"
 local datetime = require "datetime"
 local formulas = require "formulas"
 local math = require "math"
 local nmap = require "nmap"
+local outlib = require "outlib"
 local stdnse = require "stdnse"
 local table = require "table"
+
+-- These scripts contribute clock skews, so we need them to run first.
+-- portrule scripts do not always run before hostrule scripts, and certainly
+-- not before the hostrule is evaluated.
+dependencies = {
+  "bitcoin-info",
+  "http-date",
+  "http-ntlm-info",
+  "imap-ntlm-info",
+  "memcached-info",
+  "ms-sql-ntlm-info",
+  "nntp-ntlm-info",
+  "ntp-info",
+  "openwebnet-discovery",
+  "pop3-ntlm-info",
+  "rfc868-time",
+  "smb-os-discovery",
+  "smb-security-mode",
+  "smb2-time",
+  "smb2-vuln-uptime",
+  "smtp-ntlm-info",
+  "ssl-date",
+  "telnet-ntlm-info",
+}
 
 description = [[
 Analyzes the clock skew between the scanner and various services that report timestamps.
@@ -12,7 +36,9 @@ Analyzes the clock skew between the scanner and various services that report tim
 At the end of the scan, it will show groups of systems that have similar median
 clock skew among their services. This can be used to identify targets with
 similar configurations, such as those that share a common time server.
-]]
+
+You must run at least 1 of the following scripts to collect clock data:
+* ]] .. table.concat(dependencies, "\n* ") .. "\n"
 
 ---
 -- @output
@@ -36,24 +62,6 @@ author = "Daniel Miller"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
 
 categories = {"default", "safe"}
-
--- These scripts contribute clock skews, so we need them to run first.
--- portrule scripts do not always run before hostrule scripts, and certainly
--- not before the hostrule is evaluated.
-dependencies = {
-  "http-date",
-  "http-ntlm-info",
-  "imap-ntlm-info",
-  "ms-sql-ntlm-info",
-  "nntp-ntlm-info",
-  "ntp-info",
-  "pop3-ntlm-info",
-  "rfc868-time",
-  "smb-security-mode",
-  "smtp-ntlm-info",
-  "ssl-date",
-  "telnet-ntlm-info",
-}
 
 hostrule = function(host)
   return host.registry.datetime_skew and #host.registry.datetime_skew > 0
@@ -86,15 +94,27 @@ local function record_stats(host, mean, stddev, median)
 end
 
 hostaction = function(host)
-  local mean, stddev = formulas.mean_stddev(host.registry.datetime_skew)
-  local median = formulas.median(host.registry.datetime_skew)
+  local skews = host.registry.datetime_skew
+  if not skews or #skews < 1 then
+    return nil
+  end
+  local mean, stddev = formulas.mean_stddev(skews)
+  local median = formulas.median(skews)
+  -- truncate to integers; we don't care about fractional seconds)
+  mean = math.modf(mean)
+  stddev = math.modf(stddev)
+  median = math.modf(median)
   record_stats(host, mean, stddev, median)
-  local out = {mean = mean, stddev = stddev, median = median}
-  return out, ("mean: %s, deviation: %s, median: %s"):format(
-    stdnse.format_time(mean),
-    stdnse.format_time(stddev),
-    stdnse.format_time(median)
-    )
+  if mean ~= 0 or stddev ~= 0 or nmap.verbosity() > 1 then
+    local out = {count = #skews, mean = mean, stddev = stddev, median = median}
+    return out, (#skews == 1 and datetime.format_time(mean)
+      or ("mean: %s, deviation: %s, median: %s"):format(
+        datetime.format_time(mean),
+        datetime.format_time(stddev),
+        datetime.format_time(median)
+        )
+      )
+  end
 end
 
 local function sorted_keys(t)
@@ -104,26 +124,6 @@ local function sorted_keys(t)
   end
   table.sort(ret)
   return ret
-end
-
---- Return a table that yields elements sorted by key when iterated over with pairs()
---  Should probably put this in a formatting library later.
---  Depends on keys() function defined above.
---@param  t    The table whose data should be used
---@return out  A table that can be passed to pairs() to get sorted results
-function sorted_by_key(t)
-  local out = {}
-  setmetatable(out, {
-    __pairs = function(_)
-      local order = sorted_keys(t)
-      return coroutine.wrap(function()
-        for i,k in ipairs(order) do
-          coroutine.yield(k, t[k])
-        end
-      end)
-    end
-  })
-  return out
 end
 
 postaction = function()
@@ -155,16 +155,16 @@ postaction = function()
   local out = {}
   for mean, group in pairs(groups) do
     -- Collapse the biggest group
-    if #group > host_count // 2 then
-      out[stdnse.format_time(mean)] = "Majority of systems scanned"
+    if #groups > 1 and #group > host_count // 2 then
+      out[datetime.format_time(mean)] = "Majority of systems scanned"
     elseif #group > 1 then
       -- Only record groups of more than one system together
-      out[stdnse.format_time(mean)] = group
+      out[datetime.format_time(mean)] = group
     end
   end
 
   if next(out) then
-    return sorted_by_key(out)
+    return outlib.sorted_by_key(out)
   end
 end
 

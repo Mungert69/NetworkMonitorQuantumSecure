@@ -50,8 +50,8 @@
 --@copyright Same as Nmap--See https://nmap.org/book/man-legal.html
 -----------------------------------------------------------------------
 
-local bin = require "bin"
-local bit = require "bit"
+local datetime = require "datetime"
+local ipOps = require "ipOps"
 local math = require "math"
 local msrpctypes = require "msrpctypes"
 local netbios = require "netbios"
@@ -59,7 +59,9 @@ local os = require "os"
 local smb = require "smb"
 local stdnse = require "stdnse"
 local string = require "string"
+local stringaux = require "stringaux"
 local table = require "table"
+local unicode = require "unicode"
 _ENV = stdnse.module("msrpc", stdnse.seeall)
 
 -- The path, UUID, and version for SAMR
@@ -200,7 +202,8 @@ local UUID2EXE = {
 --@return smbstate if status is true, or an error message.
 function start_smb(host, path, disable_extended, overrides)
   overrides = overrides or {}
-  return smb.start_ex(host, true, true, "IPC$", path, disable_extended, overrides)
+  local _, sharename = smb.get_fqpn(host, "IPC$")
+  return smb.start_ex(host, true, true, sharename, path, disable_extended, overrides)
 end
 
 --- A wrapper around the <code>smb.stop</code> function.
@@ -242,7 +245,7 @@ function bind(smbstate, interface_uuid, interface_version, transfer_syntax)
     transfer_syntax = TRANSFER_SYNTAX
   end
 
-  data = bin.pack("<CCCC>I<SSISSICCCC",
+  data = string.pack("<BBBB>I4<I2I2I4I2I2I4BxxxI2Bx",
     0x05, -- Version (major)
     0x00, -- Version (minor)
     0x0B, -- Packet type (0x0B = bind)
@@ -255,19 +258,14 @@ function bind(smbstate, interface_uuid, interface_version, transfer_syntax)
     MAX_FRAGMENT, -- Max receive frag
     0x00000000, -- Assoc group
     0x01,       -- Number of items
-    0x00,       -- Padding/alignment
-    0x00,       -- Padding/alignment
-    0x00        -- Padding/alignment
-    ) .. bin.pack("<SCCASSAI",
     0x0000,            -- Context ID
-    0x01,              -- Number of transaction items. */
-    0x00,              -- Padding/alignment
-    interface_uuid,    -- Interface (eg. SRVSVC UUID: 4b324fc8-1670-01d3-1278-5a47bf6ee188)
+    0x01)              -- Number of transaction items. */
+  .. interface_uuid    -- Interface (eg. SRVSVC UUID: 4b324fc8-1670-01d3-1278-5a47bf6ee188)
+  .. string.pack("<I2I2",
     interface_version, -- Interface version (major)
-    0x0000,            -- Interface version (minor)
-    transfer_syntax,   -- Transfer syntax
-    2                  -- Syntax version
-    )
+    0x0000)            -- Interface version (minor)
+  .. transfer_syntax   -- Transfer syntax
+  .. string.pack("<I4", 2) -- Syntax version
 
   status, result = smb.write_file(smbstate, data, 0)
   if(status ~= true) then
@@ -286,17 +284,20 @@ function bind(smbstate, interface_uuid, interface_version, transfer_syntax)
   data = result['data']
 
   -- Extract the first part from the response
-  pos, result['version_major'], result['version_minor'], result['packet_type'], result['packet_flags'], result['data_representation'], result['frag_length'], result['auth_length'], result['call_id'] = bin.unpack("<CCCC>I<SSI", data)
-  if(result['call_id'] == nil) then
+  local fmt = "<BBBB>I4<I2I2I4"
+  if #data < string.packsize(fmt) then
     return false, "MSRPC: ERROR: Ran off the end of SMB packet; likely due to server truncation"
   end
+  result.version_major, result.version_minor, result.packet_type, result.packet_flags,
+    result.data_representation, result.frag_length, result.auth_length,
+    result.call_id, pos = string.unpack(fmt, data)
 
   -- Check if the packet type was a fault
   if(result['packet_type'] == 0x03) then -- MSRPC_FAULT
     return false, "Bind() returned a fault (packet type)"
   end
   -- Check if the flags indicate DID_NOT_EXECUTE
-  if(bit.band(result['packet_flags'], 0x20) == 0x20) then
+  if((result['packet_flags'] & 0x20) == 0x20) then
     return false, "Bind() returned a fault (flags)"
   end
   -- Check if it requested authorization (I've never seen this, but wouldn't know how to handle it)
@@ -304,7 +305,7 @@ function bind(smbstate, interface_uuid, interface_version, transfer_syntax)
     return false, "Bind() returned an 'auth length', which we don't know how to deal with"
   end
   -- Check if the packet was fragmented (I've never seen this, but wouldn't know how to handle it)
-  if(bit.band(result['packet_flags'], 0x03) ~= 0x03) then
+  if((result['packet_flags'] & 0x03) ~= 0x03) then
     return false, "Bind() returned a fragmented packet, which we don't know how to handle"
   end
   -- Check if the wrong message type was returned
@@ -317,23 +318,22 @@ function bind(smbstate, interface_uuid, interface_version, transfer_syntax)
   end
 
   -- If we made it this far, then we have a valid Bind() result. Pull out some more parameters.
-  pos, result['max_transmit_frag'], result['max_receive_frag'], result['assoc_group'], result['secondary_address_length'] = bin.unpack("<SSIS", data, pos)
-  if(result['secondary_address_length'] == nil) then
+  local fmt = "<I2I2I4I2"
+  if #data - pos + 1 < string.packsize(fmt) then
     return false, "MSRPC: ERROR: Ran off the end of SMB packet; likely due to server truncation"
   end
+  result.max_transmit_frag, result.max_receive_frag, result.assoc_group,
+    result.secondary_address_length, pos = string.unpack(fmt, data, pos)
 
   -- Read the secondary address
-  pos, result['secondary_address'] = bin.unpack(string.format("<A%d", result['secondary_address_length']), data, pos)
-  if(result['secondary_address'] == nil) then
+  if #data - pos + 1 < result.secondary_address_length + 1 then -- +1 to account for num_results below
     return false, "MSRPC: ERROR: Ran off the end of SMB packet; likely due to server truncation"
   end
+  result.secondary_address, pos = string.unpack(("<c%d"):format(result.secondary_address_length), data, pos)
   pos = pos + ((4 - ((pos - 1) % 4)) % 4); -- Alignment -- don't ask how I came up with this, it was a lot of drawing, and there's probably a far better way
 
   -- Read the number of results
-  pos, result['num_results'] = bin.unpack("<C", data, pos)
-  if(result['num_results'] == nil) then
-    return false, "MSRPC: ERROR: Ran off the end of SMB packet; likely due to server truncation"
-  end
+  result.num_results, pos = string.unpack("<B", data, pos)
   pos = pos + ((4 - ((pos - 1) % 4)) % 4); -- Alignment
 
   -- Verify we got back what we expected
@@ -342,10 +342,11 @@ function bind(smbstate, interface_uuid, interface_version, transfer_syntax)
   end
 
   -- Read in the last bits
-  pos, result['ack_result'], result['align'], result['transfer_syntax'], result['syntax_version'] = bin.unpack("<SSA16I", data, pos)
-  if(result['syntax_version'] == nil) then
+  local fmt = "<I2I2c16I4"
+  if #data - pos + 1 < string.packsize(fmt) then
     return false, "MSRPC: ERROR: Ran off the end of SMB packet; likely due to server truncation"
   end
+  result.ack_result, result.align, result.transfer_syntax, result.syntax_version, pos = string.unpack(fmt, data, pos)
 
   return true, result
 end
@@ -385,7 +386,7 @@ function call_function(smbstate, opnum, arguments)
   local first = true
   local is_first, is_last
 
-  data = bin.pack("<CCCC>I<SSIISSA",
+  data = string.pack("<BBBB>I4<I2I2I4I4I2I2",
     0x05,        -- Version (major)
     0x00,        -- Version (minor)
     0x00,        -- Packet type (0x00 = request)
@@ -396,11 +397,10 @@ function call_function(smbstate, opnum, arguments)
     0x41414141,  -- Call ID (I use 'AAAA' because it's easy to recognize)
     #arguments,  -- Alloc hint
     0x0000,      -- Context ID
-    opnum,       -- Opnum
-    arguments
-    )
+    opnum)       -- Opnum
+  .. arguments
 
-  stdnse.debug3("MSRPC: Calling function 0x%02x with %d bytes of arguments", #arguments, opnum)
+  stdnse.debug3("MSRPC: Calling function 0x%02x with %d bytes of arguments", opnum, #arguments)
 
   -- Pass the information up to the smb layer
   status, result = smb.write_file(smbstate, data, 0)
@@ -422,14 +422,17 @@ function call_function(smbstate, opnum, arguments)
     data       = result['data']
 
     -- Extract the first part from the response
-    pos, result['version_major'], result['version_minor'], result['packet_type'], result['packet_flags'], result['data_representation'], result['frag_length'], result['auth_length'], result['call_id'] = bin.unpack("<CCCC>I<SSI", data)
-    if(result['call_id'] == nil) then
+    local fmt = "<BBBB>I4<I2I2I4"
+    if #data < string.packsize(fmt) then
       return false, "MSRPC: ERROR: Ran off the end of SMB packet; likely due to server truncation"
     end
+    result.version_major, result.version_minor, result.packet_type,
+    result.packet_flags, result.data_representation, result.frag_length,
+    result.auth_length, result.call_id, pos = string.unpack(fmt, data)
 
     -- Check if we're fragmented
-    is_first = (bit.band(result['packet_flags'], 0x01) == 0x01)
-    is_last  = (bit.band(result['packet_flags'], 0x02) == 0x02)
+    is_first = ((result['packet_flags'] & 0x01) == 0x01)
+    is_last  = ((result['packet_flags'] & 0x02) == 0x02)
 
     -- We have a fragmented packet, make sure it's the first (if we're on the first)
     if(first == true and is_first == false) then
@@ -445,7 +448,7 @@ function call_function(smbstate, opnum, arguments)
     if(result['packet_type'] == 0x03) then -- MSRPC_FAULT
       return false, "MSRPC call returned a fault (packet type)"
     end
-    if(bit.band(result['packet_flags'], 0x20) == 0x20) then
+    if((result['packet_flags'] & 0x20) == 0x20) then
       return false, "MSRPC call returned a fault (flags)"
     end
     if(result['auth_length'] ~= 0) then
@@ -459,10 +462,11 @@ function call_function(smbstate, opnum, arguments)
     end
 
     -- Extract some more
-    pos, result['alloc_hint'], result['context_id'], result['cancel_count'], align = bin.unpack("<ISCC", data, pos)
-    if(align == nil) then
+    local fmt = "<I4I2BB"
+    if #data - pos + 1 < string.packsize(fmt) then
       return false, "MSRPC: ERROR: Ran off the end of SMB packet; likely due to server truncation"
     end
+    result.alloc_hint, result.context_id, result.cancel_count, align, pos = string.unpack(fmt, data, pos)
 
     -- Rest is the arguments
     arguments = arguments .. string.sub(data, pos)
@@ -484,12 +488,11 @@ function call_lanmanapi(smbstate, opnum, paramdesc, datadesc, data)
   local parameters = ""
   local pos
 
-  parameters = bin.pack("<SzzA",
+  parameters = string.pack("<I2zz",
     opnum,
     paramdesc,  -- Parameter Descriptor
-    datadesc,      -- Return Descriptor
-    data
-    )
+    datadesc)      -- Return Descriptor
+  .. data
 
   stdnse.debug1("MSRPC: Sending Browser Service request")
   status, result = smb.send_transaction_named_pipe(smbstate, parameters, nil, "\\PIPE\\LANMAN", true)
@@ -513,11 +516,10 @@ function rap_netserverenum2(smbstate, domain, server_type, detail_level)
   local paramdesc = (domain and "WrLehDz" or "WrLehDO")
   assert( detail_level > 0 and detail_level < 2, "detail_level must be either 0 or 1")
   local datadesc = ( detail_level == 0 and "B16" or "B16BBDz")
-  local data = bin.pack("<SSIA", detail_level,
+  local data = string.pack("<I2I2I4", detail_level,
   14724,
-  server_type,
-  (domain or "")
-  )
+  server_type)
+  .. (domain or "")
 
   local status, result = call_lanmanapi(smbstate, NETSERVERENUM2, paramdesc, datadesc, data )
 
@@ -529,7 +531,7 @@ function rap_netserverenum2(smbstate, domain, server_type, detail_level)
   local data = result.data
 
   stdnse.debug1("MSRPC: Parsing Browser Service response")
-  local pos, status, convert, entry_count, available_entries = bin.unpack("<SSSS", parameters)
+  local status, convert, entry_count, available_entries, pos = string.unpack("<I2I2I2I2", parameters)
 
   if(status ~= 0) then
     return false, string.format("Call to Browser Service failed with status = %d", status)
@@ -544,7 +546,7 @@ function rap_netserverenum2(smbstate, domain, server_type, detail_level)
   for i = 1, entry_count, 1 do
     local server = {}
 
-    pos, server.name = bin.unpack("<z", data, pos)
+    server.name, pos = string.unpack("<z", data, pos)
     stdnse.debug1("MSRPC: Found name: %s", server.name)
 
     -- pos needs to be rounded to the next even multiple of 16
@@ -553,10 +555,10 @@ function rap_netserverenum2(smbstate, domain, server_type, detail_level)
     if ( detail_level > 0 ) then
       local comment_offset, _
       server.version = {}
-      pos, server.version.major, server.version.minor,
-        server.type, comment_offset, _ = bin.unpack("<CCISS", data, pos)
+      server.version.major, server.version.minor,
+        server.type, comment_offset, _, pos = string.unpack("<BBI4I2I2", data, pos)
 
-      _, server.comment = bin.unpack("<z", data, (comment_offset - convert + 1))
+      server.comment, pos = string.unpack("<z", data, (comment_offset - convert + 1))
     end
     table.insert(entries, server)
   end
@@ -662,12 +664,16 @@ end
 --@return (status, result) If status is false, result is an error message. Otherwise, result is a table of values, the most
 --        useful one being 'shares', which is a list of the system's shares.
 function srvsvc_netsharegetinfo(smbstate, server, share, level)
-  local status, result
-  local arguments
-  local pos, align
+  stdnse.debug2("Calling NetShareGetInfo(%s, %s, %d)", server, share, level)
 
+  --NetGetShareInfo seems to reject FQPN and reads the server value from the request
+  --If any function called this function using a FQPN, this should take care of it.
+  local _, _, sharename = string.find(share, "\\\\.*\\(.*)")
+  if sharename then
+    share = sharename
+  end
   --    [in]   [string,charset(UTF16)] uint16 *server_unc,
-  arguments = msrpctypes.marshall_unicode_ptr("\\\\" .. server, true)
+  local arguments = msrpctypes.marshall_unicode_ptr("\\\\" .. server, true)
 
   --    [in]   [string,charset(UTF16)] uint16 share_name[],
   .. msrpctypes.marshall_unicode(share, true)
@@ -679,7 +685,7 @@ function srvsvc_netsharegetinfo(smbstate, server, share, level)
 
 
   -- Do the call
-  status, result = call_function(smbstate, 0x10, arguments)
+  local status, result = call_function(smbstate, 0x10, arguments)
   if(status ~= true) then
     return false, result
   end
@@ -688,7 +694,7 @@ function srvsvc_netsharegetinfo(smbstate, server, share, level)
 
   -- Make arguments easier to use
   arguments = result['arguments']
-  pos = 1
+  local pos = 1
 
   --    [in]   [string,charset(UTF16)] uint16 *server_unc,
   --    [in]   [string,charset(UTF16)] uint16 share_name[],
@@ -1150,8 +1156,9 @@ end
 --@param uuid      UUID byte string
 --@return UUID converted to string representation
 function uuid_to_string(uuid)
-  local pos, i1,s1,s2,c1,c2,c3,c4,c5,c6,c7,c8 = bin.unpack("<ISSCCCCCCCC",uuid)
-  return string.format("%02x-%02x-%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",i1,s1,s2,c1,c2,c3,c4,c5,c6,c7,c8)
+  -- Mixed-endian; first 3 parts are little-endian, next 2 are big-endian
+  local A, B, C, D, E = string.unpack("<I4I2I2>c2c6", uuid)
+  return ("%08x-%04x-%04x-%s-%s"):format(A, B, C, stdnse.tohex(D), stdnse.tohex(E))
 end
 
 --- Helper function that maps known UUIDs to corresponding exe/services.
@@ -1221,14 +1228,13 @@ function epmapper_lookup(smbstate,handle)
     netbios = nil,
     ncacn_http = nil
   }
-  --stdnse.set_tostring(lookup_response,stdnse.format_generator({key_order = {"new_handle,annotation,uuid,exe,tcp_port,udp_port,ip_addr,ncalrpc,ncacn_np,netbios,ncacn_http"}}))
 
   lookup_response.new_handle = string.sub(data,25,44)
 
   --  stdnse.debug1("new_handle: %s", stdnse.tohex(new_handle))
 
   local num_entries
-  pos,  num_entries = bin.unpack("<I",data,45)
+  num_entries, pos = string.unpack("<I4", data, 45)
   if num_entries == 0 then
     return false, "finished"
   end
@@ -1238,7 +1244,7 @@ function epmapper_lookup(smbstate,handle)
   pos = pos + 16
   pos = pos + 8
   local annotation_length
-  pos,annotation_length = bin.unpack("<I",data,pos)
+  annotation_length, pos = string.unpack("<I4", data, pos)
   if annotation_length > 1 then
     lookup_response.annotation = string.sub(data,pos,pos+annotation_length-2)
   end
@@ -1248,11 +1254,11 @@ function epmapper_lookup(smbstate,handle)
   --skip lengths
   pos = pos + 8
   local num_floors,floor_len,uuid, address_type,address_len,tcp_port,udp_port,ip_addr,saved_pos,ncalrpc,ncacn_np,netbios,ncacn_http
-  pos, num_floors = bin.unpack("<S",data,pos)
+  num_floors, pos = string.unpack("<I2", data, pos)
 
   for i = 1, num_floors do
     saved_pos = pos
-    pos, floor_len = bin.unpack("<S",data,pos)
+    floor_len, pos = string.unpack("<I2", data, pos)
 
     if i == 1 then
       uuid = string.sub(data,pos+1,pos+16)
@@ -1260,15 +1266,15 @@ function epmapper_lookup(smbstate,handle)
       lookup_response.exe = string_uuid_to_exe(lookup_response.uuid)
     else
       if not (i == 2) and not (i == 3) then        -- just skip floor 2 and 3
-        pos,address_type,address_len = bin.unpack("<CS",data,pos)
+        address_type, address_len, pos = string.unpack("<BI2", data, pos)
         if address_type == 0x07 then
-          pos,lookup_response.tcp_port = bin.unpack(">S",data,pos)
+          lookup_response.tcp_port, pos = string.unpack(">I2", data, pos)
         elseif address_type == 0x08 then
-          pos,lookup_response.udp_port = bin.unpack(">S",data,pos)
+          lookup_response.udp_port, pos = string.unpack(">I2", data, pos)
         elseif address_type == 0x09 then
-          local i1,i2,i3,i4
-          pos,i1,i2,i3,i4 = bin.unpack("CCCC",data,pos)
-          lookup_response.ip_addr = string.format("%d.%d.%d.%d",i1,i2,i3,i4)
+          local ip
+          ip, pos = string.unpack("c4", data, pos)
+          lookup_response.ip_addr = ipOps.str_to_ip(ip)
         elseif address_type == 0x0f then
           lookup_response.ncacn_np = string.sub(data,pos,pos+address_len-2)
           floor_len = floor_len + address_len - 2
@@ -1279,7 +1285,7 @@ function epmapper_lookup(smbstate,handle)
           lookup_response.netbios = string.sub(data,pos,pos+address_len-2)
           floor_len = floor_len + address_len - 2
         elseif address_type == 0x1f then
-          pos, lookup_response.ncacn_http = bin.unpack(">S",data,pos)
+          lookup_response.ncacn_http, pos = string.unpack(">I2", data, pos)
         else
           stdnse.debug1("unknown address type %x",address_type)
         end
@@ -2160,7 +2166,7 @@ function lsa_lookupnames2(smbstate, policy_handle, names)
   local result
   local pos, align
 
-  stdnse.debug2("MSRPC: Calling LsarLookupNames2(%s) [%s]", stdnse.strjoin(", ", names), smbstate['ip'])
+  stdnse.debug2("MSRPC: Calling LsarLookupNames2(%s) [%s]", stringaux.strjoin(", ", names), smbstate['ip'])
 
 
   --    [in]     policy_handle *handle,
@@ -2251,7 +2257,7 @@ function lsa_lookupsids2(smbstate, policy_handle, sids)
   local result
   local pos, align
 
-  stdnse.debug2("MSRPC: Calling LsarLookupSids2(%s) [%s]", stdnse.strjoin(", ", sids), smbstate['ip'])
+  stdnse.debug2("MSRPC: Calling LsarLookupSids2(%s) [%s]", stringaux.strjoin(", ", sids), smbstate['ip'])
 
   --    [in]     policy_handle *handle,
   arguments = msrpctypes.marshall_policy_handle(policy_handle)
@@ -2622,7 +2628,7 @@ function winreg_enumkey(smbstate, handle, index, name)
 
   --    [in,out,unique] NTTIME           *last_changed_time
   pos, result['changed_time'] = msrpctypes.unmarshall_NTTIME_ptr(arguments, pos)
-  result['changed_date'] = os.date("%Y-%m-%d %H:%M:%S", result['changed_time'])
+  result['changed_date'] = datetime.format_timestamp(result['changed_time'])
 
   pos, result['return'] = msrpctypes.unmarshall_int32(arguments, pos)
   if(result['return'] == nil) then
@@ -2764,7 +2770,7 @@ function winreg_queryinfokey(smbstate, handle)
 
   --    [out,ref] NTTIME *last_changed_time
   pos, result['last_changed_time'] = msrpctypes.unmarshall_NTTIME(arguments, pos)
-  result['last_changed_date'] = os.date("%Y-%m-%d %H:%M:%S", result['last_changed_time'])
+  result['last_changed_date'] = datetime.format_timestamp(result['last_changed_time'])
 
   pos, result['return'] = msrpctypes.unmarshall_int32(arguments, pos)
   if(result['return'] == nil) then
@@ -2838,7 +2844,7 @@ function winreg_queryvalue(smbstate, handle, value)
   if(result['data'] ~= nil) then
     local _
     if(result['type'] == "REG_DWORD") then
-      _, result['value'] = bin.unpack("<I", result['data'])
+      result['value'] = string.unpack("<I4", result['data'])
     elseif(result['type'] == "REG_SZ" or result['type'] == "REG_MULTI_SZ" or result['type'] == "REG_EXPAND_SZ") then
       _, result['value'] = msrpctypes.unicode_to_string(result['data'], 1, #result['data'] / 2)
     elseif(result['type'] == "REG_BINARY") then
@@ -2977,9 +2983,10 @@ end
 --
 --@param smbstate    The SMB state table
 --@param machinename The name or IP of the machine.
+--@param access_mask The access_mask to open the service with.
 --@return (status, result) If status is false, result is an error message. Otherwise, result is a table of values
 --        representing the "out" parameters.
-function svcctl_openscmanagerw(smbstate, machinename)
+function svcctl_openscmanagerw(smbstate, machinename, access_mask)
   local status, result
   local arguments
   local pos, align
@@ -2998,7 +3005,7 @@ function svcctl_openscmanagerw(smbstate, machinename)
 
   --        [in] uint32 access_mask,
   -- .. msrpctypes.marshall_int32(0x000f003f)
-  .. msrpctypes.marshall_int32(0x02000000)
+  .. msrpctypes.marshall_int32(access_mask)
 
   --        [out,ref] policy_handle *handle
 
@@ -3234,7 +3241,7 @@ end
 --@param name     The name of the service.
 --@return (status, result) If status is false, result is an error message. Otherwise, result is a table of values
 --        representing the "out" parameters.
-function svcctl_openservicew(smbstate, handle, name)
+function svcctl_openservicew(smbstate, handle, name, access_mask)
   local status, result
   local arguments
   local pos, align
@@ -3248,7 +3255,7 @@ function svcctl_openservicew(smbstate, handle, name)
   .. msrpctypes.marshall_unicode(name, true)
 
   --        [in] uint32 access_mask,
-  .. msrpctypes.marshall_int32(0x000f01ff)
+  .. msrpctypes.marshall_int32(access_mask)
   --        [out,ref] policy_handle *handle
 
 
@@ -3429,6 +3436,275 @@ function svcctl_queryservicestatus(smbstate, handle, control)
   end
 
   return true, result
+end
+
+-- Crafts a marshalled request for sending it to the enumservicestatusw function
+--
+--@param handle          The handle, opened by <code>OpenServiceW</code>.
+--@param typeofservice   The type of services to be enumerated.
+--@param servicestate    The state of the services to be enumerated.
+--@param cbbufsize       The size of the buffer pointed to by the lpServices
+--                       parameter, in bytes.
+--@param lpresumehandle  A pointer to a variable that, on input, specifies the
+--                       starting point of enumeration.
+--@return string         Returns marshalled string with given arguments.
+local function enumservicestatusparams(handle, tyepofservice, servicestate, cbbufsize, lpresumehandle)
+
+  -- [in,ref] policy_handle *handle
+  return msrpctypes.marshall_policy_handle(handle)
+
+  -- [in] uint32 type
+  .. msrpctypes.marshall_int32(tyepofservice, true)
+
+  -- [in] svcctl_ServiceState
+  .. msrpctypes.marshall_int32(servicestate, true)
+
+  -- [in] [range(0,0x40000)] uint32 cbufsize
+  .. msrpctypes.marshall_int32(cbbufsize, true)
+
+  -- [in,out,unique] uint32 *resume_handle
+  .. msrpctypes.marshall_int32_ptr(lpresumehandle, true)
+
+end
+
+-- Unmarshalls the string based on offset.
+--
+--@param arguments The marshalled arguments to extract the data.
+--@param startpos  The start position of the string.
+--@return startpos Returns the strating position of the string.
+--@return string   Returns the unmarshalled string.
+
+-- Unmarshalls ENUM_SERVICE_STATUS structure.
+--
+-- The structure of ENUM_SERVICE_STATUS is as follows:
+--
+-- <code>
+--    typedef struct  {
+--      LPTSTR         lpServiceName
+--      LPTSTR         lpDisplayName
+--      SERVICE_STATUS ServiceStatus
+--    }
+-- </code>
+--
+-- References:
+-- https://msdn.microsoft.com/en-us/library/windows/desktop/ms682651(v=vs.85).aspx
+--
+-- I created this function as a support for svcctl_enumservicesstatusw function.
+-- svcctl_enumservicesstatusw function returns multiple services in the buffer.
+-- In order to remember the starting and ending positions of different unmarshalled
+-- strings and SERVICE_STATUS structs I had to store the previous offset of the
+-- unmarshalled string. This previous offset will be helpful while retrieving the
+-- continuous strings from the buffer.
+--
+--@param arguments      The marshalled arguments to extract the data.
+--@param pos            The position within <code>arguments</code>.
+--@return pos           Returns new position in the arguments.
+--@return serviceName   Returns an unmarshalled string.
+--@return displayName   Returns an unmarshalled string.
+--@return serviceStatus Returns table of values
+local function unmarshall_enum_service_status(arguments, pos)
+
+  local _
+  local serviceNameOffset
+  local displayNameOffset
+  local serviceStatus
+  local serviceName
+  local displayName
+
+  pos, serviceNameOffset = msrpctypes.unmarshall_int32(arguments, pos)
+  pos, displayNameOffset = msrpctypes.unmarshall_int32(arguments, pos)
+  pos, serviceStatus = msrpctypes.unmarshall_SERVICE_STATUS(arguments, pos)
+
+  _, serviceName = msrpctypes.unmarshall_lptstr(arguments, serviceNameOffset + 5)
+  _, displayName = msrpctypes.unmarshall_lptstr(arguments, displayNameOffset + 5)
+
+  -- ServiceName and displayName are converted into UTF-8.
+  serviceName = unicode.utf16to8(serviceName)
+  displayName = unicode.utf16to8(displayName)
+
+  -- Since we are converting the string from utf16to8, an extra NULL byte is
+  -- present at the end of the string. These two lines, strip the last character
+  -- or NULL byte from the end of the string.
+  serviceName = string.sub(serviceName, 1, serviceName:len()-1)
+  displayName = string.sub(displayName, 1, displayName:len()-1)
+
+  stdnse.debug2("ServiceName = %s", serviceName)
+  stdnse.debug2("DisplayName = %s", displayName)
+
+  return pos, serviceName, displayName, serviceStatus
+
+end
+
+-- Attempts to retrieve list of services from a remote system.
+--
+-- The structure of EnumServicesStatus is as follows:
+--
+-- <code>
+--    typedef struct {
+--  	  policy_handle *handle,
+--  	  uint32 type,
+--  	  svcctl_ServiceState state,
+--  	  uint8 *service,
+--  	  uint32 offered,
+--  	  uint32 *needed,
+--  	  uint32 *services_returned,
+--  	  uint32 *resume_handle
+--    }
+-- </code>
+--
+-- References:
+-- https://github.com/samba-team/samba/blob/d8a5565ae647352d11d622bd4e73ff4568678a7c/librpc/idl/svcctl.idl
+-- https://msdn.microsoft.com/en-us/library/windows/desktop/ms682637(v=vs.85).aspx
+--
+--@param smbstate The SMB state table.
+--@param handle   The handle, opened by <code>OpenServiceW</code>.
+--@param dwservicetype The type of services to be enumerated.
+--                     Lookup table for dwservicetype is as follows:
+--                       SERVICE_DRIVER - 0x0000000B
+--                       SERVICE_FILE_SYSTEM_DRIVER - 0x00000002
+--                       SERVICE_KERNEL_DRIVER - 0x00000001
+--                       SERVICE_WIN32 - 0x00000030
+--                       SERVICE_WIN32_OWN_PROCESS - 0x00000010 (default)
+--                       SERVICE_WIN32_SHARE_PROCESS - 0x00000020
+--@param dwservicestate The state of the services to be enumerated.
+--                      Lookup table for dwservicetype is as follows:
+--                      SERVICE_ACTIVE - 0x00000001
+--                      SERVICE_INACTIVE - 0x00000002
+--                      SERVICE_STATE_ALL - 0x00000003 (default)
+--@return pos     Returns success or failure.
+--@return output  Returns the list of services running on a remote windows system
+--                with serviceName, displayName and service status structure.
+function svcctl_enumservicesstatusw(smbstate, handle, dwservicetype, dwservicestate)
+  local status
+  local result
+  local arguments
+  local pos
+  local _
+  local serviceName
+  local displayName
+  local serviceStatus
+  local lpservices
+
+  local output = stdnse.output_table()
+
+  local DW_SERVICE_TYPE = dwservicetype or 0x00000010
+  local DW_SERVICE_STATE = dwservicestate or 0x00000003
+
+  arguments = enumservicestatusparams(handle, DW_SERVICE_TYPE, DW_SERVICE_STATE, 0x00, nil)
+
+  -- This call is made only to retrieve the pcbBytesNeeded value.
+  status, result = call_function(smbstate, 0x0e, arguments)
+
+  if status ~= true then
+    return false, result
+  end
+
+  arguments = result["arguments"]
+
+  pos = 1
+
+  -- Since the first call is made to retrieve pcbBytesNeeded, the server returns
+  -- an empty array in the response. The following line of code unpacks an
+  -- empty array.
+  lpservices, pos = string.unpack("<s4", arguments, pos)
+
+  -- [out,ref] [range(0,0x40000)] uint32 *pcbBytesNeeded,
+  pos, result["pcbBytesNeeded"] = msrpctypes.unmarshall_int32(arguments, pos)
+
+  -- Unmarshalls return value.
+  _, result["ReturnValue"] = msrpctypes.unmarshall_int32(arguments, arguments:len()-3)
+
+  -- 0x00 stands for No Error. This message at this stage indicates there are no services.
+  if result["ReturnValue"] == 0x00 then
+    return true, {}
+
+  -- 0x05 stands for Access Denied.
+  elseif result["ReturnValue"] == 0x05 then
+    return false, "Access is denied."
+
+  -- Checks for other error codes expect 0x7a and 0xea.
+  elseif not (result["ReturnValue"] == 0x7A or result["ReturnValue"] == 0xEA) then
+    return false, "Error occurred. Error code = " .. tostring(result["ReturnValue"])
+  end
+
+  ------- Functional calls here are made to retrieve the data -------------------------
+
+  local MAX_BUFFER_SIZE = 0xfa00
+  stdnse.debug3("MAX_BUFFER_SIZE = %d", MAX_BUFFER_SIZE)
+
+  -- Initalizes the lpResumeHandle parameter for the first call.
+  result["lpResumeHandle"] = 0x00
+
+  -- Loop runs until we retrieve all the data into our buffer.
+  repeat
+
+    -- cbbufsize parameter in enumservicestatusparams function *must* have a value
+    -- strictly less than result["pcbBytesNeeded"] retrieved from the above call.
+    --
+    -- If larger value is assigned to result["pcbBytesNeeded"], errored response
+    -- will be returned.
+    arguments = enumservicestatusparams(handle, DW_SERVICE_TYPE, DW_SERVICE_STATE, math.min(result["pcbBytesNeeded"], MAX_BUFFER_SIZE), result["lpResumeHandle"])
+
+    status, result = call_function(smbstate, 0x0e, arguments)
+
+    if status ~= true then
+      return false, result
+    end
+
+    arguments = result["arguments"]
+
+    -- Caches length for future use.
+    local length = arguments:len()
+
+    -- Last 4 bytes returns the return value.
+    _, result["ReturnValue"] = msrpctypes.unmarshall_int32(arguments, length - 3)
+    stdnse.debug("ReturnValue = %d", result["ReturnValue"])
+
+    -- Next last 8 bytes returns the lpResumeHandle.
+    _, result["lpResumeHandle"] = msrpctypes.unmarshall_int32_ptr(arguments, length - 11)
+    stdnse.debug("lpResumeHandle = %d", result["lpResumeHandle"])
+
+    -- Next last 4 bytes returns the number of services returned.
+    _, result["lpServicesReturned"] = msrpctypes.unmarshall_int32(arguments, length - 15)
+    stdnse.debug("lpServicesReturned = %d", result["lpServicesReturned"])
+
+    -- Next last 4 bytes returns the pcbBytesNeeded or pcbBytes left for next iteration.
+    _, result["pcbBytesNeeded"] = msrpctypes.unmarshall_int32(arguments, length - 19)
+    stdnse.debug("pcbBytesNeeded = %d", result["pcbBytesNeeded"])
+
+    -- Since we are receiving the length of arguments in the beginning of the buffer,
+    -- we have to exclude those bytes from our decoding functions.
+    -- The size of the buffer will be uint32 which is of 4 bytes and hence we
+    -- take the starting position as 5 for unmarshalling purposes.
+    pos = 5
+
+    -- Initializes local variables for future use.
+    local count = result["lpServicesReturned"]
+
+    -- Executes the loop until all the services are unmarshalled.
+    repeat
+
+      pos, serviceName, displayName, serviceStatus = unmarshall_enum_service_status(arguments, pos)
+
+      local t = stdnse.output_table()
+      t["display_name"] = displayName
+      t["state"] = serviceStatus["state"]
+      t["type"] = serviceStatus["type"]
+      t["controls_accepted"] = serviceStatus["controls_accepted"]
+
+      -- Stores the result in a table.
+      output[serviceName] = t
+
+      count = count - 1
+
+    until count < 1
+
+  until result["pcbBytesNeeded"] == 0
+
+  stdnse.debug3("MSRPC: EnumServiceStatus() returned successfully")
+
+  return true, output
+
 end
 
 ---Calls the function <code>JobAdd</code>, which schedules a process to be run
@@ -4145,7 +4421,7 @@ local function get_domain_info(host, domain)
   response['groups'] = groups
   response['users'] = names
   if(querydomaininfo2_result_8['info']['domain_create_time'] ~= 0) then
-    response['created'] = os.date("%Y-%m-%d %H:%M:%S", querydomaininfo2_result_8['info']['domain_create_time'])
+    response['created'] = datetime.format_timestamp(querydomaininfo2_result_8['info']['domain_create_time'])
   else
     response['created'] = "unknown"
   end
@@ -4306,7 +4582,7 @@ function service_create(host, servicename, path)
 
   -- Open the service manager
   stdnse.debug2("Opening the remote service manager")
-  status, open_result = svcctl_openscmanagerw(smbstate, host.ip)
+  status, open_result = svcctl_openscmanagerw(smbstate, host.ip, 0x02000000)
   if(status == false) then
     smb.stop(smbstate)
     return false, open_result
@@ -4370,7 +4646,7 @@ function service_start(host, servicename, args)
 
   -- Open the service manager
   stdnse.debug1("Opening the remote service manager")
-  status, open_result = svcctl_openscmanagerw(smbstate, host.ip)
+  status, open_result = svcctl_openscmanagerw(smbstate, host.ip, 0x02000000)
   if(status == false) then
     smb.stop(smbstate)
     return false, open_result
@@ -4378,7 +4654,7 @@ function service_start(host, servicename, args)
 
   -- Get a handle to the service
   stdnse.debug2("Getting a handle to the service")
-  status, open_service_result = svcctl_openservicew(smbstate, open_result['handle'], servicename)
+  status, open_service_result = svcctl_openservicew(smbstate, open_result['handle'], servicename, 0x000f01ff)
   if(status == false) then
     smb.stop(smbstate)
     return false, open_service_result
@@ -4452,7 +4728,7 @@ function service_stop(host, servicename)
 
   -- Open the service manager
   stdnse.debug2("Opening the remote service manager")
-  status, open_result = svcctl_openscmanagerw(smbstate, host.ip)
+  status, open_result = svcctl_openscmanagerw(smbstate, host.ip, 0x02000000)
   if(status == false) then
     smb.stop(smbstate)
     return false, open_result
@@ -4460,7 +4736,7 @@ function service_stop(host, servicename)
 
   -- Get a handle to the service
   stdnse.debug2("Getting a handle to the service")
-  status, open_service_result = svcctl_openservicew(smbstate, open_result['handle'], servicename)
+  status, open_service_result = svcctl_openservicew(smbstate, open_result['handle'], servicename, 0x000f01ff)
   if(status == false) then
     smb.stop(smbstate)
     return false, open_service_result
@@ -4531,7 +4807,7 @@ function service_delete(host, servicename)
 
   -- Open the service manager
   stdnse.debug2("Opening the remote service manager")
-  status, open_result = svcctl_openscmanagerw(smbstate, host.ip)
+  status, open_result = svcctl_openscmanagerw(smbstate, host.ip, 0x02000000)
   if(status == false) then
     smb.stop(smbstate)
     return false, open_result
@@ -4539,7 +4815,7 @@ function service_delete(host, servicename)
 
   -- Get a handle to the service
   stdnse.debug2("Getting a handle to the service: %s", servicename)
-  status, open_service_result = svcctl_openservicew(smbstate, open_result['handle'], servicename)
+  status, open_service_result = svcctl_openservicew(smbstate, open_result['handle'], servicename, 0x000f01ff)
   if(status == false) then
     smb.stop(smbstate)
     return false, open_service_result
@@ -4613,15 +4889,15 @@ function get_server_stats(host)
   local stats = netservergetstatistics_result['stat']
 
   -- Convert the date to a string
-  stats['start_str'] = os.date("%Y-%m-%d %H:%M:%S", stats['start'])
+  stats['start_str'] = datetime.format_timestamp(stats['start'])
 
   -- Get the period and convert it to a proper time offset
   stats['period'] = os.time() - stats['start']
-  stats.period_str = stdnse.format_time(stats.period)
+  stats.period_str = datetime.format_time(stats.period)
 
   -- Combine the 64-bit values
-  stats['bytessent'] = bit.bor(bit.lshift(stats['bytessent_high'], 32), stats['bytessent_low'])
-  stats['bytesrcvd'] = bit.bor(bit.lshift(stats['bytesrcvd_high'], 32), stats['bytesrcvd_low'])
+  stats['bytessent'] = ((stats['bytessent_high'] << 32) | stats['bytessent_low'])
+  stats['bytesrcvd'] = ((stats['bytesrcvd_high'] << 32) | stats['bytesrcvd_low'])
 
   -- Sidestep divide-by-zero errors (probably won't come up, but I'd rather be safe)
   if(stats['period'] == 0) then
@@ -4704,8 +4980,18 @@ function get_share_info(host, name)
   end
 
   -- Call NetShareGetInfo
+
   local status, netsharegetinfo_result = srvsvc_netsharegetinfo(smbstate, host.ip, name, 2)
+  stdnse.debug2("NetShareGetInfo status:%s result:%s", status, netsharegetinfo_result)
   if(status == false) then
+    if(string.find(netsharegetinfo_result, "NT_STATUS_WERR_ACCESS_DENIED")) then
+      stdnse.debug2("Calling NetShareGetInfo with information level 1")
+      status, netsharegetinfo_result = srvsvc_netsharegetinfo(smbstate, host.ip, name, 1)
+      if status then
+        smb.stop(smbstate)
+        return true, netsharegetinfo_result
+      end
+    end
     smb.stop(smbstate)
     return false, netsharegetinfo_result
   end
@@ -4772,13 +5058,13 @@ function RRAS_marshall_RequestBuffer(RB_PCBIndex, RB_ReqType, RB_Buffer)
   RB_Dummy = 4
   RB_Done = 0
   Alignment = 0
-  rb_blob = bin.pack("<IIIILA",
+  rb_blob = string.pack("<I4I4I4I4I8",
     RB_PCBIndex,
     RB_ReqType,
     RB_Dummy,
     RB_Done,
-    Alignment,
-    RB_Buffer)
+    Alignment)
+  .. RB_Buffer
   return rb_blob
 end
 
@@ -4829,7 +5115,7 @@ function RRAS_SubmitRequest(smbstate, pReqBuffer, dwcbBufSize)
   --pack the request
   local req_blob
   --[in, out, unique, size_is(dwcbBufSize) PBYTE pReqBuffer,
-  req_blob = bin.pack("<IIAA", 0x20000, dwcbBufSize, pReqBuffer, get_pad(pReqBuffer,4)) --unique pointer see samba:ndr_push_unique_ptr
+  req_blob = string.pack("<I4I4", 0x20000, dwcbBufSize) .. pReqBuffer .. get_pad(pReqBuffer,4) --unique pointer see samba:ndr_push_unique_ptr
   --[in] DWORD dwcbBufSize
   .. msrpctypes.marshall_int32(dwcbBufSize)
   --call the function
@@ -4941,35 +5227,35 @@ function DNSSERVER_Query(smbstate, server_name, zone, operation)
   local unique_ptr
   unique_ptr = 0x00020000
   srv_name_utf16 = msrpctypes.string_to_unicode(server_name, true)
-  req_blob = bin.pack("<IIIIAA",
+  req_blob = string.pack("<I4I4I4I4",
     unique_ptr,
     #srv_name_utf16/2,
     0,
-    #srv_name_utf16/2,
-    srv_name_utf16,
-    get_pad(srv_name_utf16, 4))
+    #srv_name_utf16/2)
+  .. srv_name_utf16
+  .. get_pad(srv_name_utf16, 4)
   --[in, unique, string] LPCSTR pszZone,
   if(zone == nil) then
-    req_blob = bin.pack("<I", 0x00000000)
+    req_blob = string.pack("<I4", 0x00000000)
   else
     zone_ascii = zone .. '\0'
-    req_blob = req_blob .. bin.pack("<IIIIAA",
+    req_blob = req_blob .. string.pack("<I4I4I4I4",
       unique_ptr + 1,
       #zone_ascii,
       0,
-      #zone_ascii,
-      zone_ascii,
-      get_pad(zone_ascii, 4))
+      #zone_ascii)
+    .. zone_ascii
+    .. get_pad(zone_ascii, 4)
   end
   --[in, unique, string] LPCSTR pszOperation,
   operation_ascii = operation .. '\0'
-  req_blob = req_blob .. bin.pack("<IIIIAA",
+  req_blob = req_blob .. string.pack("<I4I4I4I4",
     unique_ptr+2,
     #operation_ascii,
     0,
-    #operation_ascii,
-    operation_ascii,
-    get_pad(operation_ascii, 4))
+    #operation_ascii)
+  .. operation_ascii
+  .. get_pad(operation_ascii, 4)
 
   local call_result
   stdnse.debug(
@@ -4997,7 +5283,10 @@ function DNSSERVER_Query(smbstate, server_name, zone, operation)
   result = {}
   pos, result['type_id'] = msrpctypes.unmarshall_int32_ptr(rep_blob)
   --[out, switch_is(*pdwTypeId)] DNSSRV_RPC_UNION* ppData) -- pointer_default(unique)
-  pos, ptr, result['data']= bin.unpack("<IA", rep_blob, pos)
+  -- TODO: The original used the 'A' format to unpack a single byte, which I
+  -- replaced with the literal equivalent 'B'. Should it have been a substring
+  -- to the end of the blob instead?
+  ptr, result['data'], pos = string.unpack("<I4B", rep_blob, pos)
   return result
 end
 

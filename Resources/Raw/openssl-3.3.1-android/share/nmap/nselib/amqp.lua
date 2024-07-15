@@ -13,7 +13,8 @@
 --  o AMQP
 --    - This class contains the core functions needed to communicate with AMQP
 --
-
+-- @args amqp.version Can be used to specify the client version to use (currently, 0-8, 0-9 or 0-9-1)
+--
 -- @copyright Same as Nmap--See https://nmap.org/book/man-legal.html
 -- @author Sebastian Dragomir <velorien@gmail.com>
 
@@ -21,10 +22,10 @@
 
 -- Created 05/04/2011 - v0.1 - created by Sebastian Dragomir <velorien@gmail.com>
 
-local bin = require "bin"
 local match = require "match"
 local nmap = require "nmap"
 local stdnse = require "stdnse"
+local string = require "string"
 local table = require "table"
 _ENV = stdnse.module("amqp", stdnse.seeall);
 
@@ -92,7 +93,7 @@ AMQP = {
       end
       read = read + 1
 
-      tmp = select( 2, bin.unpack("C", tmp) )
+      tmp = string.unpack("B", tmp)
       status, key = self.amqpsocket:receive_buf(match.numbytes(tmp), true)
       if ( not(status) ) then
         return status, "ERROR: AMQP:handshake connection closed unexpectedly while reading key", nil
@@ -113,7 +114,7 @@ AMQP = {
 
         read = read + 4
         value = {}
-        tmp = select( 2, bin.unpack(">I", tmp) )
+        tmp = string.unpack(">I4", tmp)
         status, err, value = self:decodeTable(value, tmp)
         read = read + tmp
         table.insert(tbl, key .. ": ")
@@ -156,7 +157,7 @@ AMQP = {
     end
 
     read = read + 4
-    tmp = select( 2, bin.unpack(">I", tmp) )
+    tmp = string.unpack(">I4", tmp)
     status, value = self.amqpsocket:receive_buf(match.numbytes(tmp), true)
 
     if ( not(status) ) then
@@ -182,7 +183,7 @@ AMQP = {
       return status, "ERROR: AMQP:handshake connection closed unexpectedly while reading value for " .. key, nil, 0
     end
 
-    value = select( 2, bin.unpack("C", value) )
+    value = string.unpack("B", value)
     read = read + 1
 
     return true, nil, value == 0x01 and "YES" or "NO", read
@@ -209,14 +210,14 @@ AMQP = {
 
     -- check if the server rejected our proposed version
     if ( #tmp ~= 11 ) then
-      if ( #tmp == 8 and select( 2, bin.unpack(">I", tmp) ) == 0x414D5150 ) then
+      if ( #tmp == 8 and string.unpack(">I4", tmp) == 0x414D5150 ) then
         local vi, vii, v1, v2, v3, v4, found
-        _, vi = bin.unpack(">I", tmp, 5)
+        vi = string.unpack(">I4", tmp, 5)
         found = false
 
         -- check if we support the server's version
         for _, v in pairs( self.client_version_strings ) do
-          _, vii = bin.unpack(">I", v)
+          vii = string.unpack(">I4", v)
           if ( vii == vi ) then
             version = v
             found = true
@@ -238,7 +239,7 @@ AMQP = {
         end
 
         -- version unsupported
-        _, v1, v2, v3, v4 = bin.unpack(">CCCC", tmp, 5)
+        v1, v2, v3, v4 = string.unpack(">BBBB", tmp, 5)
         return false, ("ERROR: AMQP:handshake unsupported version (%d.%d.%d.%d)"):format( v1, v2, v3, v4 )
       else
         return false, ("ERROR: AMQP:handshake server might not be AMQP, received: %s"):format( tmp )
@@ -246,8 +247,7 @@ AMQP = {
     end
 
     -- parse frame header
-    local frametype, chnumber, framesize, method
-    _, frametype, chnumber, framesize, method = bin.unpack(">CSII", tmp)
+    local frametype, chnumber, framesize, method = string.unpack(">BI2I4I4", tmp)
     stdnse.debug1("frametype: %d, chnumber: %d, framesize: %d, method: %d", frametype, chnumber, framesize, method)
 
     if (frametype ~= 1) then
@@ -259,11 +259,11 @@ AMQP = {
     end
 
     -- parse protocol version
-    status, tmp = self.amqpsocket:receive_buf(match.num_bytes(2), true)
+    status, tmp = self.amqpsocket:receive_buf(match.numbytes(2), true)
     if ( not(status) ) then
       return status, "ERROR: AMQP:handshake connection closed unexpectedly while reading version"
     end
-    version = select( 2, bin.unpack(">S", tmp) )
+    version = string.unpack(">I2", tmp)
     self.protover = AMQP.versions[version]
 
     if ( not(self.protover) ) then
@@ -276,7 +276,7 @@ AMQP = {
       return status, "ERROR: AMQP:handshake connection closed unexpectedly while reading server properties size"
     end
 
-    local tablesize = select( 2, bin.unpack(">I", tmp) )
+    local tablesize = string.unpack(">I4", tmp)
     properties = {}
     status, err, properties = self:decodeTable(properties, tablesize)
 

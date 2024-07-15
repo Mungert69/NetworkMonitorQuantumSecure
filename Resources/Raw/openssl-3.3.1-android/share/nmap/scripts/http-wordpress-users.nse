@@ -4,6 +4,7 @@ local nmap = require "nmap"
 local shortport = require "shortport"
 local stdnse = require "stdnse"
 local string = require "string"
+local table = require "table"
 
 description = [[
 Enumerates usernames in Wordpress blog/CMS installations by exploiting an
@@ -63,7 +64,7 @@ local function get_wp_user(host, port, path, id)
     elseif req.status == 200 then
       -- Users with no posts get a 200 response, but the name is in an RSS link.
       -- http://seclists.org/nmap-dev/2011/q3/812
-      local _, _, user = string.find(req.body, 'https?://.-/author/(.-)/feed/')
+      local _, _, user = string.find(req.body, 'https?://.-/author/([^/]+)/feed/')
       return user
     end
   end
@@ -133,7 +134,7 @@ action = function(host, port)
   end
 
   if filewrite and #users>0 then
-    local status, err = write_file(filewrite,  stdnse.strjoin("\n", users))
+    local status, err = write_file(filewrite,  table.concat(users, "\n"))
     if status then
       output[#output+1] = string.format("Users saved to %s\n", filewrite)
     else
@@ -143,6 +144,6 @@ action = function(host, port)
 
   if #output > 1 then
     output[#output+1] = string.format("Search stopped at ID #%s. Increase the upper limit if necessary with 'http-wordpress-users.limit'", limit)
-    return stdnse.strjoin("\n", output)
+    return table.concat(output, "\n")
   end
 end

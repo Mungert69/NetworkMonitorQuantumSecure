@@ -5,8 +5,10 @@
 
 local base64 = require "base64"
 local comm = require "comm"
+local match = require "match"
 local stdnse = require "stdnse"
 local string = require "string"
+local stringaux = require "stringaux"
 local table = require "table"
 _ENV = stdnse.module("pop3", stdnse.seeall)
 
@@ -41,7 +43,7 @@ end
 function login_user(socket, user, pw)
   socket:send("USER " .. user .. "\r\n")
   local status, line = socket:receive_lines(1)
-  if not stat(line) then return false, err.user_error end
+  if not stat(line) then return false, err.userError end
   socket:send("PASS " .. pw .. "\r\n")
 
   status, line = socket:receive_lines(1)
@@ -53,7 +55,7 @@ end
 
 
 ---
--- Try to login using the the <code>AUTH</code> command using SASL/Plain method.
+-- Try to login using the <code>AUTH</code> command using SASL/Plain method.
 -- @param socket Socket connected to POP3 server.
 -- @param user User string.
 -- @param pw Password string.
@@ -163,13 +165,13 @@ function capabilities(host, port)
     return nil, "Failed to send"
   end
 
-  status, line = socket:receive_buf("%.", false)
+  status, line = socket:receive_buf(match.pattern_limit("%.", 2048), false)
   if( not(status) ) then
     return nil, "Failed to receive"
   end
   socket:close()
 
-  local lines = stdnse.strsplit("\r\n",line)
+  local lines = stringaux.strsplit("\r\n",line)
   if not stat(table.remove(lines,1)) then
     capas.capa = false
     return capas
@@ -180,7 +182,7 @@ function capabilities(host, port)
       local capability = line:sub(line:find("[%w-]+"))
       line = line:sub(#capability + 2)
       if ( line ~= "" ) then
-        capas[capability] = stdnse.strsplit(" ", line)
+        capas[capability] = stringaux.strsplit(" ", line)
       else
         capas[capability] = {}
       end

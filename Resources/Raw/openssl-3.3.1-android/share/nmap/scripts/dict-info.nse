@@ -1,4 +1,5 @@
 local nmap = require "nmap"
+local match = require "match"
 local shortport = require "shortport"
 local stdnse = require "stdnse"
 local table = require "table"
@@ -51,14 +52,14 @@ action = function(host, port)
     'quit',
   }
 
-  if ( not(socket:send(stdnse.strjoin("\r\n", probes) .. "\r\n")) ) then
+  if ( not(socket:send(table.concat(probes, "\r\n") .. "\r\n")) ) then
     return fail("Failed to send request to server")
   end
 
   local srvinfo
 
   repeat
-    local status, data = socket:receive_buf("\r\n", false)
+    local status, data = socket:receive_buf(match.pattern_limit("\r\n", 2048), false)
     if ( not(status) ) then
       return fail("Failed to read response from server")
     elseif ( data:match("^5") ) then

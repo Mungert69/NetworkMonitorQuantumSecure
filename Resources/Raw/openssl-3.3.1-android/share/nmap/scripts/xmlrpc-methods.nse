@@ -6,6 +6,7 @@ local stdnse = require "stdnse"
 local strbuf = require "strbuf"
 local string = require "string"
 local table = require "table"
+local tableaux = require "tableaux"
 
 description = [[
 Performs XMLRPC Introspection via the system.listMethods method.
@@ -15,11 +16,10 @@ of system.methodHelp for each method returned by listMethods.
 ]]
 
 ---
--- @usage nmap xmlrpc-info <target>
---
--- @args xmlrpc-info.url The URI path to request.
+-- @args xmlrpc-methods.url The URI path to request.
 --
 -- @output
+-- | xmlrpc-methods:
 -- |   Supported Methods:
 -- |     list
 -- |     system.listMethods
@@ -52,13 +52,13 @@ local function set_80_columns(t)
         table.insert(line, word)
         ll = ll + #word + 1
       else
-        buffer = buffer .. stdnse.strjoin(" ", line) .. "\n"
+        buffer = buffer .. table.concat(line, " ") .. "\n"
         ll =  #word + 1
         line = {word}
       end
     end
     string.gsub(description, "(%S+)", add_word)
-    buffer = buffer .. stdnse.strjoin(" ", line) .. "\n\n"
+    buffer = buffer .. table.concat(line, " ") .. "\n\n"
   end
   return "\n" .. strbuf.dump(buffer)
 end
@@ -87,7 +87,7 @@ action = function(host, port)
       }
     parser:parseSAX(response.body, {stripWhitespace=true})
 
-    if  nmap.verbosity() > 1 and stdnse.contains(output["Supported Methods"], "system.methodHelp") then
+    if  nmap.verbosity() > 1 and tableaux.contains(output["Supported Methods"], "system.methodHelp") then
       for i, method in ipairs(output["Supported Methods"]) do
         data = '<methodCall> <methodName>system.methodHelp</methodName> <params> <param><value> <string>' .. method .. '</string> </value></param> </params> </methodCall>'
         response = http.post(host, port, url, {header = {["Content-Type"] = "application/x-www-form-urlencoded"}}, nil, data)

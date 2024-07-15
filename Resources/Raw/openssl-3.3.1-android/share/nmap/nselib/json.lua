@@ -2,10 +2,6 @@
 -- Library methods for handling JSON data. It handles JSON encoding and
 -- decoding according to RFC 4627.
 --
--- There is a test section at the bottom which shows some example
--- parsing. If you want to parse JSON, you can test it by pasting sample JSON
--- into the <code>TESTS</code> table and run the <code>test</code> method
---
 -- There is a straightforward mapping between JSON and Lua data types. One
 -- exception is JSON <code>NULL</code>, which is not the same as Lua
 -- <code>nil</code>. (A better match for Lua <code>nil</code> is JavaScript
@@ -24,8 +20,6 @@
 -- Modified 02/27/2010 - v0.4 Added unicode handling (written by David Fifield). Renamed toJson
 -- and fromJson into generate() and parse(), implemented more proper numeric parsing and added some more error checking.
 
-local bit = require "bit";
-local nmap = require "nmap"
 local stdnse = require "stdnse"
 local string = require "string"
 local table = require "table"
@@ -102,7 +96,7 @@ local function unicode16 (subject, position, hex)
       error(("Bad unicode escape \\u%s\\u%s (bad low surrogate)"):format(hex, lowhex))
     end
     position = position+6 -- consume '\uXXXX'
-    cp = 0x10000 + bit.band(cp, 0x3FF) * 0x400 + bit.band(cp2, 0x3FF)
+    cp = 0x10000 + (cp & 0x3FF) * 0x400 + (cp2 & 0x3FF)
     return position, unicode.utf8_enc(cp);
   end
 end
@@ -238,7 +232,7 @@ function generate(obj)
   elseif obj == true then
     return "true"
   elseif type(obj) == "number" then
-    return string.format("%g", obj)
+    return tostring(obj)
   elseif type(obj) == "string" then
     return escape(obj)
   elseif type(obj) == "table" then
@@ -336,8 +330,16 @@ local TESTS = {
     test = function(o) return not next(o) end
   },
   {'', valid=false},
-  {'null', valid=false}, -- error
-  {'"abc"', valid=false}, -- error
+  {
+    'null',
+    generates = 'null',
+    is = "null"
+  },
+  {
+    '"abc"',
+    generates = '"abc"',
+    is = "string",
+  },
   {'{a":1}', valid=false}, -- error
   {'{"a" bad :1}', valid=false}, -- error
   {
@@ -359,12 +361,12 @@ local TESTS = {
   },
   {
     '[5e3]',
-    generates = '[5000]',
+    generates = '[5000.0]',
     is = "array",
   },
   {
     '[5e+3]',
-    generates = '[5000]',
+    generates = '[5000.0]',
     is = "array",
   },
   {
@@ -374,7 +376,7 @@ local TESTS = {
   },
   {
     '[5.5e3]',
-    generates = '[5500]',
+    generates = '[5500.0]',
     is = "array",
   },
   {
@@ -394,12 +396,23 @@ local TESTS = {
     generates = '["A"]',
     is = "array",
   },  -- Should become Lua {"A"}
-  {'["\\uD800"]', valid=false},  -- error
+  {
+    '["\\uD800"]',
+    valid=false,
+    test = function(s)
+             return s:find("Bad unicode escape.*missing low surrogate") ~= nil
+           end
+  },  -- error
   {
     '["\\uD834\\uDD1EX"]',
     generates = '["\240\157\132\158X"]',
     is = "array",
   },  -- Should become Lua {"\240\157\132\158X"}
+  {
+    '1684119503',
+    generates = '1684119503',
+    is = "number"
+  }
 }
 
 test_suite = unittest.TestSuite:new()
@@ -412,8 +425,9 @@ for _, test in ipairs(TESTS) do
   local status, val = parse(test[1])
   if test.valid == false then
     test_suite:add_test(is_false(status), "Syntax error status is false")
-    test_suite:add_test(equal(val, "syntax error"), "Syntax error")
-    break
+    if not test.test then
+      test_suite:add_test(equal(val, "syntax error"), "Syntax error")
+    end
   end
   if test.generates then
     test_suite:add_test(equal(generate(val), test.generates), "Generate")

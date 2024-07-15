@@ -1,7 +1,6 @@
 local brute = require "brute"
 local creds = require "creds"
 local cvs = require "cvs"
-local nmap = require "nmap"
 local shortport = require "shortport"
 local stdnse = require "stdnse"
 
@@ -51,7 +50,7 @@ Driver =
   end,
 
   connect = function( self )
-    self.helper:connect()
+    self.helper:connect(brute.new_socket())
     return true
   end,
 

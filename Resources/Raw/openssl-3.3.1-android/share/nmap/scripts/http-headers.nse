@@ -1,5 +1,4 @@
 local http = require "http"
-local nmap = require "nmap"
 local shortport = require "shortport"
 local stdnse = require "stdnse"
 local table = require "table"
@@ -24,6 +23,8 @@ Performs a HEAD request for the root folder ("/") of a web server and displays t
 --
 --@args path The path to request, such as <code>/index.php</code>. Default <code>/</code>.
 --@args useget Set to force GET requests instead of HEAD.
+--
+--@see http-security-headers.nse
 
 author = "Ron Bowes"
 
@@ -55,12 +56,8 @@ action = function(host, port)
     request_type = "GET"
   end
 
-  if(result == nil) then
+  if not (result and result.status) then
     return fail("Header request failed")
-  end
-
-  if(result.rawheader == nil) then
-    return fail("Header request didn't return a proper header")
   end
 
   table.insert(result.rawheader, "(Request type: " .. request_type .. ")")

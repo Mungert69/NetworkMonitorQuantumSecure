@@ -1,6 +1,6 @@
-local bit    = require 'bit'
 local smb    = require 'smb'
 local string = require 'string'
+local stringaux = require "stringaux"
 local stdnse = require 'stdnse'
 local ls     = require 'ls'
 
@@ -124,7 +124,7 @@ end
 
 -- checks whether the file entry is a directory
 local function is_dir(fe)
-  return ( bit.band(fe.attrs, 16) == 16 )
+  return ( (fe.attrs & 16) == 16 )
 end
 
 local function list_files(host, share, smbstate, path, options, output, maxdepth, basedir)
@@ -145,7 +145,7 @@ local function list_files(host, share, smbstate, path, options, output, maxdepth
       if not continue then
         return false
       end
-      if is_dir(fe) then
+      if is_dir(fe) and not (fe.fname == "." or fe.fname == "..") then
         continue = true
         if maxdepth > 0 then
           continue = list_files(host, share, smbstate,
@@ -171,7 +171,7 @@ action = function(host)
 
   -- give priority to specified shares if specified
   if arg_shares ~= nil then
-    arg_shares = stdnse.strsplit(":", arg_shares)
+    arg_shares = stringaux.strsplit(":", arg_shares)
   elseif arg_share ~= nil then
     arg_shares = {arg_share}
   else
@@ -181,6 +181,7 @@ action = function(host)
   local output = ls.new_listing()
 
   for _, share in ipairs(arg_shares) do
+    stdnse.debug1("Share name:%s", share)
     local status, smbstate = smb.start_ex(host, true, true, share,
       nil, nil, nil)
     if ( not(status) ) then
@@ -192,14 +193,14 @@ action = function(host)
       -- remove leading slash
       arg_path = ( arg_path:sub(1,2) == '\\' and arg_path:sub(2) or arg_path )
 
-      local options = {}
+      local options = {maxfiles = ls.config('maxfiles')}
       local depth, path, dirs = 0, arg_path, {}
       local file_count, dir_count, total_bytes = 0, 0, 0
       local continue = true
 
       ls.new_vol(
         output,
-        '\\\\' .. stdnse.get_hostname(host) .. '\\' .. share .. path,
+        share .. path,
         false)
       continue = list_files(host, share, smbstate, path, options,
         output, ls.config('maxdepth'))

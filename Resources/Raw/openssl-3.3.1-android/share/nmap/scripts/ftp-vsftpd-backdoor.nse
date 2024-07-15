@@ -24,7 +24,7 @@ References:
 -- @usage
 -- nmap --script ftp-vsftpd-backdoor -p 21 <host>
 --
--- @args exploit.cmd or ftp-vsftpd-backdoor.cmd Command to execute in shell
+-- @args ftp-vsftpd-backdoor.cmd Command to execute in shell
 --       (default is <code>id</code>).
 --
 -- @output
@@ -34,7 +34,7 @@ References:
 -- |   VULNERABLE:
 -- |   vsFTPd version 2.3.4 backdoor
 -- |     State: VULNERABLE (Exploitable)
--- |     IDs:  CVE:CVE-2011-2523  OSVDB:73573
+-- |     IDs:  CVE:CVE-2011-2523  BID:48539
 -- |     Description:
 -- |       vsFTPd version 2.3.4 backdoor, this was reported on 2011-07-04.
 -- |     Disclosure date: 2011-07-03
@@ -43,8 +43,8 @@ References:
 -- |       Shell command: id
 -- |       Results: uid=0(root) gid=0(root) groups=0(root)
 -- |     References:
--- |       http://osvdb.org/73573
--- |       http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2011-2523
+-- |       https://www.securityfocus.com/bid/48539
+-- |       https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2011-2523
 -- |       http://scarybeastsecurity.blogspot.com/2011/07/alert-vsftpd-download-backdoored.html
 -- |_      https://github.com/rapid7/metasploit-framework/blob/master/modules/exploits/unix/ftp/vsftpd_234_backdoor.rb
 --
@@ -137,7 +137,7 @@ action = function(host, port)
 
   local vsftp_vuln = {
     title = "vsFTPd version 2.3.4 backdoor",
-    IDS = {CVE = 'CVE-2011-2523', OSVDB = '73573'},
+    IDS = {CVE = 'CVE-2011-2523', BID = '48539'},
     description = [[
 vsFTPd version 2.3.4 backdoor, this was reported on 2011-07-04.]],
     references = {
@@ -158,17 +158,14 @@ vsFTPd version 2.3.4 backdoor, this was reported on 2011-07-04.]],
   end
 
   -- Create socket.
-  local sock, err = ftp.connect(host, port,
-    {recv_before = false,
-    timeout = 8000})
+  local sock, code, message, buffer = ftp.connect(host, port,
+    {request_timeout = 8000})
   if not sock then
-    stdnse.debug1("can't connect: %s", err)
+    stdnse.debug1("can't connect: %s", code)
     return nil
   end
 
   -- Read banner.
-  local buffer = stdnse.make_buffer(sock, "\r?\n")
-  local code, message = ftp.read_reply(buffer)
   if not code then
     stdnse.debug1("can't read banner: %s", message)
     sock:close()

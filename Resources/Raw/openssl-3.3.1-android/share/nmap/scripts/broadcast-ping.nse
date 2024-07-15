@@ -1,14 +1,14 @@
-local bin = require "bin"
 local coroutine = require "coroutine"
 local ipOps = require "ipOps"
 local nmap = require "nmap"
 local packet = require "packet"
 local stdnse = require "stdnse"
 local tab = require "tab"
+local string = require "string"
 local table = require "table"
 local target = require "target"
+local rand = require "rand"
 
-local openssl = stdnse.silent_require "openssl"
 
 description = [[
 Sends broadcast pings on a selected interface using raw ethernet packets and
@@ -96,28 +96,30 @@ local icmp_packet = function(srcIP, dstIP, ttl, data_length, mtu, seqNo, icmp_id
   -- ICMP Message
   local icmp_payload = nil
   if data_length and data_length>0 then
-    icmp_payload = openssl.rand_bytes(data_length)
+    icmp_payload = rand.random_string(data_length)
   else
     icmp_payload = ""
   end
 
   -- Type=08; Code=00; Chksum=0000; ID=icmp_id; SeqNo=icmp_seqNo; Payload=icmp_payload(hex string);
-  local icmp_msg = bin.pack(">CCSASA", 8, 0, 0, icmp_id, seqNo, icmp_payload)
+  local icmp_msg = string.pack(">BBI2", 8, 0, 0) .. icmp_id .. string.pack("I2", seqNo) .. icmp_payload
 
   local icmp_checksum = packet.in_cksum(icmp_msg)
 
-  icmp_msg = bin.pack(">CCSASA", 8, 0, icmp_checksum, icmp_id, seqNo, icmp_payload)
+  icmp_msg = string.pack(">BBI2", 8, 0, icmp_checksum) .. icmp_id .. string.pack("I2", seqNo) .. icmp_payload
 
 
   --IP header
-  local ip_bin = bin.pack(">ASSACCx10", -- x10 = checksum & addresses
-    "\x45\x00", -- IPv4, no options, no DSCN, no ECN
+  local ip_bin = "\x45\x00" .. -- IPv4, no options, no DSCN, no ECN
+    string.pack(">I2I2",
     20 + #icmp_msg, -- total length
-    0, -- IP ID
-    "\x40\x00", -- DF
+    0) -- IP ID
+    .. "\x40\x00" -- DF
+    .. string.pack("BB",
     ttl,
     1 -- ICMP
     )
+    .. ("\0"):rep(10) -- checksum & addresses
 
   -- IP+ICMP; Addresses and checksum need to be filled
   local icmp_bin = ip_bin .. icmp_msg
@@ -154,7 +156,6 @@ local broadcast_if = function(if_table,icmp_responders)
 
   -- raw sniffing socket (icmp echoreply style)
   local pcap = nmap.new_socket()
-  pcap:set_timeout(timeout)
 
   local mtu = if_table.mtu or 256  -- 256 is minimal mtu
 
@@ -168,7 +169,7 @@ local broadcast_if = function(if_table,icmp_responders)
 
   for i = 1, num_probes do
     -- ICMP packet
-    local icmp_id = openssl.rand_bytes(2)
+    local icmp_id = rand.random_string(2)
     icmp_ids[icmp_id]=true
     local icmp = icmp_packet( source_IP, destination_IP, ttl,
     data_length, mtu, sequence_number, icmp_id)
@@ -183,7 +184,10 @@ local broadcast_if = function(if_table,icmp_responders)
     try( dnet:ethernet_send(ethernet_icmp) )
   end
 
-  while true do
+  local start_time = nmap.clock_ms()
+  local now = start_time
+  while( now - start_time < timeout ) do
+    pcap:set_timeout(timeout - (now - start_time))
     local status, plen, l2, l3data, _ = pcap:pcap_receive()
     if not status then break end
 
@@ -201,6 +205,7 @@ local broadcast_if = function(if_table,icmp_responders)
     else
       stdnse.debug1("Erroneous ICMP packet received; Cannot parse IP header.")
     end
+    now = nmap.clock_ms()
   end
 
   pcap:close()
@@ -210,33 +215,17 @@ local broadcast_if = function(if_table,icmp_responders)
 end
 
 
+local filter_interfaces = function (if_table)
+  if if_table.up == "up" and if_table.link=="ethernet" and if_table.address and
+    if_table.address:match("%d+%.%d+%.%d+%.%d+") then
+    return if_table
+  end
+end
+
 action = function()
 
-  --get interface script-args, if any
-  local interface_arg = stdnse.get_script_args(SCRIPT_NAME .. ".interface")
-  local interface_opt = nmap.get_interface()
-
   -- interfaces list (decide which interfaces to broadcast on)
-  local interfaces ={}
-  if interface_opt or interface_arg then
-    -- single interface defined
-    local interface = interface_opt or interface_arg
-    local if_table = nmap.get_interface_info(interface)
-    if not (if_table and if_table.address and if_table.link=="ethernet") then
-      stdnse.debug1("Interface not supported or not properly configured.")
-      return false
-    end
-    table.insert(interfaces, if_table)
-  else
-    local tmp_ifaces = nmap.list_interfaces()
-    for _, if_table in ipairs(tmp_ifaces) do
-      if if_table.address and
-        if_table.link=="ethernet" and
-        if_table.address:match("%d+%.%d+%.%d+%.%d+") then
-        table.insert(interfaces, if_table)
-      end
-    end
-  end
+  local interfaces = stdnse.get_script_interfaces(filter_interfaces)
 
   if #interfaces == 0 then
     stdnse.debug1("No interfaces found.")

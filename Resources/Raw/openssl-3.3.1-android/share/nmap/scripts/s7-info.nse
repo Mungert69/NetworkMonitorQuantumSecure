@@ -1,4 +1,3 @@
-local bin = require "bin"
 local nmap = require "nmap"
 local shortport = require "shortport"
 local stdnse = require "stdnse"
@@ -50,7 +49,7 @@ categories = {"discovery", "version"}
 
 
 -- port rule for devices running on TCP/102
-portrule = shortport.port_or_service(102, "iso-tsap", "tcp")
+portrule = shortport.version_port_or_service(102, "iso-tsap", "tcp")
 
 ---
 -- Function to send and receive the S7COMM Packet
@@ -61,13 +60,14 @@ portrule = shortport.port_or_service(102, "iso-tsap", "tcp")
 -- inside of the main action.
 -- @param socket the socket that was created in Action.
 -- @param query the specific query that you want to send/receive on.
-local function send_receive(socket, query)
+-- @param bytes how many bytes (minimum) you expect back
+local function send_receive(socket, query, bytes)
   local sendstatus, senderr = socket:send(query)
   if(sendstatus == false) then
     return "Error Sending S7COMM"
   end
   -- receive response
-  local rcvstatus, response = socket:receive()
+  local rcvstatus, response = socket:receive_bytes(bytes)
   if(rcvstatus == false) then
     return "Error Reading S7COMM"
   end
@@ -87,22 +87,17 @@ end
 -- @param output Table used for output for return to Nmap
 local function parse_response(response, host, port, output)
   -- unpack the protocol ID
-  local pos, value = bin.unpack("C", response, 8)
+  local value = string.byte(response, 8)
   -- unpack the second byte of the SZL-ID
-  local pos, szl_id = bin.unpack("C", response, 31)
-  -- set the offset to 0
-  local offset = 0
+  local szl_id = string.byte(response, 31)
   -- if the protocol ID is 0x32
-  if (value == 0x32) then
-    local pos
+  if (value == 0x32 and #response >= 125) then
     -- unpack the module information
-    pos, output["Module"] = bin.unpack("z", response, 44)
+    output["Module"] = string.unpack("z", response, 44)
     -- unpack the basic hardware information
-    pos, output["Basic Hardware"] = bin.unpack("z", response, 72)
-    -- set version number to 0
-    local version = 0
+    output["Basic Hardware"] = string.unpack("z", response, 72)
     -- parse version number
-    local pos, char1, char2, char3 = bin.unpack("CCC", response, 123)
+    local char1, char2, char3 = string.unpack("BBB", response, 123)
     -- concatenate string, or if string is nil make version number 0.0
     output["Version"] = table.concat({char1 or "0.0", char2, char3}, ".")
     -- return the output table
@@ -124,9 +119,9 @@ end
 local function second_parse_response(response, output)
   local offset = 0
   -- unpack the protocol ID
-  local pos, value = bin.unpack("C", response, 8)
+  local value = string.byte(response, 8)
   -- unpack the second byte of the SZL-ID
-  local pos, szl_id = bin.unpack("C", response, 31)
+  local szl_id = string.byte(response, 31)
   -- if the protocol ID is 0x32
   if (value == 0x32) then
     -- if the szl-ID is not 0x1c
@@ -135,15 +130,25 @@ local function second_parse_response(response, output)
       offset = 4
     end
     -- parse system name
-    pos, output["System Name"] = bin.unpack("z", response, 40 + offset)
+    if #response > 40 + offset then
+      output["System Name"] = string.unpack("z", response, 40 + offset)
+    end
     -- parse module type
-    pos, output["Module Type"] = bin.unpack("z", response, 74 + offset)
+    if #response > 74 + offset then
+      output["Module Type"] = string.unpack("z", response, 74 + offset)
+    end
     -- parse serial number
-    pos, output["Serial Number"] = bin.unpack("z", response, 176 + offset)
+    if #response > 176 + offset then
+      output["Serial Number"] = string.unpack("z", response, 176 + offset)
+    end
     -- parse plant identification
-    pos, output["Plant Identification"] = bin.unpack("z", response, 108 + offset)
+    if #response > 108 + offset then
+      output["Plant Identification"] = string.unpack("z", response, 108 + offset)
+    end
     -- parse copyright
-    pos, output["Copyright"] = bin.unpack("z", response, 142 + offset)
+    if #response > 142 + offset then
+      output["Copyright"] = string.unpack("z", response, 142 + offset)
+    end
 
     -- for each element in the table, if it is nil, then remove the information from the table
     for key, value in pairs(output) do
@@ -184,17 +189,17 @@ end
 -- @param port port that was scanned via nmap
 action = function(host, port)
   -- COTP packet with a dst of 102
-local COTP = bin.pack("H", "0300001611e00000001400c1020100c2020" .. "102" .. "c0010a")
+local COTP = stdnse.fromhex( "0300001611e00000001400c1020100c2020" .. "102" .. "c0010a")
   -- COTP packet with a dst of 200
-  local alt_COTP = bin.pack("H", "0300001611e00000000500c1020100c2020" .. "200" .. "c0010a")
+  local alt_COTP = stdnse.fromhex( "0300001611e00000000500c1020100c2020" .. "200" .. "c0010a")
   -- setup the ROSCTR Packet
-  local ROSCTR_Setup = bin.pack("H", "0300001902f08032010000000000080000f0000001000101e0")
+  local ROSCTR_Setup = stdnse.fromhex( "0300001902f08032010000000000080000f0000001000101e0")
   -- setup the Read SZL information packet
-  local Read_SZL = bin.pack("H", "0300002102f080320700000000000800080001120411440100ff09000400110001")
+  local Read_SZL = stdnse.fromhex( "0300002102f080320700000000000800080001120411440100ff09000400110001")
   -- setup the first SZL request (gather the basic hardware and version number)
-  local first_SZL_Request = bin.pack("H", "0300002102f080320700000000000800080001120411440100ff09000400110001")
+  local first_SZL_Request = stdnse.fromhex( "0300002102f080320700000000000800080001120411440100ff09000400110001")
   -- setup the second SZL request
-  local second_SZL_Request = bin.pack("H", "0300002102f080320700000000000800080001120411440100ff090004001c0001")
+  local second_SZL_Request = stdnse.fromhex( "0300002102f080320700000000000800080001120411440100ff090004001c0001")
   -- response is used to collect the packet responses
   local response
   -- output table for Nmap
@@ -208,9 +213,9 @@ local COTP = bin.pack("H", "0300001611e00000001400c1020100c2020" .. "102" .. "c0
     return nil
   end
   -- send and receive the COTP Packet
-  response  = send_receive(sock, COTP)
+  response  = send_receive(sock, COTP, 6)
   -- unpack the PDU Type
-  local pos, CC_connect_confirm = bin.unpack("C", response, 6)
+  local CC_connect_confirm = string.byte(response, 6)
   -- if PDU type is not 0xd0, then not a successful COTP connection
   if ( CC_connect_confirm ~= 0xd0) then
     sock:close()
@@ -223,34 +228,34 @@ local COTP = bin.pack("H", "0300001611e00000001400c1020100c2020" .. "102" .. "c0
       stdnse.debug1('Error establishing connection for %s - %s', host, conerr)
       return nil
     end
-    response = send_receive(sock, alt_COTP)
-    local pos, CC_connect_confirm = bin.unpack("C", response, 6)
+    response = send_receive(sock, alt_COTP, 6)
+    local CC_connect_confirm = string.byte(response, 6)
     if ( CC_connect_confirm ~= 0xd0) then
       stdnse.debug1('S7 INFO:: Could not negotiate COTP')
       return nil
     end
   end
   -- send and receive the ROSCTR Setup Packet
-  response  = send_receive(sock, ROSCTR_Setup)
+  response  = send_receive(sock, ROSCTR_Setup, 8)
   -- unpack the protocol ID
-  local pos, protocol_id = bin.unpack("C", response, 8)
+  local protocol_id = string.byte(response, 8)
   -- if protocol ID is not 0x32 then return nil
   if ( protocol_id ~= 0x32) then
     return nil
   end
   -- send and receive the READ_SZL packet
-  response  = send_receive(sock, Read_SZL)
-  local pos, protocol_id = bin.unpack("C", response, 8)
+  response  = send_receive(sock, Read_SZL, 8)
+  local protocol_id = string.byte(response, 8)
   -- if protocol ID is not 0x32 then return nil
   if ( protocol_id ~= 0x32) then
     return nil
   end
   -- send and receive the first SZL Request packet
-  response  = send_receive(sock, first_SZL_Request)
+  response  = send_receive(sock, first_SZL_Request, 125)
   -- parse the response for basic hardware information
   output = parse_response(response, host, port, output)
   -- send and receive the second SZL Request packet
-  response = send_receive(sock, second_SZL_Request)
+  response = send_receive(sock, second_SZL_Request, 180)
   -- parse the response for more information
   output = second_parse_response(response, output)
   -- close the socket

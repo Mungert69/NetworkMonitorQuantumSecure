@@ -33,12 +33,12 @@ categories = {"intrusive", "brute"}
 
 local arg_db = stdnse.get_script_args(SCRIPT_NAME .. ".db") or "admin"
 
-portrule = shortport.port_or_service({27017}, {"mongodb"})
+portrule = shortport.port_or_service({27017}, {"mongodb", "mongod"})
 
 Driver = {
 
   new = function(self, host, port, options)
-    local o = { host = host, port = port, sock = nmap.new_socket() }
+    local o = { host = host, port = port, sock = brute.new_socket() }
     setmetatable(o, self)
     self.__index = self
     return o

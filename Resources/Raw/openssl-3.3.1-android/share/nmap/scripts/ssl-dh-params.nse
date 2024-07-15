@@ -31,7 +31,7 @@ Opportunistic STARTTLS sessions are established on services that support them.
 -- |   VULNERABLE:
 -- |   Transport Layer Security (TLS) Protocol DHE_EXPORT Ciphers Downgrade MitM (Logjam)
 -- |     State: VULNERABLE
--- |     IDs:  OSVDB:122331  CVE:CVE-2015-4000
+-- |     IDs:  BID:74733  CVE:CVE-2015-4000
 -- |       The Transport Layer Security (TLS) protocol contains a flaw that is triggered
 -- |       when handling Diffie-Hellman key exchanges defined with the DHE_EXPORT cipher.
 -- |       This may allow a man-in-the-middle attacker to downgrade the security of a TLS
@@ -50,7 +50,7 @@ Opportunistic STARTTLS sessions are established on services that support them.
 -- |     References:
 -- |       https://weakdh.org
 -- |       https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2015-4000
--- |       http://osvdb.org/122331
+-- |       https://www.securityfocus.com/bid/74733
 -- |
 -- |   Diffie-Hellman Key Exchange Insufficient Diffie-Hellman Group Strength
 -- |     State: VULNERABLE
@@ -86,13 +86,12 @@ Opportunistic STARTTLS sessions are established on services that support them.
 -- |         Generator Length: 1024 bits
 -- |         Public Key Length: 1024 bits
 -- |     References:
--- |       https://weakdh.org
--- |_      http://www2.esentire.com/TLSUnjammedWP
+-- |_      https://weakdh.org
 
 author = "Jacob Gajek"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
 categories = {"vuln", "safe"}
-
+dependencies = {"https-redirect"}
 
 -- Anonymous Diffie-Hellman key exchange variants
 local DH_anon_ALGORITHMS = {
@@ -114,14 +113,7 @@ local DHE_ALGORITHMS_EXPORT = {
   ["DHE_DSS_EXPORT1024"] = 1
 }
 
--- Helper function to convert hex string to byte array
-local function fromhex(hexstr)
-  return string.gsub(hexstr, "%s*(%x%x)%s*",
-    function(c)
-      return string.char(tonumber(c, 16))
-    end
-  )
-end
+local fromhex = stdnse.fromhex
 
 -- Common Diffie-Hellman groups
 --
@@ -399,7 +391,33 @@ local DHE_PRIMES = {
     99034DB4 819780EC 8EE28A4E 66B5C4E0 A634E47B F9C981A5 EC4908EE 1B83A410
     813165AC 0AB6BDCF D3257188 AC49399D 541C16F2 960F9D64 B9C51EC0 85AD0BB4
     FE389013 18F0CD61 65D4B1B3 1C723953 B83217F8 B3EBF870 8160E82D 7911754B
-  ]])] = "weakdh.org/1024-bit MODP group with safe prime modulus"
+  ]])] = "weakdh.org/1024-bit MODP group with safe prime modulus",
+
+  -- haproxy, postfix, and IronPort params courtesy Frank Bergmann
+  [fromhex([[
+    EC86F870 A03316EC 051A7359 CD1F8BF8 29E4D2CF 52DDC224 8DB5389A FB5CA4E4
+    B2DACE66 5074A685 4D4B1D30 B82BF310 E9A72D05 71E781DF 8B59523B 5F430B68
+    F1DB07BE 086B1B23 EE4DCC9E 0E43A01E DF438CEC BEBE90B4 5154B92F 7B64764E
+    5DD42EAE C29EAE51 4359C777 9C503C0E ED73045F F14C762A D8F8CFFC 3440D1B4
+    42618466 423904F8 68B262D7 55ED1B74 7591E0C5 69C1315C DB7B442E CE84580D
+    1E660CC8 449EFD40 08675DFB A7768F00 1187E993 F97DC4BC 745520D4 4A412F43
+    421AC1F2 97174927 376B2F88 7E1CA0A1 899227D9 565A71C1 56377E3A 9D05E7EE
+    5D8F8217 BCE9C293 3082F9F4 C9AE49DB D054B4D9 754DFA06 B8D63841 B71F77F3
+  ]])] = "haproxy 1.5 builtin",
+
+  [fromhex([[
+    B0FEB4CF D45507E7 CC88590D 1726C50C A54A9223 8178DA88 AA4C1306 BF5D2F9E
+    BC96B851 009D0C0D 75ADFD3B B17E714F 3F915414 44B83025 1CEBDF72 9C4CF189
+    0D683F94 8EA4FB76 8918B291 16900199 668C5381 4E273D99 E75A7AAF D5ECE27E
+    FAED0118 C2782559 065C39F6 CD4954AF C1B1EA4A F953D0DF 6DAFD493 E7BAAE9B
+  ]])] = "postfix builtin",
+
+  [fromhex([[
+    F8D5CCE8 7A3961B5 F5CBC834 40C51856 E0E6FA6D 5AB28310 78C86762 1CA46CA8
+    7D7FA3B1 AF75B834 3C699374 D36920F2 E39A653D E8F0725A A6E2D297 7537558C
+    E27E784F 4B549BEF B558927B A30C8BD8 1DACDCAE 93027B5D CE1BC176 70AF7DEC
+    E81149AB D7D632D9 B80A6397 CEBCC7A9 619CCF38 288EA3D5 23287743 B04E6FB3
+  ]])] = "IronPort SMTPD builtin",
 }
 
 
@@ -607,11 +625,10 @@ local function get_dhe_params(host, port, protocol, ciphers)
   local t = {}
   local pos = 1
   t.protocol = protocol
-  t.extensions = {}
-
-  if host.targetname then
-    t.extensions.server_name = tls.EXTENSION_HELPERS.server_name(host.targetname)
-  end
+  local tlsname = tls.servername(host)
+  t.extensions = {
+    server_name = tlsname and tls.EXTENSION_HELPERS["server_name"](tlsname),
+  }
 
   -- Keep ClientHello record size below 255 bytes and the number of ciphersuites
   -- to 64 or less in order to avoid implementation issues with some TLS servers
@@ -771,7 +788,7 @@ end
 
 
 portrule = function(host, port)
-  return shortport.ssl(host, port) or sslcert.getPrepareTLSWithoutReconnect(port)
+  return port.protocol == "tcp" and (shortport.ssl(host, port) or sslcert.getPrepareTLSWithoutReconnect(port))
 end
 
 local function format_check(t, label)
@@ -820,7 +837,7 @@ the encrypted stream.]],
     state = vulns.STATE.NOT_VULN,
     IDS = {
       CVE = 'CVE-2015-4000',
-      OSVDB = '122331'
+      BID = '74733'
     },
     SCORES = {
       CVSSv2 = '4.3'
@@ -861,12 +878,16 @@ Additional testing may be required to verify the security of these
 parameters.]],
     state = vulns.STATE.NOT_VULN,
     references = {
-      "https://weakdh.org",
-      "http://www2.esentire.com/TLSUnjammedWP"
+      "https://weakdh.org"
     }
   }
 
   for protocol in pairs(tls.PROTOCOLS) do
+    if protocol == "TLSv1.3" then
+      -- TLSv1.3 does not allow anonymous key exchange and only allows specific
+      -- DHE groups named in RFC 7919
+      goto NEXT_PROTOCOL
+    end
     -- Try anonymous DH ciphersuites
     cipher, dhparams = get_dhe_params(host, port, protocol, dh_anons)
     -- Explicit test for false needed because nil just means no ciphers supported.

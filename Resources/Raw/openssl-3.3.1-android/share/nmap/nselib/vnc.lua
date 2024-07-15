@@ -24,13 +24,13 @@
 -- Version 0.1
 -- Created 07/07/2010 - v0.1 - created by Patrik Karlsson <patrik@cqure.net>
 
-local bin = require "bin"
 local bits = require "bits"
 local match = require "match"
 local nmap = require "nmap"
 local stdnse = require "stdnse"
 local string = require "string"
 local table = require "table"
+local tableaux = require "tableaux"
 _ENV = stdnse.module("vnc", stdnse.seeall)
 
 local HAVE_SSL, openssl = pcall(require,'openssl')
@@ -63,7 +63,7 @@ local function process_error(socket)
   if( not(status) ) then
     return false, "VNC:handshake failed to retrieve error message"
   end
-  local len = select(2, bin.unpack(">I", tmp))
+  local len = string.unpack(">I4", tmp)
   local status, err = socket:receive_buf(match.numbytes(len), true)
   if( not(status) ) then
     return false, "VNC:handshake failed to retrieve error message"
@@ -73,7 +73,7 @@ end
 
 local function first_of (list, lookup)
   for i=1, #list do
-    if stdnse.contains(lookup, list[i]) then
+    if tableaux.contains(lookup, list[i]) then
       return list[i]
     end
   end
@@ -121,6 +121,7 @@ VNC = {
     COLIN_DEAN_XVP = 22,
     MAC_OSX_SECTYPE_30 = 30,
     MAC_OSX_SECTYPE_35 = 35,
+    MSLOGON = 0xfffffffa,
   },
 
   -- Security types are fetched from the rfbproto.pdf
@@ -137,17 +138,17 @@ VNC = {
     [20]= "GTK-VNC SASL",
     [21]= "MD5 hash authentication",
     [22]= "Colin Dean xvp",
-
     -- Mac OS X screen sharing uses 30 and 35
-    [30]= "Mac OS X security type",
+    [30]= "Apple Remote Desktop",
     [35]= "Mac OS X security type",
+    [0xfffffffa] = "UltraVNC MS Logon",
   },
 
-  new = function(self, host, port)
+  new = function(self, host, port, socket)
     local o = {
       host = host,
       port = port,
-      socket = nmap.new_socket(),
+      socket = socket or nmap.new_socket(),
     }
     o.socket:set_timeout(5000)
     setmetatable(o, self)
@@ -157,9 +158,6 @@ VNC = {
 
   --- Connects the VNC socket
   connect = function(self)
-    if ( not(HAVE_SSL) ) then
-      return false, "The VNC module requires OpenSSL support"
-    end
     return self.socket:connect(self.host, self.port, "tcp")
   end,
 
@@ -175,7 +173,7 @@ VNC = {
   -- @return status, true on success, false on failure
   -- @return error string containing error message if status is false
   handshake = function(self)
-    local status, data = self.socket:receive_buf("[\r\n]+", true)
+    local status, data = self.socket:receive_buf(match.pattern_limit("[\r\n]+", 16), true)
     if not status or not string.match(data, "^RFB %d%d%d%.%d%d%d[\r\n]") then
       stdnse.debug1("ERROR: Not a VNC port. Banner: %s", data)
       return false, "Not a VNC port."
@@ -223,7 +221,7 @@ VNC = {
         return false, "VNC:handshake failed to receive security data"
       end
 
-      vncsec.types[1] = select(2, bin.unpack(">I", tmp) )
+      vncsec.types[1] = string.unpack(">I4", tmp)
       self.vncsec = vncsec
 
       -- do we have an invalid security type, if so we need to handle an
@@ -238,7 +236,7 @@ VNC = {
         return false, "ERROR: VNC:handshake failed to receive security data"
       end
 
-      vncsec.count = select(2, bin.unpack("C", tmp))
+      vncsec.count = string.unpack("B", tmp)
       if ( vncsec.count == 0 ) then
         return process_error(self.socket)
       end
@@ -250,7 +248,7 @@ VNC = {
       end
 
       for i=1, vncsec.count do
-        table.insert( vncsec.types, select(2, bin.unpack("C", tmp, i) ) )
+        table.insert( vncsec.types, (string.unpack("B", tmp, i)) )
       end
       self.vncsec = vncsec
     end
@@ -283,7 +281,7 @@ VNC = {
   end,
 
   sendSecType = function (self, sectype)
-    return self.socket:send( bin.pack("C", sectype))
+    return self.socket:send( string.pack("B", sectype))
   end,
 
   --- Attempts to login to the VNC service using any supported method
@@ -318,6 +316,10 @@ VNC = {
       elseif self:supportsSecType( VNC.sectypes.TIGHT ) then
         self:sendSecType(VNC.sectypes.TIGHT)
         return self:login_tight(username, password)
+
+      elseif self:supportsSecType( VNC.sectypes.MAC_OSX_SECTYPE_30 ) then
+        self:sendSecType(VNC.sectypes.MAC_OSX_SECTYPE_30)
+        return self:login_ard(username, password)
 
       else
         return false, "The server does not support any matching security type"
@@ -364,55 +366,127 @@ VNC = {
       return false, "Failed to retrieve authentication status from server"
     end
 
-    if ( select(2, bin.unpack(">I", result) ) ~= 0 ) then
+    if string.unpack(">I4", result) ~= 0 then
       return false, "Authentication failed"
     end
     return true
   end,
 
+  handshake_aten = function(self, buffer)
+    -- buffer is 24 bytes, currently unused, no idea what it's for.
+    if #buffer ~= 24 then
+      return false
+    end
+    self.aten = buffer
+    return true
+  end,
+
+  login_aten = function(self, username, password)
+    username = username or ""
+    self.socket:send(username .. ("\0"):rep(24 - #username) .. password .. ("\0"):rep(24 - #password))
+    return self:check_auth_result()
+  end,
+
   handshake_tight = function(self)
+    -- TightVNC security type
     -- https://vncdotool.readthedocs.org/en/0.8.0/rfbproto.html#tight-security-type
-    local status, buf = self.socket:receive_buf(match.numbytes(4), true)
+    -- Sometimes also ATEN KVM VNC:
+    -- https://github.com/thefloweringash/chicken-aten-ikvm
+    local status, buf = self.socket:receive_bytes(4)
     if not status then
       return false, "Failed to get number of tunnels"
     end
-    local pos, ntunnels = bin.unpack(">I", buf)
-    status, buf = self.socket:receive_buf(match.numbytes(16 * ntunnels), true)
-    if not status then
-      return false, "Failed to get list of tunnels"
+    -- If it's ATEN, it sends 24 bytes right away. Need to try parsing these
+    -- in case it's TightVNC instead, though.
+    local aten = #buf == 24 and buf
+    local ntunnels, pos = string.unpack(">I4", buf)
+    -- reasonable limits: ATEN might send a huge number here
+    if ntunnels > 0x10000 then
+      return self:handshake_aten(aten)
     end
-
-    pos = 1
     local tight = {
       tunnels = {},
       types = {}
     }
-    for i=1, ntunnels do
-      local tunnel = {}
-      pos, tunnel.code, tunnel.vendor, tunnel.signature = bin.unpack(">IA4A8", buf, pos)
-      tight.tunnels[#tight.tunnels+1] = tunnel
-    end
-
     if ntunnels > 0 then
-      -- for now, just return the first one. TODO: choose a supported tunnel type
-      self.socket:send(bin.pack(">I", tight.tunnels[1].code))
+      local have = #buf - pos + 1
+      if have < 16 * ntunnels then
+        local newbuf
+        status, newbuf = self.socket:receive_bytes(16 * ntunnels - have)
+        if not status then
+          if aten then
+            return self:handshake_aten(aten)
+          end
+          return false, "Failed to get list of tunnels"
+        end
+        buf = buf .. newbuf
+        aten = false -- we must have read something beyond 24 bytes
+      end
+
+      local have_none_tunnel = false
+      for i=1, ntunnels do
+        local tunnel = {}
+        tunnel.code, tunnel.vendor, tunnel.signature, pos = string.unpack(">I4 c4 c8", buf, pos)
+        if tunnel.code == 0 then
+          have_none_tunnel = true
+        end
+        tight.tunnels[#tight.tunnels+1] = tunnel
+      end
+
+      -- at this point, might still be ATEN with a first byte of 1, but chances are it's Tight
+      if have_none_tunnel then
+        -- Try the "NOTUNNEL" tunnel, for simplicity, if it's available.
+        self.socket:send("\0\0\0\0")
+      else
+        -- for now, just return the first one. TODO: choose a supported tunnel type
+        self.socket:send(string.pack(">I4", tight.tunnels[1].code))
+      end
     end
 
-    status, buf = self.socket:receive_buf(match.numbytes(4), true)
-    if not status then
-      return false, "Failed to get number of Tight auth types"
+    local have = #buf - pos + 1
+    if have < 4 then
+      local newbuf
+      status, newbuf = self.socket:receive_bytes(4 - have)
+      if not status then
+        if aten then
+          return self:handshake_aten(aten)
+        end
+        return false, "Failed to get number of Tight auth types"
+      end
+      buf = buf .. newbuf
+      if #buf > 24 then aten = false end
     end
-    local pos, nauth = bin.unpack(">I", buf)
-    status, buf = self.socket:receive_buf(match.numbytes(16 * nauth), true)
-    if not status then
-      return false, "Failed to get list of Tight auth types"
+    local nauth
+    nauth, pos = string.unpack(">I4", buf, pos)
+    -- reasonable limits: ATEN might send a huge number here
+    if nauth > 0x10000 then
+      return self:handshake_aten(aten)
+    end
+    if nauth > 0 then
+      have = #buf - pos + 1
+      if have < 16 * nauth then
+        local newbuf
+        status, newbuf = self.socket:receive_bytes(16 * nauth - have)
+        if not status then
+          if aten then
+            return self:handshake_aten(aten)
+          end
+          return false, "Failed to get list of Tight auth types"
+        end
+        buf = buf .. newbuf
+        if #buf > 24 then aten = false end
+      end
+
+      for i=1, nauth do
+        local auth = {}
+        auth.code, auth.vendor, auth.signature, pos = string.unpack(">I4 c4 c8", buf, pos)
+        tight.types[#tight.types+1] = auth
+      end
     end
 
-    pos = 1
-    for i=1, nauth do
-      local auth = {}
-      pos, auth.code, auth.vendor, auth.signature = bin.unpack(">IA4A8", buf, pos)
-      tight.types[#tight.types+1] = auth
+    if aten and pos < 24 then
+      -- server sent 24 bytes but we could only parse some of them. Probably ATEN KVM
+      return self:handshake_aten(aten)
     end
 
     self.tight = tight
@@ -424,6 +498,10 @@ VNC = {
     local status, err = self:handshake_tight()
     if not status then
       return status, err
+    end
+
+    if self.aten then
+      return self:login_aten(username, password)
     end
 
     if #self.tight.types == 0 then
@@ -439,7 +517,7 @@ VNC = {
       }) do
       for _, t in ipairs(self.tight.types) do
         if t.code == auth[1] then
-          self.socket:send(bin.pack(">I", t.code))
+          self.socket:send(string.pack(">I4", t.code))
           return self[auth[2]](self, username, password)
         end
       end
@@ -463,7 +541,7 @@ VNC = {
       count = 1,
       types = {}
     }
-    vncsec.count = select(2, bin.unpack("C", tmp))
+    vncsec.count = string.unpack("B", tmp)
     if ( vncsec.count == 0 ) then
       return process_error(self.socket)
     end
@@ -474,7 +552,7 @@ VNC = {
       return false, "ERROR: VNC:handshake failed to receive security data"
     end
     for i=1, vncsec.count do
-      table.insert( vncsec.types, select(2, bin.unpack("C", tmp, i) ) )
+      table.insert( vncsec.types, (string.unpack("B", tmp, i)) )
     end
     self.vncsec = vncsec
     return true
@@ -490,19 +568,19 @@ VNC = {
 
   handshake_vencrypt = function(self)
     local status, buf = self.socket:receive_buf(match.numbytes(2), true)
-    local pos, maj, min = bin.unpack("CC", buf)
+    local maj, min, pos = string.unpack("BB", buf)
     if maj ~= 0 or min ~= 2 then
       return false, string.format("Unknown VeNCrypt version: %d.%d", maj, min)
     end
-    self.socket:send(bin.pack("CC", maj, min))
+    self.socket:send(string.pack("BB", maj, min))
     status, buf = self.socket:receive_buf(match.numbytes(1), true)
-    pos, status = bin.unpack("C", buf)
+    status, pos = string.unpack("B", buf)
     if status ~= 0 then
       return false, string.format("Server refused VeNCrypt version %d.%d", maj, min)
     end
 
     status, buf = self.socket:receive_buf(match.numbytes(1), true)
-    local pos, nauth = bin.unpack("C", buf)
+    local nauth, pos = string.unpack("B", buf)
     if nauth == 0 then
       return false, "No VeNCrypt auth subtypes received"
     end
@@ -516,7 +594,7 @@ VNC = {
     }
     for i=1, nauth do
       local auth
-      pos, auth = bin.unpack(">I", buf, pos)
+      auth, pos = string.unpack(">I4", buf, pos)
       table.insert(vencrypt.types, auth)
     end
     self.vencrypt = vencrypt
@@ -546,7 +624,7 @@ VNC = {
       return false, "The server does not support any supported security type"
     end
 
-    self.socket:send(bin.pack(">I", subauth))
+    self.socket:send(string.pack(">I4", subauth))
     local status, buf = self.socket:receive_buf(match.numbytes(1), true)
     if not status or string.byte(buf, 1) ~= 1 then
       return false, "VeNCrypt auth subtype refused"
@@ -574,7 +652,8 @@ VNC = {
   end,
 
   login_plain = function(self, username, password)
-    local status = self.socket:send(bin.pack(">IIAA", #username, #password, username, password))
+    username = username or ""
+    local status = self.socket:send(string.pack(">I4 I4", #username, #password) .. username .. password)
     if not status then
       return false, "Failed to send plain auth"
     end
@@ -585,6 +664,52 @@ VNC = {
   login_sasl = function(self, username, password)
     -- TODO: support this!
     return false, "Unsupported"
+  end,
+
+  login_ard = function(self, username, password)
+    -- Thanks to David Simmons for describing this protocol:
+    -- https://cafbit.com/post/apple_remote_desktop_quirks/
+    local status, buf = self.socket:receive_bytes(4)
+    if not status then
+      return false, "Failed to get auth material lengths"
+    end
+    local gen, keylen, pos = string.unpack(">I2I2", buf)
+    if #buf - (pos - 1) < 2*keylen then
+      local status, buf2 = self.socket:receive_bytes(2*keylen - #buf)
+      if not status then
+        return false, "Failed to get auth material"
+      end
+      buf = buf .. buf2
+    end
+    local modulus, pos = string.unpack("c"..keylen, buf, pos)
+    local pubkey, pos = string.unpack("c"..keylen, buf, pos)
+
+    -- DH key exchange
+    pubkey = openssl.bignum_bin2bn(pubkey)
+    modulus = openssl.bignum_bin2bn(modulus)
+    gen = openssl.bignum_dec2bn(gen)
+
+    local secret = openssl.bignum_pseudo_rand(512) -- 512 bit DH? yeah, ok.
+    local ourkey = openssl.bignum_mod_exp(gen, secret, modulus)
+    local shared = openssl.bignum_mod_exp(pubkey, secret, modulus)
+
+    -- Pad shared secret with nulls
+    shared = openssl.bignum_bn2bin(shared)
+    shared = ('\0'):rep(keylen - #shared) .. shared
+
+    -- Generate AES key as MD5 of shared DH secret
+    local aeskey = openssl.md5(shared)
+
+    -- Encrypt username and password with AES in ECB mode
+    local blob = username .. ('\0'):rep(64 - #username) .. password .. ('\0'):rep(64 - #password)
+    local hash = openssl.encrypt('aes-128-ecb', aeskey, '', blob, false)
+
+    -- Send encrypted blob and DH public key
+    local tmpkey = openssl.bignum_bn2bin(ourkey)
+    -- pad public key on the left with nulls
+    self.socket:send(hash .. ('\0'):rep(keylen - #tmpkey) .. tmpkey)
+
+    return self:check_auth_result()
   end,
 
   --- Returns all supported security types as a table
@@ -627,12 +752,12 @@ VNC = {
     if not status then
       return false, "Did not receive ServerInit message"
     end
-    local pos, width, height, bpp, depth, bigendian, truecolor, rmax, gmax, bmax, rshift, gshift, bshift, pad1, pad2, namelen = bin.unpack(">SSCCCCSSSCCCSCI", buf)
+    local width, height, bpp, depth, bigendian, truecolor, rmax, gmax, bmax, rshift, gshift, bshift, pad1, pad2, namelen, pos = string.unpack(">I2I2 BBBB I2I2 I2BB BI2B I4", buf)
     local status, buf = self.socket:receive_buf(match.numbytes(namelen), true)
     if not status then
       return false, "Did not receive ServerInit desktop name"
     end
-    local pos, name = bin.unpack("A" .. namelen, buf)
+    local name = buf:sub(1,namelen)
     return true, {
       width = width,
       height = height,
@@ -652,40 +777,52 @@ VNC = {
   end
 }
 
+if not HAVE_SSL then
+  local login_unsupported = function()
+    return false, "Login type unsupported without OpenSSL"
+  end
+  VNC.login_vncauth = login_unsupported
+  VNC.login_tls = login_unsupported
+  VNC.login_ard = login_unsupported
+end
+
 local unittest = require "unittest"
 if not unittest.testing() then
   return _ENV
 end
 
 test_suite = unittest.TestSuite:new()
-local test_vectors = {
-  -- from John the Ripper's vnc_fmt_plug.c
-  -- pass, challenge, response
-  {
-    "1234567890",
-    "\x2f\x75\x32\xb3\xef\xd1\x7e\xea\x5d\xd3\xa0\x94\x9f\xfd\xf1\xd8",
-    "\x0e\xb4\x2d\x4d\x9a\xc1\xef\x1b\x6e\xf6\x64\x7b\x95\x94\xa6\x21"
-  },
-  {
-    "123",
-    "\x79\x63\xf9\xbb\x7b\xa6\xa4\x2a\x08\x57\x63\x80\x81\x56\xf5\x70",
-    "\x47\x5b\x10\xd0\x56\x48\xe4\x11\x0d\x77\xf0\x39\x16\x10\x6f\x98"
-  },
-  {
-    "Password",
-    "\x08\x05\xb7\x90\xb5\x8e\x96\x7f\x2a\x35\x0a\x0c\x99\xde\x38\x81",
-    "\xae\xcb\x26\xfa\xea\xaa\x62\xd7\x96\x36\xa5\x93\x4b\xac\x10\x78"
-  },
-  {
-    "pass\xc2\xA3",
-    "\x84\x07\x6f\x04\x05\x50\xee\xa9\x34\x19\x67\x63\x3b\x5f\x38\x55",
-    "\x80\x75\x75\x68\x95\x82\x37\x9f\x7d\x80\x7f\x73\x6d\xe9\xe4\x34"
-  },
-}
+-- Crypto tests require OpenSSL
+if HAVE_SSL then
+  local test_vectors = {
+    -- from John the Ripper's vnc_fmt_plug.c
+    -- pass, challenge, response
+    {
+      "1234567890",
+      "\x2f\x75\x32\xb3\xef\xd1\x7e\xea\x5d\xd3\xa0\x94\x9f\xfd\xf1\xd8",
+      "\x0e\xb4\x2d\x4d\x9a\xc1\xef\x1b\x6e\xf6\x64\x7b\x95\x94\xa6\x21"
+    },
+    {
+      "123",
+      "\x79\x63\xf9\xbb\x7b\xa6\xa4\x2a\x08\x57\x63\x80\x81\x56\xf5\x70",
+      "\x47\x5b\x10\xd0\x56\x48\xe4\x11\x0d\x77\xf0\x39\x16\x10\x6f\x98"
+    },
+    {
+      "Password",
+      "\x08\x05\xb7\x90\xb5\x8e\x96\x7f\x2a\x35\x0a\x0c\x99\xde\x38\x81",
+      "\xae\xcb\x26\xfa\xea\xaa\x62\xd7\x96\x36\xa5\x93\x4b\xac\x10\x78"
+    },
+    {
+      "pass\xc2\xA3",
+      "\x84\x07\x6f\x04\x05\x50\xee\xa9\x34\x19\x67\x63\x3b\x5f\x38\x55",
+      "\x80\x75\x75\x68\x95\x82\x37\x9f\x7d\x80\x7f\x73\x6d\xe9\xe4\x34"
+    },
+  }
 
-for _, v in ipairs(test_vectors) do
-  test_suite:add_test(unittest.equal(
-    VNC:encryptVNCDES(v[1], v[2]), v[3]), v[1])
+  for _, v in ipairs(test_vectors) do
+    test_suite:add_test(unittest.equal(
+      VNC:encryptVNCDES(v[1], v[2]), v[3]), v[1])
+  end
 end
 
 return _ENV

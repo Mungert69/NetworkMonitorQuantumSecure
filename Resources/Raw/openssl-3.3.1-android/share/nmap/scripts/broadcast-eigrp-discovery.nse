@@ -2,7 +2,6 @@ local eigrp = require "eigrp"
 local nmap = require "nmap"
 local stdnse = require "stdnse"
 local table = require "table"
-local bin = require "bin"
 local packet = require "packet"
 local ipOps = require "ipOps"
 local target = require "target"
@@ -75,6 +74,7 @@ license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
 categories = {"discovery", "broadcast", "safe"}
 
 prerule = function()
+  -- TODO: EIGRP for IPv6 uses ff02::10
   if nmap.address_family() ~= 'inet' then
     stdnse.verbose1("is IPv4 only.")
     return false
@@ -94,7 +94,7 @@ local eigrpSend = function(interface, eigrp_raw)
   local srcip = interface.address
   local dstip = "224.0.0.10"
 
-  local ip_raw = bin.pack("H", "45c00040ed780000015818bc0a00c8750a00c86b") .. eigrp_raw
+  local ip_raw = stdnse.fromhex( "45c00040ed780000015818bc0a00c8750a00c86b") .. eigrp_raw
   local eigrp_packet = packet.Packet:new(ip_raw, ip_raw:len())
   eigrp_packet:ip_set_bin_src(ipOps.ip_to_str(srcip))
   eigrp_packet:ip_set_bin_dst(ipOps.ip_to_str(dstip))
@@ -104,7 +104,7 @@ local eigrpSend = function(interface, eigrp_raw)
   local sock = nmap.new_dnet()
   sock:ethernet_open(interface.device)
   -- Ethernet IPv4 multicast, our ethernet address and packet type IP
-  local eth_hdr = bin.pack("HAH", "01 00 5e 00 00 0a", interface.mac, "08 00")
+  local eth_hdr = stdnse.fromhex("01 00 5e 00 00 0a") .. interface.mac .. stdnse.fromhex("08 00")
   sock:ethernet_send(eth_hdr .. eigrp_packet.buf)
   sock:ethernet_close()
 end
@@ -199,7 +199,6 @@ action = function()
   local as = stdnse.get_script_args(SCRIPT_NAME .. ".as")
   local kparams = stdnse.get_script_args(SCRIPT_NAME .. ".kparams") or "101000"
   local timeout = stdnse.parse_timespec(stdnse.get_script_args(SCRIPT_NAME .. ".timeout"))
-  local interface = stdnse.get_script_args(SCRIPT_NAME .. ".interface")
   local output, responses, interfaces, lthreads = {}, {}, {}, {}
   local result, response, route, eigrp_hello, k
   local timeout = (timeout or 10) * 1000
@@ -218,27 +217,13 @@ action = function()
     k[6] = string.sub(kparams, 6)
   end
 
-  interface = interface or nmap.get_interface()
-  if interface then
-    -- If an interface was provided, get its information
-    interface = nmap.get_interface_info(interface)
-    if not interface then
-      return fail(("Failed to retrieve %s interface information."):format(interface))
-    end
-    interfaces = {interface}
-    stdnse.debug1("Will use %s interface.", interface.shortname)
-  else
-    local ifacelist = nmap.list_interfaces()
-    for _, iface in ipairs(ifacelist) do
-      -- Match all ethernet interfaces
-      if iface.address and iface.link=="ethernet" and
-        iface.address:match("%d+%.%d+%.%d+%.%d+") then
-
-        stdnse.debug1("Will use %s interface.", iface.shortname)
-        table.insert(interfaces, iface)
-      end
+  local collect_interfaces = function (if_table)
+    if if_table and if_table.up == "up" and if_table.link=="ethernet"
+      and if_table.address:match("%d+%.%d+%.%d+%.%d+") then
+      interfaces[#interfaces+1] = if_table
     end
   end
+  stdnse.get_script_interfaces(collect_interfaces)
 
   -- If user didn't provide an Autonomous System value, we listen fro multicast
   -- HELLO router announcements to get one.

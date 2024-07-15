@@ -1,7 +1,6 @@
 local nmap = require "nmap"
 local packet = require "packet"
 local ipOps = require "ipOps"
-local bin = require "bin"
 local stdnse = require "stdnse"
 local target = require "target"
 local table = require "table"
@@ -41,6 +40,7 @@ license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
 categories = {"discovery", "safe", "broadcast"}
 
 prerule = function()
+  -- TODO: IPv6 is supported by PIM-SM
   if nmap.address_family() ~= 'inet' then
     stdnse.verbose1("is IPv4 only.")
     return false
@@ -55,18 +55,17 @@ end
 -- Generates a raw PIM Hello message.
 --@return hello Raw PIM Hello message
 local helloRaw = function()
-  local hello_raw = bin.pack(">CCSAAAA",
+  local hello_raw = string.pack(">BB I2",
     0x20, -- Version: 2, Type: Hello (0)
     0x00, -- Reserved
-    0x0000, -- Checksum: Calculated later
+    0x0000) -- Checksum: Calculated later
     -- Options (TLVs)
-    bin.pack(">SSS", 0x01, 0x02, 0x01), -- Hold time 1 second
-    bin.pack(">SSI", 0x14, 0x04, math.random(23456)), -- Generation ID: Random
-    bin.pack(">SSI", 0x13, 0x04, 0x01), -- DR Priority: 1
-    bin.pack(">SSCCS", 0x15, 0x04, 0x01, 0x00, 0x00) -- State fresh capable: Version = 1, interval = 0, Reserved
-    )
+    .. string.pack(">I2I2 I2", 0x01, 0x02, 0x01) -- Hold time 1 second
+    .. string.pack(">I2I2 I4", 0x14, 0x04, math.random(23456)) -- Generation ID: Random
+    .. string.pack(">I2I2 I4", 0x13, 0x04, 0x01) -- DR Priority: 1
+    .. string.pack(">I2I2 BBI2", 0x15, 0x04, 0x01, 0x00, 0x00) -- State fresh capable: Version = 1, interval = 0, Reserved
   -- Calculate checksum
-  hello_raw = hello_raw:sub(1,2) .. bin.pack(">S", packet.in_cksum(hello_raw)) .. hello_raw:sub(5)
+  hello_raw = hello_raw:sub(1,2) .. string.pack(">I2", packet.in_cksum(hello_raw)) .. hello_raw:sub(5)
 
   return hello_raw
 end
@@ -79,7 +78,7 @@ local helloQuery = function(interface, dstip)
   local srcip = interface.address
 
   local hello_raw = helloRaw()
-  local ip_raw = bin.pack("H", "45c00040ed780000016718bc0a00c8750a00c86b") .. hello_raw
+  local ip_raw = stdnse.fromhex( "45c00040ed780000016718bc0a00c8750a00c86b") .. hello_raw
   hello_packet = packet.Packet:new(ip_raw, ip_raw:len())
   hello_packet:ip_set_bin_src(ipOps.ip_to_str(srcip))
   hello_packet:ip_set_bin_dst(ipOps.ip_to_str(dstip))
@@ -88,7 +87,7 @@ local helloQuery = function(interface, dstip)
   sock = nmap.new_dnet()
   sock:ethernet_open(interface.device)
   -- Ethernet multicast for PIM, our ethernet address and packet type IP
-  eth_hdr = bin.pack(">HAS", "01 00 5e 00 00 0d", interface.mac, 0x0800)
+  eth_hdr = "\x01\x00\x5e\x00\x00\x0d" .. interface.mac .. "\x08\x00"
   sock:ethernet_send(eth_hdr .. hello_packet.buf)
   sock:ethernet_close()
 end
@@ -125,7 +124,7 @@ end
 --- Returns the network interface used to send packets to the destination host.
 --@param destination host to which the interface is used.
 --@return interface Network interface used for destination host.
-local getInterface = function(destination)
+local getInterface = function(interfaces, destination)
   -- First, create dummy UDP connection to get interface
   local sock = nmap.new_socket()
   local status, err = sock:connect(destination, "12345", "udp")
@@ -138,10 +137,16 @@ local getInterface = function(destination)
     stdnse.verbose1("%s", err)
     return
   end
-  for _, interface in pairs(nmap.list_interfaces()) do
+  for _, interface in ipairs(interfaces) do
     if interface.address == address then
       return interface
     end
+  end
+end
+
+local filter_interfaces = function (if_table)
+  if if_table.up == "up" and if_table.address:match("%d+%.%d+%.%d+%.%d+") then
+    return if_table
   end
 end
 
@@ -152,12 +157,15 @@ action = function()
   local mcast = "224.0.0.13"
 
   -- Get the network interface to use
-  local interface = nmap.get_interface()
-  if interface then
-    interface = nmap.get_interface_info(interface)
-  else
-    interface = getInterface(mcast)
+  local interface
+  local interfaces = stdnse.get_script_interfaces(filter_interfaces)
+  if #interfaces > 1 then
+    -- TODO: send on multiple interfaces
+    interface = getInterface(interfaces, mcast)
+  elseif #interfaces == 1 then
+    interface = interfaces[1]
   end
+
   if not interface then
     return stdnse.format_output(false, ("Couldn't get interface for %s"):format(mcast))
   end

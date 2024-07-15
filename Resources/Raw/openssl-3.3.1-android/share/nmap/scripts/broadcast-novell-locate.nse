@@ -1,7 +1,7 @@
-local bin = require "bin"
 local ipOps = require "ipOps"
 local srvloc = require "srvloc"
 local stdnse = require "stdnse"
+local stringaux = require "stringaux"
 local table = require "table"
 
 description = [[
@@ -47,7 +47,7 @@ function action()
   attrib = attrib:match("^%(svcaddr%-ws=(.*)%)$")
   if ( not(attrib) ) then return end
 
-  local attribs = stdnse.strsplit(",", attrib)
+  local attribs = stringaux.strsplit(",", attrib)
   if ( not(attribs) ) then return end
 
   local addrs = { name = "Addresses"}
@@ -55,8 +55,7 @@ function action()
   for _, attr in ipairs(attribs) do
     local addr = attr:match("^%d*%-%d*%-%d*%-(........)")
     if ( addr ) then
-      local pos, dw_addr = bin.unpack( "<I", bin.pack("H", addr) )
-      local ip = ipOps.fromdword(dw_addr)
+      local ip = ipOps.str_to_ip(stdnse.fromhex(addr))
 
       if ( not(ips[ip]) ) then
         table.insert(addrs, ip)

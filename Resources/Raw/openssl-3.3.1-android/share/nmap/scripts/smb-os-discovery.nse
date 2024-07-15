@@ -3,6 +3,8 @@ local smb = require "smb"
 local stdnse = require "stdnse"
 local string = require "string"
 local table = require "table"
+local os = require "os"
+local datetime = require "datetime"
 
 description = [[
 Attempts to determine the operating system, computer name, domain, workgroup, and current
@@ -134,7 +136,7 @@ function make_cpe(result)
   end
 
   if #parts > 0 then
-    return "cpe:/" .. stdnse.strjoin(":", parts)
+    return "cpe:/" .. table.concat(parts, ":")
   end
 end
 
@@ -146,6 +148,7 @@ end
 
 action = function(host)
   local response = stdnse.output_table()
+  local request_time = os.time()
   local status, result = smb.get_os(host)
 
   if(status == false) then
@@ -158,7 +161,8 @@ action = function(host)
   response.domain = result.domain
   response.server = result.server
   if result.time and result.timezone then
-    response.date = stdnse.format_timestamp(result.time, result.timezone * 60 * 60)
+    response.date = datetime.format_timestamp(result.time, result.timezone * 60 * 60)
+    datetime.record_skew(host, result.time - result.timezone * 60 * 60, request_time)
   end
   response.fqdn = result.fqdn
   response.domain_dns = result.domain_dns

@@ -2,6 +2,7 @@ local ipOps = require "ipOps"
 local nmap = require "nmap"
 local stdnse = require "stdnse"
 local string = require "string"
+local stringaux = require "stringaux"
 local table = require "table"
 local target = require "target"
 
@@ -61,7 +62,7 @@ categories = {
 }
 
 local function split_prefix (net)
-  local split = stdnse.strsplit("/", net)
+  local split = stringaux.strsplit("/", net)
   return split[1], tonumber(split[2])
 end
 ---
@@ -73,7 +74,7 @@ end
 -- @param  IPv6_Network A IPv6 Address  ( X:X:X:X::/YY )
 -- @param  IPv4SHosts   A IPv4 String can be: X.X.X.X or X.X.X.X/YY
 -- @param  addr_table   A table to hold the generated addresses.
--- @return  Number   Total succesfuly nodes added to the scan.
+-- @return  Number   Total successfully nodes added to the scan.
 -- @return  Error    A warning if something happened. (Nil otherwise)
 local From_4_to_6 = function (IPv6_Network, IPv4SHosts, addr_table)
 

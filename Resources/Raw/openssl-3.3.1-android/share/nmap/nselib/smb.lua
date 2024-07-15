@@ -122,20 +122,19 @@
 -- @copyright Same as Nmap--See https://nmap.org/book/man-legal.html
 -----------------------------------------------------------------------
 local asn1 = require "asn1"
-local bin = require "bin"
-local bit = require "bit"
-local coroutine = require "coroutine"
+local datetime = require "datetime"
 local io = require "io"
 local math = require "math"
 local match = require "match"
 local netbios = require "netbios"
 local nmap = require "nmap"
-local os = require "os"
 local smbauth = require "smbauth"
 local stdnse = require "stdnse"
 local string = require "string"
 local table = require "table"
+local tableaux = require "tableaux"
 local unicode = require "unicode"
+local smb2 = require "smb2"
 _ENV = stdnse.module("smb", stdnse.seeall)
 
 -- These arrays are filled in with constants at the bottom of this file
@@ -551,7 +550,7 @@ function start_netbios(host, port, name)
     -- Some debug information
     stdnse.debug1("SMB: Trying to start NetBIOS session with name = '%s'", name)
     -- Request a NetBIOS session
-    local session_request = bin.pack(">CCSzz",
+    local session_request = string.pack(">BBI2zz",
       0x81,                        -- session request
       0x00,                        -- flags
       0x44,                        -- length
@@ -583,10 +582,7 @@ function start_netbios(host, port, name)
       socket:close()
       return false, "SMB: Failed to close socket: " .. result
     end
-    pos, result, flags, length = bin.unpack(">CCS", result)
-    if(result == nil or length == nil) then
-      return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [1]"
-    end
+    result, flags, length, pos = string.unpack(">BBI2", result)
 
     -- Check for a positive session response (0x82)
     if result == 0x82 then
@@ -650,19 +646,19 @@ function smb_encode_header(smb, command, overrides)
   local sig = "\xFFSMB"
 
   -- Pretty much every flags is deprecated. We set these two because they're required to be on.
-  local flags  = bit.bor(0x10, 0x08) -- SMB_FLAGS_CANONICAL_PATHNAMES | SMB_FLAGS_CASELESS_PATHNAMES
+  local flags  = (0x10 | 0x08) -- SMB_FLAGS_CANONICAL_PATHNAMES | SMB_FLAGS_CASELESS_PATHNAMES
   -- These flags are less deprecated. We negotiate 32-bit status codes and long names. We also don't include Unicode, which tells
   -- the server that we deal in ASCII.
-  local flags2 = bit.bor(0x4000, 0x2000, 0x0040, 0x0001) -- SMB_FLAGS2_32BIT_STATUS | SMB_FLAGS2_EXECUTE_ONLY_READS | SMB_FLAGS2_IS_LONG_NAME | SMB_FLAGS2_KNOWS_LONG_NAMES
+  local flags2 = (0x4000 | 0x2000 | 0x0040 | 0x0001) -- SMB_FLAGS2_32BIT_STATUS | SMB_FLAGS2_EXECUTE_ONLY_READS | SMB_FLAGS2_IS_LONG_NAME | SMB_FLAGS2_KNOWS_LONG_NAMES
 
   -- Unless the user's disabled the security signature, add it
   if(nmap.registry.args.smbsign ~= "disable") then
-    flags2 = bit.bor(flags2, 0x0004) -- SMB_FLAGS2_SECURITY_SIGNATURE
+    flags2 = (flags2 | 0x0004) -- SMB_FLAGS2_SECURITY_SIGNATURE
   end
 
 
   if(smb['extended_security'] == true) then
-    flags2 = bit.bor(flags2, 0x0800) -- SMB_EXTENDED_SECURITY
+    flags2 = (flags2 | 0x0800) -- SMB_EXTENDED_SECURITY
   end
 
   -- TreeID should never ever be 'nil', but it seems to happen once in awhile so print an error
@@ -670,7 +666,7 @@ function smb_encode_header(smb, command, overrides)
     return false, string.format("SMB: ERROR: TreeID value was set to nil on host %s", smb['ip'])
   end
 
-  local header = bin.pack("<CCCCCICSSLSSSSS",
+  local header = string.pack("<BBBBB I4 B I2 I2 I8 I2 I2 I2 I2 I2",
     sig:byte(1),  -- Header
     sig:byte(2),  -- Header
     sig:byte(3),  -- Header
@@ -706,7 +702,7 @@ local function smb_encode_parameters(parameters, overrides)
   -- Make sure we have an overrides array
   overrides = overrides or {}
 
-  return bin.pack("<CA", (overrides['parameters_length'] or (#parameters / 2)), parameters)
+  return string.pack("<B", overrides['parameters_length'] or (#parameters / 2)) .. parameters
 end
 
 --- Converts a string containing the data section into the encoded data string.
@@ -723,7 +719,7 @@ local function smb_encode_data(data, overrides)
   -- Make sure we have an overrides array
   overrides = overrides or {}
 
-  return bin.pack("<SA", (overrides['data_length'] or #data), data)
+  return string.pack("<I2", overrides['data_length'] or #data) .. data
 end
 
 ---Sign the message, if possible. This is done by replacing the signature with the sequence
@@ -744,7 +740,7 @@ local function message_sign(smb, body)
   end
 
   -- Convert the sequence number to a string
-  local sequence = bin.pack("<L", smb['sequence'])
+  local sequence = string.pack("<I8", smb['sequence'])
   -- Create a new string, with the sequence number in place
   local new_packet = string.sub(body, 1, 14) .. sequence .. string.sub(body, 23)
   -- Calculate the signature
@@ -766,7 +762,7 @@ local function message_check_signature(smb, body)
   if(smb['mac_key'] == nil) then
     stdnse.debug3("SMB: Not signing message (missing mac_key)")
     return true
-  elseif(nmap.registry.args.smbsign ~= "force" and bit.band(smb['security_mode'], 0x0A) ~= 0) then
+  elseif(nmap.registry.args.smbsign ~= "force" and (smb['security_mode'] & 0x0A) ~= 0) then
     stdnse.debug3("SMB: Not signing message (server doesn't support it -- default)")
     return true
   elseif(nmap.registry.args.smbsign == "disable" or nmap.registry.args.smbsign == "ignore") then
@@ -778,7 +774,7 @@ local function message_check_signature(smb, body)
   local signature  = string.sub(body, 15, 22)
 
   -- Turn the sequence into a string
-  local sequence   = bin.pack("<L", smb['sequence'])
+  local sequence   = string.pack("<I8", smb['sequence'])
   -- Create a new string, with the sequence number in place
   local new_packet = string.sub(body, 1, 14) .. sequence .. string.sub(body, 23)
 
@@ -808,23 +804,19 @@ function smb_send(smb, header, parameters, data, overrides)
   local encoded_parameters = smb_encode_parameters(parameters, overrides)
   local encoded_data       = smb_encode_data(data, overrides)
   local body               = header .. encoded_parameters .. encoded_data
-  local attempts           = 5
   local status, err
 
   -- Calculate the message signature
   body = message_sign(smb, body)
 
-  local out = bin.pack(">I<A", #body, body)
+  local out = string.pack(">s4", body)
 
 
-  repeat
-    attempts = attempts - 1
-    stdnse.debug3("SMB: Sending SMB packet (len: %d, attempts remaining: %d)", #out, attempts)
-    status, err = smb['socket']:send(out)
-  until(status or (attempts == 0))
+  stdnse.debug3("SMB: Sending SMB packet (len: %d)", #out)
+  status, err = smb['socket']:send(out)
 
-  if(attempts == 0) then
-    stdnse.debug1("SMB: Sending packet failed after 5 tries! Giving up.")
+  if not status then
+    stdnse.debug1("SMB: Sending packet failed.")
   end
 
   return status, err
@@ -842,54 +834,35 @@ end
 --        removed). If status is false, header contains an error message and parameters/
 --        data are undefined.
 function smb_read(smb, read_data)
-  local status
   local pos, netbios_data, netbios_length, length, header, parameter_length, parameters, data_length, data
-  local attempts = 5
 
   stdnse.debug3("SMB: Receiving SMB packet")
 
   -- Receive the response -- we make sure to receive at least 4 bytes, the length of the NetBIOS length
   smb['socket']:set_timeout(TIMEOUT)
 
-  -- perform 5 attempt to read the Netbios header
-  local netbios
-  repeat
-    attempts = attempts - 1
-    status, netbios_data = smb['socket']:receive_buf(match.numbytes(4), true);
-
-    if ( not(status) and netbios_data == "EOF" ) then
-      stdnse.debug1("SMB: ERROR: Server disconnected the connection")
-      return false, "SMB: ERROR: Server disconnected the connection"
-    end
-  until(status or (attempts == 0))
+  -- attempt to read the Netbios header
+  local status, netbios_data = smb['socket']:receive_buf(match.numbytes(4), true);
 
   -- Make sure the connection is still alive
-  if(status ~= true) then
-    return false, "SMB: Failed to receive bytes after 5 attempts: " .. netbios_data
+  if not status then
+    return false, "SMB: Failed to receive bytes: " .. netbios_data
   end
 
   -- The length of the packet is 4 bytes of big endian (for our purposes).
   -- The NetBIOS header is 24 bits, big endian
-  pos, netbios_length   = bin.unpack(">I", netbios_data)
-  if(netbios_length == nil) then
-    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [2]"
-  end
+  netbios_length, pos = string.unpack(">I4", netbios_data)
   -- Make the length 24 bits
-  netbios_length = bit.band(netbios_length, 0x00FFFFFF)
+  netbios_length = (netbios_length & 0x00FFFFFF)
 
   -- The total length is the netbios_length, plus 4 (for the length itself)
   length = netbios_length + 4
 
-  local attempts = 5
-  local smb_data
-  repeat
-    attempts = attempts - 1
-    status, smb_data = smb['socket']:receive_buf(match.numbytes(netbios_length), true)
-  until(status or (attempts == 0))
+  local status, smb_data = smb['socket']:receive_buf(match.numbytes(netbios_length), true)
 
   -- Make sure the connection is still alive
-  if(status ~= true) then
-    return false, "SMB: Failed to receive bytes after 5 attempts: " .. smb_data
+  if not status then
+    return false, "SMB: Failed to receive bytes: " .. smb_data
   end
 
   local result = netbios_data .. smb_data
@@ -904,36 +877,27 @@ function smb_read(smb, read_data)
     return false, "SMB: ERROR: Server returned invalid signature"
   end
 
-  -- The header is 32 bytes.
-  pos, header   = bin.unpack("<A32", result, pos)
-  if(header == nil) then
-    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [3]"
+  local header_format = "<c32 B"
+  if (#result - pos + 1) < string.packsize(header_format) then
+    return false, "SMB: ERROR: Server returned less data than needed for header"
   end
-
-  -- The parameters length is a 1-byte value.
-  pos, parameter_length = bin.unpack("<C",     result, pos)
-  if(parameter_length == nil) then
-    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [4]"
-  end
+  header, parameter_length, pos = string.unpack("<c32 B", result, pos)
 
   -- Double the length parameter, since parameters are two-byte values.
-  pos, parameters       = bin.unpack(string.format("<A%d", parameter_length*2), result, pos)
-  if(parameters == nil) then
-    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [5]"
+  if (length - pos + 1) < (parameter_length * 2) then
+    return false, "SMB: ERROR: parameter_length greater than response length"
   end
+  parameters, pos = string.unpack(("<c%d"):format(parameter_length*2), result, pos)
 
   -- The data length is a 2-byte value.
-  pos, data_length      = bin.unpack("<S",     result, pos)
-  if(data_length == nil) then
-    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [6]"
-  end
+  data_length, pos = string.unpack("<I2", result, pos)
 
   -- Read that many bytes of data.
   if(read_data == nil or read_data == true) then
-    pos, data             = bin.unpack(string.format("<A%d", data_length),        result, pos)
-    if(data == nil) then
-      return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [7]"
+    if (length - pos + 1) < data_length then
+      return false, "SMB: ERROR: data_length greater than response length"
     end
+    data = string.unpack("c" .. data_length, result, pos)
   else
     data = nil
   end
@@ -942,131 +906,109 @@ function smb_read(smb, read_data)
   return true, header, parameters, data
 end
 
---- Sends out <code>SMB_COM_NEGOTIATE</code>, which is typically the first SMB packet sent out.
+---
+-- Negotiates SMBv1 connections
 --
 -- Sends the following:
 -- * List of known protocols
 --
--- Receives:
--- * The preferred dialect
--- * The security mode
--- * Max number of multiplexed connections, virtual circuits, and buffer sizes
--- * The server's system time and timezone
--- * The "encryption key" (aka, the server challenge)
--- * The capabilities
--- * The server and domain names
+-- This function adds to <code>smb</code>:
+-- * 'security_mode'    Whether or not to use cleartext passwords, message signatures, etc.
+-- * 'max_mpx'          Maximum number of multiplexed connections
+-- * 'max_vc'           Maximum number of virtual circuits
+-- * 'max_buffer'       Maximum buffer size
+-- * 'max_raw_buffer'   Maximum buffer size for raw connections (considered obsolete)
+-- * 'session_key'      A value that's basically just echoed back
+-- * 'capabilities'     The server's capabilities
+-- * 'time'             The server's time (in UNIX-style seconds since 1970)
+-- * 'date'             The server's date in a user-readable format
+-- * 'timezone'         The server's timezone, in hours from UTC
+-- * 'timezone_str'     The server's timezone, as a string
+-- * 'server_challenge' A random string used for challenge/response
+-- * 'domain'           The server's primary domain or workgroup
+-- * 'server'           The server's name
 --
---@param smb       The SMB object associated with the connection
---@param overrides [optional] Overrides for various fields
---@return (status, result) If status is false, result is an error message. Otherwise, result is
---        nil and the following elements are added to <code>smb</code>:
---      * 'security_mode'    Whether or not to use cleartext passwords, message signatures, etc.
---      * 'max_mpx'          Maximum number of multiplexed connections
---      * 'max_vc'           Maximum number of virtual circuits
---      * 'max_buffer'       Maximum buffer size
---      * 'max_raw_buffer'   Maximum buffer size for raw connections (considered obsolete)
---      * 'session_key'      A value that's basically just echoed back
---      * 'capabilities'     The server's capabilities
---      * 'time'             The server's time (in UNIX-style seconds since 1970)
---      * 'date'             The server's date in a user-readable format
---      * 'timezone'         The server's timezone, in hours from UTC
---      * 'timezone_str'     The server's timezone, as a string
---      * 'server_challenge' A random string used for challenge/response
---      * 'domain'           The server's primary domain or workgroup
---      * 'server'           The server's name
-function negotiate_protocol(smb, overrides)
-  local header, parameters, data
-  local pos
-  local header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, pid, mid
-
-  header     = smb_encode_header(smb, command_codes['SMB_COM_NEGOTIATE'], overrides)
-
+-- @param smb The SMB object associated with the connection.
+-- @param overrides Overrides table.
+-- @return Boolean status
+-- @return The negotiated dialect in human readable form or an error message.
+---
+function negotiate_v1(smb, overrides)
+  local header = smb_encode_header(smb, command_codes['SMB_COM_NEGOTIATE'], overrides)
   -- Make sure we have overrides
   overrides = overrides or {}
 
   -- Parameters are blank
-  parameters = ""
-
-  -- Data is a list of strings, terminated by a blank one.
-  if(overrides['dialects'] == nil) then
-    data       = bin.pack("<CzCz", 2, (overrides['dialect'] or "NT LM 0.12"), 2, "")
-  else
-    data = ""
-    for _, v in ipairs(overrides['dialects']) do
-      data = data .. bin.pack("<Cz", 2, v)
-    end
-    data = data .. bin.pack("Cz", 2, "")
-  end
+  local parameters = ""
+  local data = string.pack("<BzBz", 2, (overrides['dialect'] or "NT LM 0.12"), 2, "")
 
   -- Send the negotiate request
   stdnse.debug2("SMB: Sending SMB_COM_NEGOTIATE")
   local result, err = smb_send(smb, header, parameters, data, overrides)
-  if(status == false) then
+  if(result == false) then
     return false, err
   end
-
   -- Read the result
-  status, header, parameters, data = smb_read(smb)
+  local status, header, parameters, data = smb_read(smb)
   if(status ~= true) then
     return false, header
   end
 
+  -- Check if we fell off the packet
+  local header_format = "<c4 B I4 B I2 I2 i8 I2 I2 I2 I2 I2"
+  if #header < string.packsize(header_format) then
+    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [8]"
+  end
+
   -- Parse out the header
-  local uid, tid
-  pos, header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid = bin.unpack("<CCCCCICSSlSSSSS", header)
+  local protocol_version, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid, pos = string.unpack(header_format, header)
 
   -- Get the protocol version
-  local protocol_version = string.char(header1, header2, header3, header4)
   if(protocol_version == ("\xFESMB")) then
     return false, "SMB: Server returned a SMBv2 packet, don't know how to handle"
   end
 
-  -- Check if we fell off the packet (if that happened, the last parameter will be nil)
-  if(header1 == nil or mid == nil) then
-    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [8]"
-  end
-
   -- Since this is the first response seen, check any necessary flags here
-  if(bit.band(flags2, 0x0800) ~= 0x0800) then
+  if((flags2 & 0x0800) ~= 0x0800) then
     smb['extended_security'] = false
   end
 
   -- Parse the parameter section
-  pos, smb['dialect'] = bin.unpack("<S", parameters)
-  if(smb['dialect'] == nil) then
+  local dialect_format = "<I2"
+  local parameters_format = "<BI2 I2 I4 I4 I4 I4"
+  if #parameters < (string.packsize(dialect_format) + string.packsize(parameters_format)) then
     return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [9]"
   end
+  smb['dialect'], pos = string.unpack(dialect_format, parameters)
 
-  -- Check if we ran off the packet
-  if(smb['dialect'] == nil) then
-    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [10]"
-  end
   -- Check if the server didn't like our requested protocol
   if(smb['dialect'] ~= 0) then
+    stdnse.debug2("Server negotiated an unknown protocol (#%d) -- aborting", smb['dialect'])
     return false, string.format("Server negotiated an unknown protocol (#%d) -- aborting", smb['dialect'])
   end
 
-  pos, smb['security_mode'], smb['max_mpx'], smb['max_vc'], smb['max_buffer'], smb['max_raw_buffer'], smb['session_key'], smb['capabilities'], smb['time'], smb['timezone'], smb['key_length'] = bin.unpack("<CSSIIIILsC", parameters, pos)
-  if(smb['security_mode'] == nil or smb['capabilities'] == nil) then
-    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [11]"
-  end
+  smb.security_mode, smb.max_mpx, smb.max_vc, smb.max_buffer, smb.max_raw_buffer, smb.session_key, smb.capabilities, pos = string.unpack(parameters_format, parameters, pos)
   -- Some broken implementations of SMB don't send these variables
-  if(smb['time'] == nil) then
-    smb['time'] = 0
-  end
-  if(smb['timezone'] == nil) then
-    smb['timezone'] = 0
-  end
-  if(smb['key_length'] == nil) then
-    smb['key_length'] = 0
-  end
-  if(smb['byte_count'] == nil) then
-    smb['byte_count'] = 0
+  smb.time = 0
+  smb.timezone = 0
+  smb.key_length = 0
+  smb.byte_count = 0
+  if (#parameters - pos + 1) >= 8 then
+    smb.time, pos = string.unpack("<I8", parameters, pos)
+    if (#parameters - pos + 1) >= 2 then
+      smb.timezone, pos = string.unpack("<i2", parameters, pos)
+      if (#parameters - pos + 1) >= 1 then
+        smb.key_length, pos = string.unpack("B", parameters, pos)
+        if (#parameters - pos + 1) >= 2 then
+          smb.byte_count, pos = string.unpack("<I2", parameters, pos)
+        end
+      end
+    end
   end
 
   -- Convert the time and timezone to more useful values
   smb['time'] = (smb['time'] // 10000000) - 11644473600
-  smb['date'] = os.date("%Y-%m-%d %H:%M:%S", smb['time'])
+  smb['date'] = datetime.format_timestamp(smb['time'])
   smb['timezone'] = -(smb['timezone'] / 60)
   if(smb['timezone'] == 0) then
     smb['timezone_str'] = "UTC+0"
@@ -1078,25 +1020,21 @@ function negotiate_protocol(smb, overrides)
 
   -- Data section
   if(smb['extended_security'] == true) then
-    pos, smb['server_challenge'] = bin.unpack(string.format("<A%d", smb['key_length']), data)
-    if(smb['server_challenge'] == nil) then
-      return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [12]"
+    if #data < 16 then
+      return false, "SMB: ERROR: not enough data for extended security"
     end
-
-    pos, smb['server_guid'] = bin.unpack("<A16", data, pos)
-    if(smb['server_guid'] == nil) then
-      return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [12]"
-    end
+    smb.server_guid, pos = string.unpack("<c16", data)
 
     -- do we have a security blob?
-    if ( #data - pos > 0 ) then
-      pos, smb['security_blob'] = bin.unpack("<A" .. #data - pos, data, pos )
+    if ( #data - pos + 1 > 0 ) then
+      smb.security_blob = data:sub(pos)
+      pos = #data + 1
     end
   else
-    pos, smb['server_challenge'] = bin.unpack(string.format("<A%d", smb['key_length']), data)
-    if(smb['server_challenge'] == nil) then
-      return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [12]"
+    if #data < smb.key_length then
+      return false, "SMB: ERROR: not enough data for server_challenge"
     end
+    smb.server_challenge, pos = string.unpack(string.format("<c%d", smb['key_length']), data)
 
     -- Get the (null-terminated) domain as a Unicode string
     smb['domain'] = ""
@@ -1118,9 +1056,97 @@ function negotiate_protocol(smb, overrides)
     end
   end
 
-  return true
+  stdnse.debug2("SMB_COM_NEGOTIATE got status:%s", status)
+  if status == 0 then
+    return true, overrides['dialect'] or "NT LM 0.12"
+  end
 end
 
+---
+-- Wrapper function to negotiate the protocol to use in the SMB connection.
+-- By default it attempts to negotiate with using following dialects:
+-- * NT LM 12.0 (SMBv1)
+-- @param smb The SMB object
+-- @param overrides Overrides table
+-- @return Boolean status
+---
+function negotiate_protocol(smb, overrides)
+  local status, dialect
+  status, dialect = negotiate_v1(smb, overrides)
+  if status then
+    return true
+  else
+    stdnse.debug1("Couldn't negotiate a SMBv1 connection:%s", dialect)
+    return false, string.format("Could not negotiate a connection:%s", dialect)
+  end
+end
+
+---
+-- Returns list of supported dialects for SMBv1, SMBv2 and SMBv3.
+-- @param host       The SMB host to connect to.
+-- @param overrides [optional] Overrides for various fields.
+-- @return Boolean status
+-- @return Table of supported dialects or error message
+---
+function list_dialects(host, overrides)
+  local supported_dialects = {}
+  local status, smb1_dialect
+  local smbstate
+
+  overrides = tableaux.tcopy(overrides or {})
+
+  -- Check for SMBv1 first
+  stdnse.debug2("Checking if SMBv1 is supported")
+  status, smbstate = start(host)
+  if(status == false) then
+    return false, smbstate
+  end
+
+  status, smb1_dialect = negotiate_v1(smbstate, overrides)
+  if status then --Add SMBv1 as a dialect
+    table.insert(supported_dialects, smb1_dialect)
+  end
+  stop(smbstate) -- Finish SMBv1 and close connection
+
+  status, smbstate = start(host)
+  if(status == false) then
+    return false, smbstate
+  end
+  stdnse.debug2("Checking if SMB 2+ is supported in general")
+  overrides['Dialects'] = nil
+  local max_dialect
+  status, max_dialect = smb2.negotiate_v2(smbstate, overrides)
+  stop(smbstate)
+  if not status then -- None of SMB2 dialects accepted by the target
+    return true, supported_dialects
+  end
+  stdnse.debug2("SMB2: Dialect '%s' is the highest supported", smb2.dialect_name(max_dialect))
+
+  -- Check individual SMB2 and SMB3 dialects
+  for i, dialect in pairs(smb2.dialects()) do
+    if dialect == max_dialect then
+      break
+    end
+    local dialect_name = smb2.dialect_name(dialect)
+    -- we need a clean connection for each negotiate request
+    status, smbstate = start(host)
+    if(status == false) then
+      return false, smbstate
+    end
+    stdnse.debug2("SMB2: Checking if dialect '%s' is supported", dialect_name)
+    overrides['Dialects'] = {dialect}
+    status = smb2.negotiate_v2(smbstate, overrides)
+    --clean smb connection
+    stop(smbstate)
+    if status then
+      stdnse.debug2("SMB2: Dialect '%s' is supported", dialect_name)
+      table.insert(supported_dialects, dialect_name)
+    end
+  end
+  table.insert(supported_dialects, smb2.dialect_name(max_dialect))
+
+  return true, supported_dialects
+end
 
 --- This is an internal function and should not be called externally. Use
 --  the start_session() function instead.
@@ -1128,8 +1154,6 @@ local function start_session_basic(smb, log_errors, overrides)
   local i, err
   local status, result
   local header, parameters, data, domain
-  local pos
-  local header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid
   local andx_command, andx_reserved, andx_offset, action
   local os, lanmanager
   local username, domain, password, password_hash, hash_type
@@ -1155,7 +1179,7 @@ local function start_session_basic(smb, log_errors, overrides)
     lanman, ntlm, smb['mac_key'] = smbauth.get_password_response(smb['ip'], username, domain, password, password_hash, hash_type, smb['server_challenge'], false)
 
     -- Parameters
-    parameters = bin.pack("<CCSSSSISSII",
+    parameters = string.pack("<BBI2 I2I2 I2 I4 I2I2 I4I4",
       0xFF,               -- ANDX -- no further commands
       0x00,               -- ANDX -- Reserved (0)
       0x0000,             -- ANDX -- next offset
@@ -1170,9 +1194,9 @@ local function start_session_basic(smb, log_errors, overrides)
       )
 
     -- Data is a list of strings, terminated by a blank one.
-    data       = bin.pack("<AAzzzz",
-      lanman,                 -- ANSI/Lanman password
-      ntlm,                   -- Unicode/NTLM password
+    data = lanman -- ANSI/Lanman password
+    .. ntlm -- Unicode/NTLM password
+    .. string.pack("<zzzz",
       username,               -- Account
       domain,                 -- Domain
       "Nmap",                 -- OS
@@ -1192,36 +1216,38 @@ local function start_session_basic(smb, log_errors, overrides)
       return false, header
     end
 
-    -- Check if we were allowed in
-    pos, header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid = bin.unpack("<CCCCCICSSlSSSSS", header)
-
-    if(header1 == nil or mid == nil) then
+    local header_format = "<c4 B I4 B I2 I2 i8 I2 I2 I2 I2 I2"
+    if #header < string.packsize(header_format) then
       return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [17]"
     end
+    -- Check if we were allowed in
+    local protocol_version, command, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid, pos
+    protocol_version, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid, pos = string.unpack(header_format, header)
 
     -- Check if we're successful
     if(status == 0) then
 
       -- Parse the parameters
-      pos, andx_command, andx_reserved, andx_offset, action = bin.unpack("<CCSS", parameters)
-      if(andx_command == nil or action == nil) then
-        return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [18]"
+      local parameters_format = "<BB I2 I2"
+      if #parameters < string.packsize(parameters_format) then
+        return false, "SMB: ERROR: Server returned less data than needed"
       end
+      andx_command, andx_reserved, andx_offset, action, pos = string.unpack(parameters_format, parameters)
 
       -- Parse the data
-      pos, os, lanmanager, domain = bin.unpack("<zzz", data)
-      if(os == nil or domain == nil) then
+      status, os, lanmanager, domain, pos = pcall(string.unpack, "<zzz", data)
+      if not status then
         return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [19]"
       end
 
       -- Fill in the smb object and smb string
       smb['uid']        = uid
-      smb['is_guest']   = bit.band(action, 1)
+      smb['is_guest']   = (action & 1)
       smb['os']         = os
       smb['lanmanager'] = lanmanager
 
       -- Check if they're using an un-supported system
-      if(os == nil or lanmanager == nil or domain == nil) then
+      if(os == "" or lanmanager == "" or domain == "") then
         stdnse.debug1("SMB: WARNING: the server is using a non-standard SMB implementation; your mileage may vary (%s)", smb['ip'])
       elseif(os == "Unix" or string.sub(lanmanager, 1, 5) == "Samba") then
         stdnse.debug1("SMB: WARNING: the server appears to be Unix; your mileage may vary.")
@@ -1287,8 +1313,6 @@ local function start_session_extended(smb, log_errors, overrides)
   local i
   local status, status_name, result, err
   local header, parameters, data
-  local pos
-  local header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid
   local andx_command, andx_reserved, andx_offset, action, security_blob_length
   local os, lanmanager
   local username, domain, password, password_hash, hash_type
@@ -1315,8 +1339,8 @@ local function start_session_extended(smb, log_errors, overrides)
   -- check what kind of security blob we were given in the negotiate protocol request
   local sp_nego = false
   if ( smb['security_blob'] and #smb['security_blob'] > 11 ) then
-    local pos, oid = bin.unpack(">A6", smb['security_blob'], 5)
-    sp_nego = ( oid == "\x2b\x06\x01\x05\x05\x02" ) -- check for SPNEGO OID 1.3.6.1.5.5.2
+    local oid, pos = string.unpack(">c6", smb['security_blob'], 5)
+    sp_nego = ( oid == "\x2b\x06\x01\x05\x05\x02" or oid == "\x06\x06\x2b\x06\x01\x05" ) -- check for SPNEGO OID 1.3.6.1.5.5.2
   end
 
   local ntlm_challenge_accepted = false
@@ -1333,8 +1357,8 @@ local function start_session_extended(smb, log_errors, overrides)
 
         if ( sp_nego ) then
           local enc = asn1.ASN1Encoder:new()
-          local mechtype = enc:encode( { type = 'A0', value = enc:encode( { type = '30', value = enc:encode( { type = '06', value = bin.pack("H", "2b06010401823702020a") } ) } ) } )
-          local oid = enc:encode( { type = '06', value = bin.pack("H", "2b0601050502") } )
+          local mechtype = enc:encode( { type = 'A0', value = enc:encode( { type = '30', value = enc:encode( { type = '06', value = stdnse.fromhex("2b06010401823702020a") } ) } ) } )
+          local oid = enc:encode( { type = '06', value = stdnse.fromhex("2b0601050502") } )
 
           security_blob = enc:encode(security_blob)
           security_blob = enc:encode( { type = 'A2', value = security_blob } )
@@ -1346,7 +1370,7 @@ local function start_session_extended(smb, log_errors, overrides)
         end
       else
         if ( sp_nego ) then
-          if ( smb['domain'] or smb['server'] and ( not(domain) or #domain == 0 ) ) then
+          if (smb['domain'] or smb['server']) and (not domain or #domain == 0) then
             domain = smb['domain'] or smb['server']
           end
           hash_type = "ntlm"
@@ -1372,15 +1396,15 @@ local function start_session_extended(smb, log_errors, overrides)
       header     = smb_encode_header(smb, command_codes['SMB_COM_SESSION_SETUP_ANDX'], overrides)
 
       -- Data is a list of strings, terminated by a blank one.
-      data = bin.pack("<Azzz",
-        security_blob,         -- Security blob
+      data = security_blob -- Security blob
+      .. string.pack("<zzz",
         "Nmap",                -- OS
         "Native Lanman",       -- Native LAN Manager
         ""                     -- Primary domain
         )
 
       -- Parameters
-      parameters = bin.pack("<CCSSSSISII",
+      parameters = string.pack("<BB I2 I2 I2 I2 I4 I2 I4 I4",
         0xFF,               -- ANDX -- no further commands
         0x00,               -- ANDX -- Reserved (0)
         #data + 24 + #header + 3, -- ANDX -- next offset
@@ -1406,11 +1430,13 @@ local function start_session_extended(smb, log_errors, overrides)
         return false, header
       end
 
-      -- Check if we were allowed in
-      pos, header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid = bin.unpack("<CCCCCICSSlSSSSS", header)
-      if(header1 == nil or mid == nil) then
-        return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [17]"
+      local header_format = "<c4 B I4 B I2 I2 i8 I2 I2 I2 I2 I2"
+      if #header < string.packsize(header_format) then
+        return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [8]"
       end
+
+      -- Check if we were allowed in
+      local protocol_version, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid, pos = string.unpack(header_format, header)
       smb['uid'] = uid
 
       -- Get a human readable name
@@ -1419,14 +1445,19 @@ local function start_session_extended(smb, log_errors, overrides)
       -- Only parse the parameters if it's ok or if we're going to keep going
       if(status_name == "NT_STATUS_SUCCESS" or status_name == "NT_STATUS_MORE_PROCESSING_REQUIRED") then
         -- Parse the parameters
-        pos, andx_command, andx_reserved, andx_offset, action, security_blob_length = bin.unpack("<CCSSS", parameters)
-        if(andx_command == nil or security_blob_length == nil) then
-          return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [18]"
+        local parameters_format = "<BBI2 I2 I2"
+        if #parameters < string.packsize(parameters_format) then
+          return false, "SMB: ERROR: Server returned less data than needed"
         end
-        smb['is_guest']   = bit.band(action, 1)
+        andx_command, andx_reserved, andx_offset, action, security_blob_length, pos = string.unpack(parameters_format, parameters)
+        smb['is_guest']   = (action & 1)
 
         -- Parse the data
-        pos, security_blob, os, lanmanager = bin.unpack(string.format("<A%dzz", security_blob_length), data)
+        if #data < security_blob_length then
+          return false, "SMB: ERROR: Server returned less data than needed"
+        end
+        security_blob, pos = string.unpack(("<c%d"):format(security_blob_length), data)
+        status, os, lanmanager, pos = pcall(string.unpack, "zz", data, pos)
 
         if not ntlm_challenge_accepted then
           if ( status_name == "NT_STATUS_MORE_PROCESSING_REQUIRED" and sp_nego ) then
@@ -1434,8 +1465,8 @@ local function start_session_extended(smb, log_errors, overrides)
             security_blob = security_blob:sub(start)
           end
 
-          if(security_blob == nil or lanmanager == nil) then
-            return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [19]"
+          if not status or security_blob == nil then
+            return false, "SMB: ERROR: NTLM challenge not accepted or lanmanager missing"
           end
           smb['os']         = os
           smb['lanmanager'] = lanmanager
@@ -1455,7 +1486,7 @@ local function start_session_extended(smb, log_errors, overrides)
         -- If it's ok, do a cleanup and return true
         if(status_name == "NT_STATUS_SUCCESS") then
           -- Check if they're using an un-supported system
-          if(os == nil or lanmanager == nil) then
+          if not status then
             stdnse.debug1("SMB: WARNING: the server is using a non-standard SMB implementation; your mileage may vary (%s)", smb['ip'])
           elseif(os == "Unix" or string.sub(lanmanager, 1, 5) == "Samba") then
             stdnse.debug1("SMB: WARNING: the server appears to be Unix; your mileage may vary.")
@@ -1578,22 +1609,21 @@ end
 --      * 'tid'         The TreeID for the session
 function tree_connect(smb, path, overrides)
   local header, parameters, data, err, result
-  local pos
-  local header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, pid, mid
   local andx_command, andx_reserved, andx_offset, action
+  local status
 
   -- Make sure we have overrides
   overrides = overrides or {}
 
   header = smb_encode_header(smb, command_codes['SMB_COM_TREE_CONNECT_ANDX'], overrides)
-  parameters = bin.pack("<CCSSS",
+  parameters = string.pack("<BBI2 I2 I2",
     0xFF,   -- ANDX no further commands
     0x00,   -- ANDX reserved
     0x0000, -- ANDX offset
     (overrides['tree_connect_flags'] or 0x0000), -- flags
     0x0000 -- password length (for share-level security)
     )
-  data = bin.pack("zz",
+  data = string.pack("zz",
     -- Share-level password
     path,   -- Path
     (overrides['tree_type'] or "?????") -- Type of tree ("?????" = any)
@@ -1612,12 +1642,12 @@ function tree_connect(smb, path, overrides)
     return false, header
   end
 
-  -- Check if we were allowed in
-  local uid, tid
-  pos, header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid = bin.unpack("<CCCCCICSSlSSSSS", header)
-  if(header1 == nil or mid == nil) then
-    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [20]"
+  local header_format = "<c4 B I4 B I2 I2 i8 I2 I2 I2 I2 I2"
+  if #header < string.packsize(header_format) then
+    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [8]"
   end
+  -- Check if we were allowed in
+  local protocol_version, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid, pos = string.unpack(header_format, header)
 
   if(status ~= 0) then
     return false, get_status_name(status)
@@ -1641,7 +1671,6 @@ end
 function tree_disconnect(smb, overrides)
   overrides = overrides or {}
   local header
-  local header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, pid, mid
 
   header = smb_encode_header(smb, command_codes['SMB_COM_TREE_DISCONNECT'], overrides)
 
@@ -1658,12 +1687,14 @@ function tree_disconnect(smb, overrides)
     return false, header
   end
 
-  -- Check if there was an error
-  local uid, tid, pos
-  pos, header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid = bin.unpack("<CCCCCICSSlSSSSS", header)
-  if(header1 == nil or mid == nil) then
-    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [21]"
+  local header_format = "<c4 B I4 B I2 I2 i8 I2 I2 I2 I2 I2"
+  if #header < string.packsize(header_format) then
+    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [8]"
   end
+
+  -- Check if there was an error
+  local protocol_version, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid, pos = string.unpack(header_format, header)
+
   if(status ~= 0) then
     return false, get_status_name(status)
   end
@@ -1683,12 +1714,12 @@ end
 function logoff(smb, overrides)
   overrides = overrides or {}
   local header, parameters, data
-  local header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, pid, mid
+  local status
 
   header = smb_encode_header(smb, command_codes['SMB_COM_LOGOFF_ANDX'], overrides)
 
   -- Parameters are a blank ANDX block
-  parameters = bin.pack("<CCS",
+  parameters = string.pack("<BB I2",
     0xFF,   -- ANDX no further commands
     0x00,   -- ANDX reserved
     0x0000  -- ANDX offset
@@ -1712,12 +1743,13 @@ function logoff(smb, overrides)
   smb['sequence'] = -1
   smb['mac_key']  = nil
 
-  -- Check if there was an error
-  local uid, tid, pos
-  pos, header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid = bin.unpack("<CCCCCICSSlSSSSS", header)
-  if(header1 == nil or mid == nil) then
+  local header_format = "<c4 B I4 B I2 I2 i8 I2 I2 I2 I2 I2"
+  if #header < string.packsize(header_format) then
     return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [22]"
   end
+
+  -- Check if there was an error
+  local protocol_version, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid, pos = string.unpack(header_format, header)
 
   if(status == 0xc0000022) then
     stdnse.debug1("SMB: ERROR: Access was denied in 'logoff', indicating a problem with your message signatures")
@@ -1744,12 +1776,11 @@ end
 --        containing a lot of different elements, the most important one being 'fid', the handle to the opened file.
 function create_file(smb, path, overrides)
   local header, parameters, data
-  local pos
-  local header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, pid, mid
   local andx_command, andx_reserved, andx_offset
   local oplock_level, fid, create_action, created, last_access, last_write, last_change, attributes, allocation_size, end_of_file, filetype, ipc_state, is_directory
   local error_count = 0
 
+  local status, pos
   repeat
     local mutex = nmap.mutex(smb['host'])
     mutex "lock"
@@ -1758,7 +1789,7 @@ function create_file(smb, path, overrides)
     overrides = overrides or {}
 
     header = smb_encode_header(smb, command_codes['SMB_COM_NT_CREATE_ANDX'], overrides)
-    parameters = bin.pack("<CCSCSIIILIIIIIC",
+    parameters = string.pack("<BBI2 B I2 I4 I4 I4 I8 I4 I4 I4 I4 I4 B",
       0xFF,   -- ANDX no further commands
       0x00,   -- ANDX reserved
       0x0000, -- ANDX offset
@@ -1776,7 +1807,7 @@ function create_file(smb, path, overrides)
       (overrides['file_create_security_flags']   or 0x01)                -- Security flags
       )
 
-    data = bin.pack("z", path)
+    data = string.pack("z", path)
 
     -- Send the create file
     stdnse.debug2("SMB: Sending SMB_COM_NT_CREATE_ANDX")
@@ -1793,12 +1824,15 @@ function create_file(smb, path, overrides)
       return false, header
     end
 
-    -- Check if we were allowed in
-    local uid, tid
-    pos, header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid = bin.unpack("<CCCCCICSSlSSSSS", header)
-    if(header1 == nil or mid == nil) then
+    local header_format = "<c4 B I4 B I2 I2 i8 I2 I2 I2 I2 I2"
+    if #header < string.packsize(header_format) then
       return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [23]"
     end
+
+    -- Check if we were allowed in
+    local protocol_version, command, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid
+    protocol_version, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid, pos = string.unpack(header_format, header)
+
     if(status == 0xc00000ac) then
       error_count = error_count + 1
       if(error_count > 10) then
@@ -1814,10 +1848,11 @@ function create_file(smb, path, overrides)
   end
 
   -- Parse the parameters
-  pos, andx_command, andx_reserved, andx_offset, oplock_level, fid, create_action, created, last_access, last_write, last_change, attributes, allocation_size, end_of_file, filetype, ipc_state, is_directory = bin.unpack("<CCSCSILLLLILLSSC", parameters)
-  if(andx_command == nil or is_directory == nil) then
-    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [24]"
+  local parameters_format = "<BBI2 BI2 I4 I8 I8 I8 I8 I4 I8 I8 I2 I2 B"
+  if #parameters < string.packsize(parameters_format) then
+    return false, "SMB: ERROR: Server returned less data than needed"
   end
+  andx_command, andx_reserved, andx_offset, oplock_level, fid, create_action, created, last_access, last_write, last_change, attributes, allocation_size, end_of_file, filetype, ipc_state, is_directory, pos = string.unpack(parameters_format, parameters)
 
   -- Fill in the smb table
   smb['oplock_level']    = oplock_level
@@ -1848,14 +1883,13 @@ end
 function read_file(smb, offset, count, overrides)
   overrides = overrides or {}
   local header, parameters, data
-  local pos
-  local header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, pid, mid
   local andx_command, andx_reserved, andx_offset
   local remaining, data_compaction_mode, reserved_1, data_length_low, data_offset, data_length_high, reserved_2, reserved_3
   local response = {}
+  local status
 
   header = smb_encode_header(smb, command_codes['SMB_COM_READ_ANDX'], overrides)
-  parameters = bin.pack("<CCSSISSISI",
+  parameters = string.pack("<BBI2 I2 I4 I2 I2 I4 I2 I4",
     0xFF,   -- ANDX no further commands
     0x00,   -- ANDX reserved
     0x0000, -- ANDX offset
@@ -1883,13 +1917,14 @@ function read_file(smb, offset, count, overrides)
     return false, header
   end
 
-  -- Check if we were allowed in
-  local uid, tid
-  pos, header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid = bin.unpack("<CCCCCICSSlSSSSS", header)
-
-  if(header1 == nil or mid == nil) then
+  local header_format = "<c4 B I4 B I2 I2 i8 I2 I2 I2 I2 I2"
+  if #header < string.packsize(header_format) then
     return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [25]"
   end
+
+  -- Check if we were allowed in
+  local protocol_version, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid, pos = string.unpack(header_format, header)
+
   if(status ~= 0 and
       (status ~= status_codes.NT_STATUS_BUFFER_OVERFLOW and (smb['filetype'] == filetype_codes.FILE_TYPE_BYTE_MODE_PIPE or
       smb['filetype'] == filetype_codes.FILE_TYPE_MESSAGE_MODE_PIPE) ) ) then
@@ -1897,13 +1932,14 @@ function read_file(smb, offset, count, overrides)
   end
 
   -- Parse the parameters
-  pos, andx_command, andx_reserved, andx_offset, remaining, data_compaction_mode, reserved_1, data_length_low, data_offset, data_length_high, reserved_2, reserved_3 = bin.unpack("<CCSSSSSSISI", parameters)
-  if(andx_command == nil or reserved_3 == nil) then
-    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [26]"
+  local parameters_format = "<BBI2 I2 I2 I2 I2 I2 I4 I2 I4"
+  if #parameters < string.packsize(parameters_format) then
+    return false, "SMB: ERROR: Server returned less data than needed"
   end
+  andx_command, andx_reserved, andx_offset, remaining, data_compaction_mode, reserved_1, data_length_low, data_offset, data_length_high, reserved_2, reserved_3, pos = string.unpack(parameters_format, parameters)
 
   response['remaining']   = remaining
-  response['data_length'] = bit.bor(data_length_low, bit.lshift(data_length_high, 16))
+  response['data_length'] = (data_length_low | (data_length_high << 16))
   response['status']      = status
 
 
@@ -1942,13 +1978,12 @@ end
 function write_file(smb, write_data, offset, overrides)
   overrides = overrides or {}
   local header, parameters, data
-  local pos
-  local header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, pid, mid
   local andx_command, andx_reserved, andx_offset
   local response = {}
+  local status
 
   header = smb_encode_header(smb, command_codes['SMB_COM_WRITE_ANDX'], overrides)
-  parameters = bin.pack("<CCSSIISSSSSI",
+  parameters = string.pack("<BBI2 I2 I4 I4 I2 I2 I2 I2 I2 I4",
     0xFF,   -- ANDX no further commands
     0x00,   -- ANDX reserved
     0x0000, -- ANDX offset
@@ -1979,22 +2014,25 @@ function write_file(smb, write_data, offset, overrides)
     return false, header
   end
 
-  local uid, tid
-  -- Check if we were allowed in
-  pos, header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid = bin.unpack("<CCCCCICSSlSSSSS", header)
-  if(header1 == nil or mid == nil) then
-    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [27]"
+  local header_format = "<c4 B I4 B I2 I2 i8 I2 I2 I2 I2 I2"
+  if #header < string.packsize(header_format) then
+    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [8]"
   end
+
+  -- Check if we were allowed in
+  local protocol_version, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid, pos = string.unpack(header_format, header)
+
   if(status ~= 0) then
     return false, get_status_name(status)
   end
 
   -- Parse the parameters
-  local count_reserved, count_high, remaining, count_low
-  pos, andx_command, andx_reserved, andx_offset, count_low, remaining, count_high, count_reserved  = bin.unpack("<CCSSSSS", parameters)
-  if(count_reserved == nil) then
-    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [28]"
+  local parameters_format = "<BBI2 I2 I2 I2 I2"
+  if #parameters < string.packsize(parameters_format) then
+    return false, "SMB: ERROR: Server returned less data than needed"
   end
+  local count_reserved, count_high, remaining, count_low
+  andx_command, andx_reserved, andx_offset, count_low, remaining, count_high, count_reserved, pos = string.unpack(parameters_format, parameters)
 
   response['count_low']  = count_low
   response['remaining']  = remaining
@@ -2013,12 +2051,12 @@ function close_file(smb, overrides)
   overrides = overrides or {}
   local header, parameters, data
   local pos
-  local header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, pid, mid
+  local status
   local andx_command, andx_reserved, andx_offset
   local response = {}
 
   header = smb_encode_header(smb, command_codes['SMB_COM_CLOSE'], overrides)
-  parameters = bin.pack("<SI",
+  parameters = string.pack("<I2 I4",
     smb['fid'], -- FID
     0xFFFFFFFF  -- Last write (unspecified)
     )
@@ -2038,12 +2076,14 @@ function close_file(smb, overrides)
     return false, header
   end
 
-  -- Check if the close was successful
-  local uid, tid
-  pos, header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid = bin.unpack("<CCCCCICSSlSSSSS", header)
-  if(header1 == nil or mid == nil) then
+  local header_format = "<c4 B I4 B I2 I2 i8 I2 I2 I2 I2 I2"
+  if #header < string.packsize(header_format) then
     return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [27]"
   end
+
+  -- Check if the close was successful
+  local protocol_version, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid, pos = string.unpack(header_format, header)
+
   if(status ~= 0) then
     return false, get_status_name(status)
   end
@@ -2061,16 +2101,15 @@ end
 function delete_file(smb, path, overrides)
   overrides = overrides or {}
   local header, parameters, data
-  local pos
-  local header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, pid, mid
   local andx_command, andx_reserved, andx_offset
+  local status
 
   header = smb_encode_header(smb, command_codes['SMB_COM_DELETE'], overrides)
-  parameters = bin.pack("<S",
+  parameters = string.pack("<I2",
     0x0027 -- Search attributes (0x27 = include read only, hidden, system, and archive)
     )
 
-  data = bin.pack("<Cz",
+  data = string.pack("<Bz",
     0x04, -- Ascii formatted filename
     path)
 
@@ -2087,12 +2126,14 @@ function delete_file(smb, path, overrides)
     return false, header
   end
 
-  -- Check if the close was successful
-  local uid, tid
-  pos, header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid = bin.unpack("<CCCCCICSSlSSSSS", header)
-  if(header1 == nil or mid == nil) then
-    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [27]"
+  local header_format = "<c4 B I4 B I2 I2 i8 I2 I2 I2 I2 I2"
+  if #header < string.packsize(header_format) then
+    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [8]"
   end
+
+  -- Check if the close was successful
+  local protocol_version, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid, pos = string.unpack(header_format, header)
+
   if(status ~= 0) then
     return false, get_status_name(status)
   end
@@ -2105,65 +2146,61 @@ end
 -- Implements SMB_COM_TRANSACTION2 to support the find_files function
 -- This function has not been extensively tested
 --
---@param smb                  The SMB object associated with the connection
---@param sub_command          The SMB_COM_TRANSACTION2 sub command
---@param function_parameters  The parameter data to pass to the function. This is untested, since none of the
---                            transactions I've done have required parameters.
---@param function_data        The data to send with the packet. This is basically the next protocol layer
---@param overrides            The overrides table
---@return (status, result) If status is false, result is an error message. Otherwise, result is a table
---        containing 'parameters' and 'data', representing the parameters and data returned by the server.
-local function send_transaction2(smb, sub_command, function_parameters, function_data, overrides)
+--@param smb           SMB object associated with the connection
+--@param sub_command   code of a SMB_COM_TRANSACTION2 sub command
+--@param trans2_param  Parameter data to pass to the function
+--@param trans2_data   Data to send with the packet
+--@param overrides     The overrides table
+--@return status       Boolean outcome of the request
+--@return error        error message if the status is false
+local function send_transaction2(smb, sub_command, trans2_param, trans2_data, overrides)
   overrides = overrides or {}
-  local header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, pid, mid
-  local header, parameters, data
-  local parameter_offset = 0
-  local parameter_size   = 0
-  local data_offset      = 0
-  local data_size        = 0
-  local total_word_count, total_data_count, reserved1, parameter_count, parameter_displacement, data_count, data_displacement, setup_count, reserved2
-  local response = {}
+  trans2_param = trans2_param or ""
+  trans2_data = trans2_data or ""
 
-  -- Header is 0x20 bytes long (not counting NetBIOS header).
-  header = smb_encode_header(smb, command_codes['SMB_COM_TRANSACTION2'], overrides) -- 0x32 = SMB_COM_TRANSACTION2
+  local header = smb_encode_header(smb, command_codes['SMB_COM_TRANSACTION2'], overrides)
+  local pad1 = "\0\0\0" -- Name, Pad1
+  local pad2 = ("\0"):rep((4 - #trans2_param % 4) % 4)
 
-  if(function_parameters) then
-    parameter_offset = 0x44
-    parameter_size = #function_parameters
-    data_offset = #function_parameters + 33 + 32
+  local trans2_param_len = #trans2_param
+    -- 68 = 32  SMB header
+    --    + 31  SMB parameters
+    --    +  2  SMB data ByteCount field
+    --    +  3  #pad1
+  local trans2_param_pos = 68
+  local trans2_data_len = #trans2_data
+  local trans2_data_pos = trans2_param_pos + trans2_param_len + #pad2
+  if trans2_data_len == 0 then
+    pad2 = ""
+    trans2_data_pos = 0
   end
 
-  -- Parameters are 0x20 bytes long.
-  parameters = bin.pack("<SSSSCCSISSSSSCCS",
-    parameter_size,                  -- Total parameter count.
-    data_size,                       -- Total data count.
-    0x000a,                          -- Max parameter count.
-    0x3984,                          -- Max data count.
-    0x00,                            -- Max setup count.
-    0x00,                            -- Reserved.
-    0x0000,                          -- Flags (0x0000 = 2-way transaction, don't disconnect TIDs).
-    0x00001388,                      -- Timeout (0x00000000 = return immediately).
-    0x0000,                          -- Reserved.
-    parameter_size,                  -- Parameter bytes.
-    parameter_offset,                -- Parameter offset.
-    data_size,                       -- Data bytes.
-    data_offset,                     -- Data offset.
-    0x01,                            -- Setup Count
-    0x00,                            -- Reserved
-    sub_command                      -- Sub command
-    )
+  -- SMB parameters are 31 bytes long, incl. initial WordCount field
+  -- https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-cifs/f7d148cd-e3d5-49ae-8b37-9633822bfeac
+  local parameters = string.pack("<I2 I2 I2 I2 BB I2 I4 I2 I2 I2 I2 I2 BB I2 ",
+            trans2_param_len,    -- Total parameter count
+            trans2_data_len,     -- Total data count
+            0x000a,              -- Max parameter count
+            0xff80,              -- Max data count
+            0x00,                -- Max setup count
+            0x00,                -- Reserved
+            0x0000,              -- Flags (2-way transaction, don't disconnect TIDs)
+            5000,                -- Timeout (ms)
+            0x0000,              -- Reserved
+            trans2_param_len,    -- Parameter count
+            trans2_param_pos,    -- Parameter offset
+            trans2_data_len,     -- Data count
+            trans2_data_pos,     -- Data offset
+            0x01,                -- Setup count
+            0x00,                -- Reserved
+            sub_command          -- Sub command
+            )
 
-  local data = "\0\0\0" .. (function_parameters or '')
-  .. (function_data or '')
+  local data = pad1 .. trans2_param .. pad2 .. trans2_data
 
   -- Send the transaction request
   stdnse.debug2("SMB: Sending SMB_COM_TRANSACTION2")
-  local result, err = smb_send(smb, header, parameters, data, overrides)
-  if(result == false) then
-    return false, err
-  end
-
-  return true
+  return smb_send(smb, header, parameters, data, overrides)
 end
 
 local function receive_transaction2(smb)
@@ -2174,11 +2211,14 @@ local function receive_transaction2(smb)
     return false, header
   end
 
-  -- Check if it worked
-  local pos, header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid = bin.unpack("<CCCCCICSSlSSSSS", header)
-  if(header1 == nil or mid == nil) then
-    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [29]"
+  local header_format = "<c4 B I4 B I2 I2 i8 I2 I2 I2 I2 I2"
+  if #header < string.packsize(header_format) then
+    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [8]"
   end
+
+  -- Check if it worked
+  local protocol_version, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid, pos = string.unpack(header_format, header)
+
   if(status ~= 0) then
     if(status_names[status] == nil) then
       return false, string.format("Unknown SMB error: 0x%08x\n", status)
@@ -2188,10 +2228,11 @@ local function receive_transaction2(smb)
   end
 
   -- Parse the parameters
-  local pos, total_word_count, total_data_count, reserved1, parameter_count, parameter_offset, parameter_displacement, data_count, data_offset, data_displacement, setup_count, reserved2 = bin.unpack("<SSSSSSSSSCC", parameters)
-  if(total_word_count == nil or reserved2 == nil) then
-    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [30]"
+  local parameters_format = "<I2 I2 I2 I2 I2 I2 I2 I2 I2 BB"
+  if #parameters < string.packsize(parameters_format) then
+    return false, "SMB: ERROR: Server returned less data than needed"
   end
+  local total_word_count, total_data_count, reserved1, parameter_count, parameter_offset, parameter_displacement, data_count, data_offset, data_displacement, setup_count, reserved2, pos = string.unpack(parameters_format, parameters)
 
   -- Convert the parameter/data offsets into something more useful (the offset into the data section)
   -- - 0x20 for the header, - 0x01 for the length.
@@ -2239,7 +2280,6 @@ end
 --        representing the parameters and data returned by the server.
 function send_transaction_named_pipe(smb, function_parameters, function_data, pipe, no_setup, overrides)
   overrides = overrides or {}
-  local header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, pid, mid
   local header, parameters, data
   local parameter_offset = 0
   local parameter_size   = 0
@@ -2247,6 +2287,7 @@ function send_transaction_named_pipe(smb, function_parameters, function_data, pi
   local data_size        = 0
   local total_word_count, total_data_count, reserved1, parameter_count, parameter_displacement, data_count, data_displacement, setup_count, reserved2
   local response = {}
+  local status
 
   if(pipe == nil) then
     pipe = "\\PIPE\\"
@@ -2268,12 +2309,12 @@ function send_transaction_named_pipe(smb, function_parameters, function_data, pi
 
   local setup
   if(no_setup) then
-    setup = bin.pack("<CC",
+    setup = string.pack("<BB",
       0x00,                            -- Number of 'setup' words (none)
       0x00                             -- Reserved.
       )
   else
-    setup = bin.pack("<CCSS",
+    setup = string.pack("<BBI2 I2 ",
       0x02,                            -- Number of 'setup' words
       0x00,                            -- Reserved.
       0x0026,                          -- Function to call.
@@ -2282,7 +2323,7 @@ function send_transaction_named_pipe(smb, function_parameters, function_data, pi
   end
 
   -- Parameters are 0x20 bytes long.
-  parameters = bin.pack("<SSSSCCSISSSSSA",
+  parameters = string.pack("<I2 I2 I2 I2 BBI2 I4 I2 I2 I2 I2 I2",
     parameter_size,                  -- Total parameter count.
     data_size,                       -- Total data count.
     0x0008,                          -- Max parameter count.
@@ -2295,12 +2336,10 @@ function send_transaction_named_pipe(smb, function_parameters, function_data, pi
     parameter_size,                  -- Parameter bytes.
     parameter_offset,                -- Parameter offset.
     data_size,                       -- Data bytes.
-    data_offset,                     -- Data offset.
-    setup
-    )
+    data_offset                      -- Data offset.
+    ) .. setup
 
-  data = bin.pack("<z", pipe)
-  .. bin.pack("<I", 0) -- Padding
+  data = string.pack("<zI4", pipe, 0) -- Padding
   .. (function_parameters or '')
   .. (function_data or '')
 
@@ -2317,12 +2356,14 @@ function send_transaction_named_pipe(smb, function_parameters, function_data, pi
     return false, header
   end
 
-  -- Check if it worked
-  local uid, tid, pos
-  pos, header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid = bin.unpack("<CCCCCICSSlSSSSS", header)
-  if(header1 == nil or mid == nil) then
-    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [29]"
+  local header_format = "<c4 B I4 B I2 I2 i8 I2 I2 I2 I2 I2"
+  if #header < string.packsize(header_format) then
+    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [8]"
   end
+
+  -- Check if it worked
+  local protocol_version, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid, pos = string.unpack(header_format, header)
+
   if(status ~= 0) then
     if(status_names[status] == nil) then
       return false, string.format("Unknown SMB error: 0x%08x\n", status)
@@ -2332,10 +2373,11 @@ function send_transaction_named_pipe(smb, function_parameters, function_data, pi
   end
 
   -- Parse the parameters
-  pos, total_word_count, total_data_count, reserved1, parameter_count, parameter_offset, parameter_displacement, data_count, data_offset, data_displacement, setup_count, reserved2 = bin.unpack("<SSSSSSSSSCC", parameters)
-  if(total_word_count == nil or reserved2 == nil) then
-    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [30]"
+  local parameters_format = "<I2 I2 I2 I2 I2 I2 I2 I2 I2 BB"
+  if #parameters < string.packsize(parameters_format) then
+    return false, "SMB: ERROR: Server returned less data than needed"
   end
+  total_word_count, total_data_count, reserved1, parameter_count, parameter_offset, parameter_displacement, data_count, data_offset, data_displacement, setup_count, reserved2, pos = string.unpack(parameters_format, parameters)
 
   -- Convert the parameter/data offsets into something more useful (the offset into the data section)
   -- - 0x20 for the header, - 0x01 for the length.
@@ -2355,18 +2397,18 @@ end
 
 function send_transaction_waitnamedpipe(smb, priority, pipe, overrides)
   overrides = overrides or {}
-  local header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, pid, mid
   local header, parameters, data
   local parameter_offset, data_offset
   local total_word_count, total_data_count, reserved1, parameter_count, parameter_offset, parameter_displacement, data_count, data_offset, data_displacement, setup_count, reserved2
   local response = {}
   local padding = ""
+  local status
 
   -- Header is 0x20 bytes long (not counting NetBIOS header).
   header = smb_encode_header(smb, command_codes['SMB_COM_TRANSACTION'], overrides) -- 0x25 = SMB_COM_TRANSACTION
 
   -- Parameters are 0x20 bytes long.
-  parameters = bin.pack("<SSSSCCSISSSSSCCSS",
+  parameters = string.pack("<I2 I2 I2 I2 BBI2 I4 I2 I2 I2 I2 I2 BBI2 I2 ",
     0,                               -- Total parameter count.
     0,                               -- Total data count.
     0x000,                           -- Max parameter count.
@@ -2386,7 +2428,7 @@ function send_transaction_waitnamedpipe(smb, priority, pipe, overrides)
     priority                         -- Handle to open file
     )
 
-  data = bin.pack("zA", pipe, string.rep('\0', (4 - ((#pipe+1) % 4)) % 4))
+  data = string.pack("z", pipe) .. string.rep('\0', (4 - ((#pipe+1) % 4)) % 4)
 
   -- Send the transaction request
   stdnse.debug2("SMB: Sending SMB_COM_TRANSACTION (WaitNamedPipe)")
@@ -2401,12 +2443,14 @@ function send_transaction_waitnamedpipe(smb, priority, pipe, overrides)
     return false, header
   end
 
-  -- Check if it worked
-  local uid, tid, pos
-  pos, header1, header2, header3, header4, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid = bin.unpack("<CCCCCICSSlSSSSS", header)
-  if(header1 == nil or mid == nil) then
-    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [31]"
+  local header_format = "<c4 B I4 B I2 I2 i8 I2 I2 I2 I2 I2"
+  if #header < string.packsize(header_format) then
+    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [8]"
   end
+
+  -- Parse out the header
+  local protocol_version, command, status, flags, flags2, pid_high, signature, unused, tid, pid, uid, mid, pos = string.unpack(header_format, header)
+
   if(status ~= 0) then
     if(status_names[status] == nil) then
       return false, string.format("Unknown SMB error: 0x%08x\n", status)
@@ -2416,10 +2460,11 @@ function send_transaction_waitnamedpipe(smb, priority, pipe, overrides)
   end
 
   -- Parse the parameters
-  pos, total_word_count, total_data_count, reserved1, parameter_count, parameter_offset, parameter_displacement, data_count, data_offset, data_displacement, setup_count, reserved2 = bin.unpack("<SSSSSSSSSCC", parameters)
-  if(total_word_count == nil or reserved2 == nil) then
-    return false, "SMB: ERROR: Server returned less data than it was supposed to (one or more fields are missing); aborting [32]"
+  local parameters_format = "<I2 I2 I2 I2 I2 I2 I2 I2 I2 BB"
+  if #parameters < string.packsize(parameters_format) then
+    return false, "SMB: ERROR: Server returned less data than needed"
   end
+  total_word_count, total_data_count, reserved1, parameter_count, parameter_offset, parameter_displacement, data_count, data_offset, data_displacement, setup_count, reserved2, pos = string.unpack(parameters_format, parameters)
 
   return true, response
 end
@@ -2466,7 +2511,7 @@ function file_upload(host, localfile, share, remotefile, overrides, encoded)
 
     if(encoded) then
       for j = 1, #data, 1 do
-        new_data[j] = string.char(bit.bxor(0xFF, string.byte(data, j)))
+        new_data[j] = string.char(0xFF ~ string.byte(data, j))
       end
       data = table.concat(new_data, "", 1, #data)
     end
@@ -2498,6 +2543,7 @@ end
 -- data is given as a string, not a file.
 --
 --@param host          The host object
+--@param data          The string containing the data to be written
 --@param share         The share to upload it to (eg, C$).
 --@param remotefile    The remote file on the machine. It is relative to the share's root.
 --@param use_anonymous [optional] If set to 'true', test is done by the anonymous user rather than the current user.
@@ -2692,12 +2738,99 @@ function file_delete(host, share, remotefile)
   return true
 end
 
+-- Sends TRANS2_FIND_FIRST2 / TRANS2_FIND_NEXT2 request, takes care of
+-- short/fragmented responses, and returns a list of file entries
+--
+-- @param smbstate the SMB object associated with the connection
+-- @param srch_id of search to resume (for TRANS2_FIND_NEXT2) or nil
+-- @param trans2_params string representing Trans2_Parameters
+-- @return status of the request
+-- @return srch_id of search to resume later, or nil if the search completed
+--                 or the error message if status is false
+-- @return list of file entries
+local function send_and_receive_find_request(smbstate, srch_id, trans2_params)
+  local TRANS2_FIND_FIRST2 = 1
+  local TRANS2_FIND_NEXT2  = 2
+  local sub_command = srch_id and TRANS2_FIND_NEXT2 or TRANS2_FIND_FIRST2
+  local status = send_transaction2(smbstate, sub_command, trans2_params, "")
+  if not status then
+    return false, "Failed to send data to server: send_transaction2"
+  end
+
+  local resp
+  status, resp = receive_transaction2(smbstate)
+  if not status or #resp.parameters < 2 then
+    return false, "Failed to receive data from server: receive_transaction2"
+  end
+
+  local param_pos = 1
+  if sub_command == TRANS2_FIND_FIRST2 then
+    srch_id, param_pos = string.unpack("<I2", resp.parameters, param_pos)
+  end
+
+  -- parse Trans2_Parameters
+  -- https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-cifs/4e65d94e-09af-4511-a77a-b73adf1c52d6
+  local param_fmt = "<I2 I2 xx I2"
+  if #resp.parameters < param_pos - 1 + param_fmt:packsize() then
+    return false, "Truncated response from server: receive_transaction2"
+  end
+  local srch_cnt, srch_end, last_name_pos = param_fmt:unpack(resp.parameters, param_pos)
+
+  -- format of SMB_FIND_FILE_BOTH_DIRECTORY_INFO, without trailing FileName
+  -- https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-cifs/2aa849f4-1bc0-42bf-9c8f-d09f11fccc4c
+  local entry_fmt = "<I4 xxxx I8 I8 I8 I8 I8 I8 I4 I4 xxxx B x c24"
+  local entry_len = entry_fmt:packsize()
+
+  -- check if we need more packets to reassemble this transaction
+  while #resp.data < last_name_pos + entry_len do
+    local status, tmp = receive_transaction2(smbstate)
+    if not status then
+      return false, "Truncated response from receive_transaction2"
+    end
+    resp.data = resp.data .. tmp.data
+  end
+
+  -- parse response, based on SMB_FIND_FILE_BOTH_DIRECTORY_INFO
+  local entries = {}
+  local data_pos = 1
+  while srch_cnt > 0 do
+    if #resp.data - data_pos + 1 < entry_len then
+      return false, "Truncated response from receive_transaction2"
+    end
+    local entry = {}
+    local next_pos, fn_pos, fn_len, sfn_len
+    next_pos, entry.created, entry.accessed, entry.write, entry.change,
+      entry.eof, entry.alloc_size, entry.attrs, fn_len, sfn_len,
+      entry.s_fname, fn_pos = entry_fmt:unpack(resp.data, data_pos)
+
+    local time = entry.created
+    time = (time // 10000000) - 11644473600
+    entry.created = datetime.format_timestamp(time)
+
+    if sfn_len > 0 then
+      entry.s_fname = entry.s_fname:sub(1, sfn_len)
+    else
+      entry.s_fname = nil
+    end
+
+    if #resp.data - fn_pos + 1 < fn_len then
+      return false, "Truncated response from receive_transaction2"
+    end
+    entry.fname = string.unpack("z", resp.data, fn_pos)
+    table.insert(entries, entry)
+    data_pos = data_pos + next_pos
+    srch_cnt = srch_cnt - 1
+  end
+  return true, (srch_end == 0 and srch_id or nil), entries
+end
+
 ---
--- List files based on a pattern withing a given share and directory
+-- List files based on a pattern within a given share and directory
 --
 -- @param smbstate the SMB object associated with the connection
 -- @param fname filename to search for, relative to share path
 -- @param options table containing none or more of the following
+--        <code>maxfiles</code> how many files to request in a single Trans2 op
 --        <code>srch_attrs</code> table containing one or more of the following boolean attributes:
 --              <code>ro</code> - find read only files
 --              <code>hidden</code> - find hidden files
@@ -2706,123 +2839,91 @@ end
 --              <code>dir</code> - find directories
 --              <code>archive</code> - find archived files
 -- @return iterator function retrieving the next result
-function find_files(smbstate, fname, options)
-  local TRANS2_FIND_FIRST2, TRANS2_FIND_NEXT2 = 1, 2
+function find_files (smbstate, fname, options)
   options = options or {}
 
-  if (not(options.srch_attrs)) then
-    options.srch_attrs = { ro = true, hidden = true, system = true, dir = true}
+  -- convert options.srch_attrs to a bitmap
+  local xlat_srch_attrs = {ro      = "SMB_FILE_ATTRIBUTE_READONLY",
+                           hidden  = "SMB_FILE_ATTRIBUTE_HIDDEN",
+                           system  = "SMB_FILE_ATTRIBUTE_SYSTEM",
+                           volid   = "SMB_FILE_ATTRIBUTE_VOLUME",
+                           dir     = "SMB_FILE_ATTRIBUTE_DIRECTORY",
+                           archive = "SMB_FILE_ATTRIBUTE_ARCHIVE"}
+  local srch_attrs_mask = 0
+  local srch_attrs = options.srch_attrs or {ro=true, hidden=false, system=true, dir=true}
+  for k, v in pairs(srch_attrs) do
+    if v then
+      srch_attrs_mask = srch_attrs_mask | file_attributes[xlat_srch_attrs[k]]
+    end
   end
 
-  local nattrs = (( options.srch_attrs.ro and 1 or 0 ) + ( options.srch_attrs.hidden and 2 or 0 ) +
-    ( options.srch_attrs.hidden and 2 or 0 ) + ( options.srch_attrs.system and 4 or 0 ) +
-    ( options.srch_attrs.volid and 8 or 0 ) + ( options.srch_attrs.dir and 16 or 0 ) +
-    ( options.srch_attrs.archive and 32 or 0 ))
-
-  if ( not(fname) ) then
-    fname = '\\*\0'
-  elseif( fname:sub(1,1) ~= '\\' ) then
-    fname = '\\' .. fname .. '\0'
+  fname = fname or '\\*'
+  if fname:sub(1,1) ~= '\\' then
+    fname = '\\' .. fname
   end
 
-  -- Sends the request and takes care of short/fragmented responses
-  local function send_and_receive_find_request(smbstate, trans_type, function_parameters)
-
-    local status, err = send_transaction2(smbstate, trans_type, function_parameters, "")
-    if ( not(status) ) then
-      return false, "Failed to send data to server: send_transaction2"
-    end
-
-    local status, response = receive_transaction2(smbstate)
-    if ( not(status) ) then
-      return false, "Failed to receive data from server: receive_transaction2"
-    end
-
-    local pos = ( TRANS2_FIND_FIRST2 == trans_type and 9 or 7 )
-    local last_name_offset = select(2, bin.unpack("<S", response.parameters, pos))
-
-    if ( not(last_name_offset) ) then
-      return false, "Could not determine last_name_offset"
-    end
-
-    -- check if we need more packets to reassemble this transaction
-    local NE_UP_TO_FNAME_SIZE = 94
-    while ( last_name_offset > ( #response.data - NE_UP_TO_FNAME_SIZE ) ) do
-      local status, tmp = receive_transaction2(smbstate)
-      if ( not(status) ) then
-        return false, "Failed to receive data from receive_transaction2"
-      end
-      response.data = response.data .. tmp.data
-    end
-
-    return true, response
+  local srch_flags = 0x0002 | 0x0004 -- SMB_FIND_CLOSE_AT_EOS, SMB_FIND_RETURN_RESUME_KEYS
+  local srch_info_lvl = 0x0104       -- SMB_FIND_FILE_BOTH_DIRECTORY_INFO
+  local max_srch_cnt = tonumber(options.maxfiles)
+  if max_srch_cnt and max_srch_cnt > 0 then
+    max_srch_cnt = math.floor(4 + math.min(1020, max_srch_cnt))
+  else
+    max_srch_cnt = 1024
   end
 
-  local srch_count = 173 -- picked up by wireshark
-  local flags = 6 -- Return RESUME keys, close search if END OF SEARCH is reached
-  local loi   = 260 -- Level of interest, return SMB_FIND_FILE_BOTH_DIRECTORY_INFO
-  local storage_type = 0 -- despite the documentation of having to be either 0x01 or 0x40, wireshark reports 0
+  -- state variables for next_entry() iterator
+  local first_run = true
+  local srch_id = nil
+  local last_fname = nil
+  local entries = {}
+  local entry_idx = 1
 
-  -- SMB header: 32
-  -- trans2 header: 36
-  -- FIND_FIRST2 parameters: 12 + #fname
-  local pad = ( 32 + 36 + 12 + #fname ) % 4
-  local function_parameters = bin.pack("<SSSSIAA",
-    nattrs, srch_count, flags, loi, storage_type, fname, string.rep('\0', (4 - pad) % 4))
-
-
-  local function next_item()
-
-    local status, response = send_and_receive_find_request(smbstate, TRANS2_FIND_FIRST2, function_parameters)
-    if ( not(status) ) then
-      return
-    end
-
-    local srch_id = select(2, bin.unpack("<S", response.parameters))
-    local stop_loop = ( select(2, bin.unpack("<S", response.parameters, 5)) ~= 0 )
-    local first = true
-    local last_name
-
-    repeat
-      local pos = 1
-      if ( not(first) ) then
-        local function_parameters = bin.pack("<SSSISA", srch_id, srch_count, loi, 0, flags, last_name .. "\0")
-        status, response = send_and_receive_find_request(smbstate, TRANS2_FIND_NEXT2, function_parameters)
-        if ( not(status) ) then
+  local function next_entry()
+    if entry_idx > #entries then  -- get more file entries from the target
+      local trans2_params
+      if first_run then -- TRANS2_FIND_FIRST2
+        first_run = false
+        -- https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-cifs/b2b2a730-9499-4f05-884e-d5bb7b9caf90
+        trans2_params = string.pack("<I2 I2 I2 I2 I4 z",
+                                  srch_attrs_mask, -- what types of files to return
+                                  max_srch_cnt,    -- maximum number of returned entries
+                                  srch_flags,      -- Flags
+                                  srch_info_lvl,   -- level of returned file details
+                                  0,               -- SearchStorageType
+                                  fname)           -- file name to search for
+      -- FIXME filename ASCII vs UNICODE
+      else -- TRANS2_FIND_NEXT2
+        if not srch_id then  -- the search is over
           return
         end
-
-        -- check whether END-OF-SEARCH was set
-        stop_loop = ( select(2, bin.unpack(">S", response.parameters, 3)) ~= 0 )
+        -- https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-cifs/80dc980e-fe03-455c-ada6-7c5dd6c551ba
+        trans2_params = string.pack("<I2 I2 I2 I4 I2 z",
+                                  srch_id,         -- which search to resume
+                                  max_srch_cnt,    -- maximum number of returned entries
+                                  srch_info_lvl,   -- level of returned file details
+                                  0,               -- ResumeKey
+                                  srch_flags,      -- Flags
+                                  last_fname)      -- last file name previously returned
+        -- FIXME wtf is ResumeKey?
       end
-
-      -- parse response, based on LOI == 260
-      repeat
-        local fe, last_pos, ne, f_len, ea_len, sf_len, _ = {}, pos
-
-        pos, ne, fe.fi, fe.created, fe.accessed, fe.write, fe.change,
-        fe.eof, fe.alloc_size, fe.attrs, f_len, ea_len, sf_len, _ = bin.unpack("<IILLLLLLIIICC", response.data, pos)
-        pos, fe.s_fname = bin.unpack("A24", response.data, pos)
-
-        local time = fe.created
-        time = (time / 10000000) - 11644473600
-        fe.created = os.date("%Y-%m-%d %H:%M:%S", time)
-
-        -- TODO: cleanup fe.s_fname
-        pos, fe.fname = bin.unpack("A" .. f_len, response.data, pos)
-        pos = last_pos + ne
-
-        -- removing trailing zero bytes from file name
-        fe.fname = fe.fname:sub(1, -2)
-        last_name = fe.fname
-
-        coroutine.yield(fe)
-      until ( ne == 0 or pos > response.data:len() )
-      first = false
-    until(stop_loop)
-    return
+      local status
+      status, srch_id, entries = send_and_receive_find_request(smbstate, srch_id, trans2_params)
+      if not status then
+        stdnse.debug1("Routine find_files failed with error: %s", srch_id)
+        srch_id = nil
+        entries = {}
+      end
+      entry_idx = 1
+      if #entries == 0 then
+        return
+      end
+    end
+    local entry = entries[entry_idx]
+    last_fname = entry.fname
+    entry_idx = entry_idx + 1
+    return entry
   end
-  return coroutine.wrap(next_item)
+  return next_entry
 end
 
 ---Determine whether or not the anonymous user has write access on the share. This is done by creating then
@@ -3075,6 +3176,12 @@ function share_get_details(host, share)
   local i
   local details = {}
 
+  --Transform name to FQPN form
+  status, share = get_fqpn(host, share)
+  if not status then
+    stdnse.debug1("SMB:Couldn't obtain FQPN share name. Trying with '%s'", share)
+  end
+
   -- Save the name
   details['name'] = share
 
@@ -3183,7 +3290,7 @@ function share_get_list(host)
   -- Ensure that the server returns the proper error message
   -- first try anonymously, then using a user account (in case anonymous connections are not supported)
   for _, anon in ipairs({true, false}) do
-    status, result = share_host_returns_proper_error(host)
+    status, result = share_host_returns_proper_error(host, anon)
 
     if(status == true and result == false) then
       return false, "Server doesn't return proper value for non-existent shares; can't enumerate shares"
@@ -3421,11 +3528,11 @@ function get_uniqueish_name(host, extension, seed)
   local str = lhost .. (seed or "") .. (extension or "") .. (nmap.registry.args.randomseed or "")
 
   for i = 1, #str, 1 do
-    local chr = string.byte(string.sub(str, i, i), 1)
-    hash = bit.bxor(hash, chr)
-    hash = bit.bor(bit.lshift(hash, 3), bit.rshift(hash, 29))
-    hash = bit.bxor(hash, 3)
-    hash = bit.band(hash, 0xFFFFFFFF)
+    local chr = str:byte(i)
+    hash = hash ~ chr
+    hash = (hash << 3) | (hash >> 29)
+    hash = hash ~ 3
+    hash = hash & 0xFFFFFFFF
   end
 
   local response
@@ -3442,19 +3549,18 @@ end
 -- 'false' is simply returned.
 function is_admin(host, username, domain, password, password_hash, hash_type)
   local msrpc = require "msrpc" -- avoid require cycle
-  local status, smbstate, err, result
   local overrides = get_overrides(username, domain, password, password_hash, hash_type)
 
   stdnse.debug1("SMB: Checking if %s is an administrator", username)
 
-  status, smbstate = start(host)
+  local status, smbstate = start(host)
   if(status == false) then
     stdnse.debug1("SMB; is_admin: Failed to start SMB: %s [%s]", smbstate, username)
     stop(smbstate)
     return false
   end
 
-  status, err      = negotiate_protocol(smbstate, overrides)
+  local status, err      = negotiate_protocol(smbstate, overrides)
   if(status == false) then
     stdnse.debug1("SMB; is_admin: Failed to negotiate protocol: %s [%s]", err, username)
     stop(smbstate)
@@ -3468,7 +3574,8 @@ function is_admin(host, username, domain, password, password_hash, hash_type)
     return false
   end
 
-  status, err      = tree_connect(smbstate, "IPC$", overrides)
+  local _, fqpn_share = get_fqpn(host, "IPC$")
+  status, err      = tree_connect(smbstate, fqpn_share, overrides)
   if(status == false) then
     stdnse.debug1("SMB; is_admin: Failed to connect tree: %s [%s]", err, username)
     stop(smbstate)
@@ -3500,6 +3607,19 @@ function is_admin(host, username, domain, password, password_hash, hash_type)
   stop(smbstate)
 
   return true
+end
+
+---
+-- Returns the fully qualified path name (FQPN) for shares.
+-- This is required for modern versions of Windows.
+-- Returns \\<ip>\<sharename> when successful. Otherwise, returns the same share name.
+---
+function get_fqpn(host, sharename)
+  if host.ip and sharename then
+    return true, string.format("\\\\%s\\%s", host.ip, sharename)
+  end
+  stdnse.debug1("SMB: get_fqpn: Couldn't determine server IP address")
+  return false, sharename
 end
 
 command_codes =
@@ -3582,6 +3702,24 @@ command_codes =
 for i, v in pairs(command_codes) do
   command_names[v] = i
 end
+
+
+-- https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-cifs/2198f480-e047-4df0-ba64-f28eadef00b9
+file_attributes =
+{
+  SMB_FILE_ATTRIBUTE_NORMAL      = 0x0000,
+  SMB_FILE_ATTRIBUTE_READONLY    = 0x0001,
+  SMB_FILE_ATTRIBUTE_HIDDEN      = 0x0002,
+  SMB_FILE_ATTRIBUTE_SYSTEM      = 0x0004,
+  SMB_FILE_ATTRIBUTE_VOLUME      = 0x0008,
+  SMB_FILE_ATTRIBUTE_DIRECTORY   = 0x0010,
+  SMB_FILE_ATTRIBUTE_ARCHIVE     = 0x0020,
+  SMB_SEARCH_ATTRIBUTE_READONLY  = 0x0100,
+  SMB_SEARCH_ATTRIBUTE_HIDDEN    = 0x0200,
+  SMB_SEARCH_ATTRIBUTE_SYSTEM    = 0x0400,
+  SMB_SEARCH_ATTRIBUTE_DIRECTORY = 0x1000,
+  SMB_SEARCH_ATTRIBUTE_ARCHIVE   = 0x2000
+}
 
 
 -- see http://msdn.microsoft.com/en-us/library/cc231196(v=prot.10).aspx
@@ -4135,7 +4273,7 @@ status_codes =
   NT_STATUS_FILE_IS_OFFLINE                   = 0xc0000267,
   NT_STATUS_DS_NO_MORE_RIDS                   = 0xc00002a8,
   NT_STATUS_NOT_A_REPARSE_POINT               = 0xc0000275,
-  NT_STATUS_NO_SUCH_JOB                       = 0xc000EDE
+  NT_STATUS_NO_SUCH_JOB                       = 0xc0000EDE
 }
 
 for i, v in pairs(status_codes) do
@@ -4213,10 +4351,11 @@ namedpipes =
       self.name = namedpipes.make_pipe_name( self._host.ip, self._pipeSubPath )
 
       stdnse.debug2("%s: Connecting to named pipe: %s", NP_LIBRARY_NAME, self.name )
-      local status, result, errorMessage
+      local errorMessage
       local bool_negotiate_protocol, bool_start_session, bool_disable_extended = true, true, false
-      status, result = start_ex( self._host, bool_negotiate_protocol, bool_start_session,
-        "IPC$", self._pipeSubPath, bool_disable_extended, self._overrides )
+      local _, fqpn_share = get_fqpn(host, "IPC$")
+      local status, result = start_ex( self._host, bool_negotiate_protocol, bool_start_session,
+        fqpn_share, self._pipeSubPath, bool_disable_extended, self._overrides )
 
       if status then
         self._smbstate = result

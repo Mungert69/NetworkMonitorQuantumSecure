@@ -8,11 +8,11 @@
 -- @copyright Same as Nmap--See https://nmap.org/book/man-legal.html
 ---
 
-local bin = require "bin"
 local math = require "math"
 local stdnse = require "stdnse"
 local string = require "string"
 local table = require "table"
+local unittest = require "unittest"
 
 _ENV = stdnse.module("formulas", stdnse.seeall)
 
@@ -70,14 +70,18 @@ local function chi2(data, num_cats)
     return x2
 end
 
+local function c_to_bin (c)
+  local n = stdnse.tobinary(c:byte())
+  return ("0"):rep(8-#n)..n
+end
+
 -- Split a string into a sequence of bit strings of the given length.
 -- splitbits("abc", 5) --> {"01100", "00101", "10001", "00110"}
 -- Any short final group is omitted.
 local function splitbits(s, n)
-    local seq
+    local bits = s:gsub(".", c_to_bin)
 
-    local _, bits = bin.unpack("B" .. #s, s)
-    seq = {}
+    local seq = {}
     for i = 1, #bits - n, n do
         seq[#seq + 1] = bits:sub(i, i + n - 1)
     end
@@ -126,7 +130,7 @@ function looksRandom(data)
     return true
 end
 
--- Return the mean and sample standard deviation of an array, using the
+--- Return the mean and sample standard deviation of an array, using the
 -- algorithm from Knuth Vol. 2, Section 4.2.2.
 --
 -- @params t An array-style table of values
@@ -136,7 +140,9 @@ function mean_stddev(t)
   local i, m, s, sigma
 
   if #t == 0 then
-    return 0, nil
+    return nil, nil
+  elseif #t == 1 then
+    return t[1], 0
   end
 
   m = t[1]
@@ -203,4 +209,12 @@ function median(t)
   return quickselect(t, math.ceil(#t/2))
 end
 
+if not unittest.testing() then
+  return _ENV
+end
+
+test_suite = unittest.TestSuite:new()
+
+local table_equal = unittest.table_equal
+test_suite:add_test(table_equal(splitbits("abc", 5), {"01100", "00101", "10001", "00110"}), 'splitbits("abc", 5)')
 return _ENV

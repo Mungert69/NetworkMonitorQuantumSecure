@@ -1,8 +1,9 @@
 local http = require "http"
+local ipOps = require "ipOps"
 local table = require "table"
+local tableaux = require "tableaux"
 local shortport = require "shortport"
 local stdnse = require "stdnse"
-local string = require "string"
 
 description = [[
 A script to detect WebDAV installations. Uses the OPTIONS and PROPFIND methods.
@@ -31,9 +32,9 @@ This script takes inspiration from the various scripts listed here:
 -- |   Allowed Methods: GET, HEAD, COPY, MOVE, POST, PUT, PROPFIND, PROPPATCH, OPTIONS, MKCOL, DELETE, TRACE, REPORT
 -- |   Server Type: DAV/0.9.8 Python/2.7.6
 -- |   Server Date: Fri, 22 May 2015 19:28:00 GMT
--- |   WebDAV type: unkown
+-- |   WebDAV type: Unknown
 -- |   Directory Listing:
--- |     http://localhosft
+-- |     http://localhost
 -- |     http://localhost:8008/WebDAVTest_b1tqTWeyRR
 -- |     http://localhost:8008/WebDAVTest_A0QWJb7hcK
 -- |     http://localhost:8008/WebDAVTest_hf9Mqqpi1M
@@ -44,7 +45,7 @@ This script takes inspiration from the various scripts listed here:
 -- PROPFIND, PROPPATCH, OPTIONS, MKCOL, DELETE, TRACE, REPORT</elem>
 -- <elem key="Server Type">DAV/0.9.8 Python/2.7.6</elem>
 -- <elem key="Server Date">Fri, 22 May 2015 19:28:00 GMT</elem>
--- <elem key="WebDAV type">unkown</elem>
+-- <elem key="WebDAV type">Unknown</elem>
 -- <table key="Directory Listing">
 --   <elem>http://localhost</elem>
 --   <elem>http://localhost:8008/WebDAVTest_b1tqTWeyRR</elem>
@@ -78,7 +79,7 @@ local function get_options (host, port, path)
 
     if response.header['dav'] and response.header['dav']:find('1') then
       ret['WebDAV'] = true
-      ret['WebDAV type'] = 'Unkown'
+      ret['WebDAV type'] = 'Unknown'
       if response.header['X-MSDAVEXT'] then
         ret['WebDAV type'] = 'SHAREPOINT DAV'
       end
@@ -93,34 +94,22 @@ local function get_options (host, port, path)
   end
 end
 
-
-local function validateIP(matched_ip)
-  local oct_1, oct_2, oct_3, oct_4 = matched_ip:match('(%d%d?%d?)%.(%d%d?%d?)%.(%d%d?%d)%.(%d%d?%d?)')
-  if tonumber(oct_1) > 255 or tonumber(oct_2) > 255 or tonumber(oct_3) > 255 or tonumber(oct_4) > 255 then
-    return false
-  end
-  return true
-end
-
 -- a function to extract internal ip addresses from PROPFIND response.
 local function getIPs(body)
-  local ip_pat1 = '192%.168%.%d+%.%d+'
-  local ip_pat2 = '10%.%d+%.%d+%.%d+'
-  local ip_pat3 = '172%.%d+%.%d+%.%d+'
-  local ip_pats = {
-    ip_pat1,
-    ip_pat2,
-    ip_pat3,
-  }
+  local ip_pats = {'%f[%d]192%.168%.%d+%.%d+',
+                   '%f[%d]10%.%d+%.%d+%.%d+',
+                   '%f[%d]172%.1[6-9]%.%d+%.%d+',
+                   '%f[%d]172%.2%d%.%d+%.%d+',
+                   '%f[%d]172%.3[01]%.%d+%.%d+'}
   local result = {}
   for _, ip_pat in pairs(ip_pats) do
     for ip in body:gmatch(ip_pat) do
-      if validateIP(ip) then
+      if ipOps.expand_ip(ip) then
         result[ip] = true
       end
     end
   end
-  return stdnse.keys(result)
+  return tableaux.keys(result)
 end
 
 -- a function to test the PROPFIND method.
@@ -191,4 +180,3 @@ function action (host, port)
 
   if #output > 0 then return output else return nil end
 end
-

@@ -6,6 +6,7 @@ local shortport = require "shortport"
 local stdnse = require "stdnse"
 local string = require "string"
 local table = require "table"
+local rand = require "rand"
 
 description = [[
 Enumerates the installed Drupal modules/themes by using a list of known modules and themes.
@@ -25,6 +26,8 @@ If you want to update your themes or module list refer to the link below.
 ]]
 
 ---
+-- @see http-vuln-cve2014-3704.nse
+--
 -- @args http-drupal-enum.root The base path. Defaults to <code>/</code>.
 -- @args http-drupal-enum.number Number of modules to check.
 -- Use this option with a number or "all" as an argument to test for all modules.
@@ -175,7 +178,7 @@ function action (host, port)
   -- We default to HEAD requests unless the server returns
   -- non 404 (200 or other) status code
 
-  local response = http.head(host, port, modules_path .. stdnse.generate_random_string(8) .. "/LICENSE.txt")
+  local response = http.head(host, port, modules_path .. rand.random_alpha(8) .. "/LICENSE.txt")
   if response.status ~= 404 then
     method = "GET"
   end

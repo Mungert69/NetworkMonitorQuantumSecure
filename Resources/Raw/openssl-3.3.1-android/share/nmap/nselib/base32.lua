@@ -25,8 +25,6 @@
 -- @author Patrick Donnelly <batrick@batbytes.com>
 -- @copyright The MIT License (MIT); Copyright (c) 2016 Patrick Joseph Donnelly (batrick@batbytes.com)
 
-local debug1 = require "stdnse".debug1
-
 local assert = assert
 local error = error
 local ipairs = ipairs
@@ -43,6 +41,8 @@ local remove = require "os".remove
 local char = require "string".char
 
 local concat = require "table".concat
+
+local unittest = require "unittest"
 
 _ENV = require "stdnse".module "base32"
 
@@ -108,7 +108,10 @@ function enc (p, hexExtend)
 end
 
 
-local db32table_standard = setmetatable({}, {__index = function (t, k) error "invalid encoding: invalid character" end})
+local db32metatable = {
+  __index = function (t, k) error "invalid encoding: invalid character" end
+}
+local db32table_standard = setmetatable({}, db32metatable)
 do
     local r = {["="] = 0}
     for i, v in ipairs(b32standard) do
@@ -118,7 +121,7 @@ do
         db32table_standard[i] = r[char(i)]
     end
 end
-local db32table_hex = setmetatable({}, {__index = function (t, k) error "invalid encoding: invalid character" end})
+local db32table_hex = setmetatable({}, db32metatable)
 do
     local r = {["="] = 0}
     for i, v in ipairs(b32hexExtend) do
@@ -187,49 +190,56 @@ function dec (b32, hexExtend)
     return concat(out)
 end
 
-do
-    local function test(a, b)
-        assert(enc(a) == b and dec(b) == a)
-    end
-    local function testh(a, b)
-        assert(enc(a, true) == b and dec(b, true) == a)
-    end
+if not unittest.testing() then
+  return _ENV
+end
 
-    test("", "")
-    test("f", "MY======")
-    test("fo", "MZXQ====")
-    test("foo", "MZXW6===")
-    test("foob", "MZXW6YQ=")
-    test("fooba", "MZXW6YTB")
-    test("foobar", "MZXW6YTBOI======")
-    testh("", "")
-    testh("f", "CO======")
-    testh("fo", "CPNG====")
-    testh("foo", "CPNMU===")
-    testh("foob", "CPNMUOG=")
-    testh("foobar", "CPNMUOJ1E8======")
+test_suite = unittest.TestSuite:new()
 
-    -- extensive tests
-    if false then
-        local path = tmpname()
-        local file = open(path, "w")
-        local t = {}
-        for a = 0, 255, random(1, 7) do
-            for b = 0, 255, random(2, 7) do
-                for c = 0, 255, random(2, 7) do
-                    t[#t+1] = char(a, b, c, 0xA)
-                    file:write(t[#t])
-                end
-            end
-        end
-        assert(file:close())
-        local input = concat(t)
-        local output = enc(input)
-        local good = assert(popen("base32 < "..path, "r")):read("a"):gsub("%s", "")
-        remove(path)
-        assert(output == good)
-        assert(dec(output) == input)
+local equal = unittest.equal
+local function test(a, b)
+  test_suite:add_test(equal(enc(a), b), "encoding")
+  test_suite:add_test(equal(dec(b), a), "decoding")
+end
+local function testh(a, b)
+  test_suite:add_test(equal(enc(a, true), b), "hex encoding")
+  test_suite:add_test(equal(dec(b, true), a), "hex decoding")
+end
+
+test("", "")
+test("f", "MY======")
+test("fo", "MZXQ====")
+test("foo", "MZXW6===")
+test("foob", "MZXW6YQ=")
+test("fooba", "MZXW6YTB")
+test("foobar", "MZXW6YTBOI======")
+testh("", "")
+testh("f", "CO======")
+testh("fo", "CPNG====")
+testh("foo", "CPNMU===")
+testh("foob", "CPNMUOG=")
+testh("foobar", "CPNMUOJ1E8======")
+
+-- extensive tests
+if false then
+  local path = tmpname()
+  local file = open(path, "w")
+  local t = {}
+  for a = 0, 255, random(1, 7) do
+    for b = 0, 255, random(2, 7) do
+      for c = 0, 255, random(2, 7) do
+        t[#t+1] = char(a, b, c, 0xA)
+        file:write(t[#t])
+      end
     end
+  end
+  assert(file:close())
+  local input = concat(t)
+  local output = enc(input)
+  local good = assert(popen("base32 < "..path, "r")):read("a"):gsub("%s", "")
+  remove(path)
+  assert(output == good)
+  assert(dec(output) == input)
 end
 
 return _ENV

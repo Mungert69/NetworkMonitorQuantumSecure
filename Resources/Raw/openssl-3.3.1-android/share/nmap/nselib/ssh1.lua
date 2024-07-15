@@ -6,15 +6,15 @@
 -- @copyright Same as Nmap--See https://nmap.org/book/man-legal.html
 
 
-local bin = require "bin"
-local bit = require "bit"
 local io = require "io"
 local math = require "math"
 local nmap = require "nmap"
 local os = require "os"
 local stdnse = require "stdnse"
 local string = require "string"
+local stringaux = require "stringaux"
 local table = require "table"
+local base64 = require "base64"
 local openssl = stdnse.silent_require "openssl"
 _ENV = stdnse.module("ssh1", stdnse.seeall)
 
@@ -31,8 +31,7 @@ _ENV = stdnse.module("ssh1", stdnse.seeall)
 --  the return is similar to the lua function string:find()
 check_packet_length = function( buffer )
   if #buffer < 4 then return nil end
-  local payload_length, packet_length, offset
-  offset, payload_length = bin.unpack( ">I", buffer )
+  local payload_length = string.unpack( ">I4", buffer )
   local padding = 8 - payload_length % 8
   assert(payload_length)
   local total = 4+payload_length+padding;
@@ -52,6 +51,11 @@ end
 receive_ssh_packet = function( socket )
   local status, packet = socket:receive_buf(check_packet_length, true)
   return status, packet
+end
+
+local function unpack_with_padding(len_bytes, data, offset)
+  local length, offset = string.unpack( ">I".. len_bytes, data, offset )
+  return string.unpack( ">c" .. math.ceil( length / 8 ), data, offset )
 end
 
 --- Fetch an SSH-1 host key.
@@ -79,29 +83,25 @@ fetch_host_key = function(host, port)
   socket:close()
   if not status then return end
 
-  offset, packet_length = bin.unpack( ">i", data )
+  packet_length, offset = string.unpack( ">I4", data )
   padding = 8 - packet_length % 8
   offset = offset + padding
 
   if padding + packet_length + 4 == #data then
     -- seems to be a proper SSH1 packet
     local msg_code,host_key_bits,exp,mod,length,fp_input
-    offset, msg_code = bin.unpack( ">c", data, offset )
+    msg_code, offset = string.unpack( ">B", data, offset )
     if msg_code == 2 then -- 2 => SSH_SMSG_PUBLIC_KEY
       -- ignore cookie and server key bits
-      offset, _, _ = bin.unpack( ">A8i", data, offset )
+      offset = offset + 8 + 4
       -- skip server key exponent and modulus
-      offset, length = bin.unpack( ">S", data, offset )
-      offset = offset + math.ceil( length / 8 )
-      offset, length = bin.unpack( ">S", data, offset )
-      offset = offset + math.ceil( length / 8 )
+      _, offset = unpack_with_padding(2, data, offset)
+      _, offset = unpack_with_padding(2, data, offset)
 
-      offset, host_key_bits = bin.unpack( ">i", data, offset )
-      offset, length = bin.unpack( ">S", data, offset )
-      offset, exp = bin.unpack( ">A" .. math.ceil( length / 8 ), data, offset )
+      host_key_bits, offset = string.unpack( ">I4", data, offset )
+      exp, offset = unpack_with_padding(2, data, offset)
       exp = openssl.bignum_bin2bn( exp )
-      offset, length = bin.unpack( ">S", data, offset )
-      offset, mod = bin.unpack( ">A" .. math.ceil( length / 8 ), data, offset )
+      mod, offset = unpack_with_padding(2, data, offset)
       mod = openssl.bignum_bin2bn( mod )
 
       fp_input = mod:tobin()..exp:tobin()
@@ -109,7 +109,7 @@ fetch_host_key = function(host, port)
       return {exp=exp,mod=mod,bits=host_key_bits,key_type='rsa1',fp_input=fp_input,
               full_key=('%d %s %s'):format(host_key_bits, exp:todec(), mod:todec()),
               key=('%s %s'):format(exp:todec(), mod:todec()), algorithm="RSA1",
-              fingerprint=openssl.md5(fp_input)}
+              fingerprint=openssl.md5(fp_input), fp_sha256=openssl.digest("sha256",fp_input)}
     end
   end
 end
@@ -121,6 +121,16 @@ end
 fingerprint_hex = function( fingerprint, algorithm, bits )
   fingerprint = stdnse.tohex(fingerprint,{separator=":",group=2})
   return ("%d %s (%s)"):format( bits, fingerprint, algorithm )
+end
+
+--- Format a key fingerprint in base64.
+-- @param fingerprint Key fingerprint.
+-- @param hash The hashing algorithm used
+-- @param algorithm Key algorithm.
+-- @param bits Key size in bits.
+fingerprint_base64 = function( fingerprint, hash, algorithm, bits )
+  fingerprint = base64.enc(fingerprint)
+  return ("%d %s:%s (%s)"):format( bits, hash, fingerprint:match("[^=]+"), algorithm )
 end
 
 --- Format a key fingerprint in Bubble Babble.
@@ -137,14 +147,14 @@ fingerprint_bubblebabble = function( fingerprint, algorithm, bits )
     local in1,in2,idx1,idx2,idx3,idx4,idx5
     if i < #fingerprint or #fingerprint / 2 % 2 ~= 0 then
       in1 = fingerprint:byte(i)
-      idx1 = (bit.band(bit.rshift(in1,6),3) + seed) % 6 + 1
-      idx2 = bit.band(bit.rshift(in1,2),15) + 1
-      idx3 = (bit.band(in1,3) + math.floor(seed/6)) % 6 + 1
+      idx1 = (((in1 >> 6) & 3) + seed) % 6 + 1
+      idx2 = ((in1 >> 2) & 15) + 1
+      idx3 = ((in1 & 3) + math.floor(seed/6)) % 6 + 1
       s = s .. vowels[idx1] .. consonants[idx2] .. vowels[idx3]
       if i < #fingerprint then
         in2 = fingerprint:byte(i+1)
-        idx4 = bit.band(bit.rshift(in2,4),15) + 1
-        idx5 = bit.band(in2,15) + 1
+        idx4 = ((in2 >> 4) & 15) + 1
+        idx5 = (in2 & 15) + 1
         s = s .. consonants[idx4] .. '-' .. consonants[idx5]
         seed = (seed * 5 + in1 * 7 + in2) % 36
       end
@@ -186,8 +196,8 @@ fingerprint_visual = function( fingerprint, algorithm, bits )
     input = fingerprint:byte(i)
     -- each byte conveys four 2-bit move commands
     for j=1,4 do
-      if bit.band( input, 1) == 1 then x = x + 1 else x = x - 1 end
-      if bit.band( input, 2) == 2 then y = y + 1 else y = y - 1 end
+      if (input & 1) == 1 then x = x + 1 else x = x - 1 end
+      if (input & 2) == 2 then y = y + 1 else y = y - 1 end
 
       x = math.max(x,1); x = math.min(x,fieldsize_x)
       y = math.max(y,1); y = math.min(y,fieldsize_y)
@@ -195,7 +205,7 @@ fingerprint_visual = function( fingerprint, algorithm, bits )
       if field[x][y] < #characters - 2 then
         field[x][y] = field[x][y] + 1
       end
-      input = bit.rshift( input, 2 )
+      input = input >> 2
     end
   end
 
@@ -255,7 +265,7 @@ parse_known_hosts_file = function(path)
     for l in io.lines(knownhostspath) do
         lnumber = lnumber + 1
         if l and string.sub(l, 1, 1) ~= "#" then
-            local parts = stdnse.strsplit(" ", l)
+            local parts = stringaux.strsplit(" ", l)
             table.insert(known_host_entries, {entry=parts, linenumber=lnumber})
         end
     end

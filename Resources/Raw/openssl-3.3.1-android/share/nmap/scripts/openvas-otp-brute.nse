@@ -1,6 +1,6 @@
 local brute = require "brute"
 local creds = require "creds"
-local nmap = require "nmap"
+local match = require "match"
 local shortport = require "shortport"
 local stdnse = require "stdnse"
 local string = require "string"
@@ -42,7 +42,7 @@ Driver =
   end,
 
   connect = function ( self )
-    self.socket = nmap.new_socket()
+    self.socket = brute.new_socket()
     if ( not(self.socket:connect(self.host, self.port, "ssl")) ) then
       return false
     end
@@ -59,7 +59,7 @@ Driver =
     end
 
     local response
-    status, response = self.socket:receive_buf("\r?\n", false)
+    status, response = self.socket:receive_buf(match.pattern_limit("\r?\n", 2048), false)
     if ( not(status) or response ~= "< OTP/1.0 >" ) then
       local err = brute.Error:new( "Bad handshake from server: "..response )
       err:setAbort(true)
@@ -82,7 +82,7 @@ Driver =
 
     -- Create a buffer and receive the first line
     local line
-    status, line = self.socket:receive_buf("\r?\n", false)
+    status, line = self.socket:receive_buf(match.pattern_limit("\r?\n", 2048), false)
 
     if (line == nil or string.match(line,"Bad login")) then
       stdnse.debug2("Bad login: %s/%s", username, password)

@@ -1,6 +1,7 @@
 local nmap = require "nmap"
 local shortport = require "shortport"
 local table = require "table"
+local tableaux = require "tableaux"
 local stdnse = require "stdnse"
 local string = require "string"
 local sslcert = require "sslcert"
@@ -94,7 +95,7 @@ for k, v in pairs(sslv2.SSL_CIPHERS) do
 end
 
 portrule = function(host, port)
-  return shortport.ssl(host, port) or sslcert.getPrepareTLSWithoutReconnect(port)
+  return port.protocol == "tcp" and (shortport.ssl(host, port) or sslcert.getPrepareTLSWithoutReconnect(port))
 end
 
 -- Return whether all values of "t1" are also values in "t2".
@@ -132,7 +133,7 @@ local function do_setup(host, port)
     end
   end
   socket:set_timeout(timeout)
-  socket:send(sslv2.client_hello(stdnse.keys(sslv2.SSL_CIPHER_CODES)))
+  socket:send(sslv2.client_hello(tableaux.keys(sslv2.SSL_CIPHER_CODES)))
   local status, buffer = sslv2.record_buffer(socket)
   if not status then
     socket:close()
@@ -285,7 +286,11 @@ function action(host, port)
   local offered_ciphers = registry_get(host, port) or sslv2.test_sslv2(host, port)
   if not offered_ciphers then
     output.vulns = report:make_output()
-    return output
+    if (#output > 0) then
+      return output
+    else
+      return nil
+    end
   end
   if next(offered_ciphers) then
     output.ciphers = offered_ciphers
@@ -330,5 +335,7 @@ function action(host, port)
   report:add_vulns(cve_2016_0800)
 
   output.vulns = report:make_output()
-  return output
+  if (#output > 0) then
+    return output
+  end
 end

@@ -15,6 +15,7 @@ local table = require "table"
 --  https://nmap.org/book/man-legal.html
 --
 -- @args http-fingerprints.nikto-db-path Looks at the given path for nikto database.
+--       The database is expected to be a CSV file structured as nikto "db_tests".
 --       It then converts the records in nikto's database into our Lua table format
 --       and adds them to our current fingerprints if they don't exist already.
 --       Unfortunately, our current implementation has some limitations:
@@ -451,7 +452,7 @@ table.insert(fingerprints, {
     matches = {
       {
         match = 'IP_SHARER WEB',
-        output = 'Arris 2307'
+        output = 'Belkin/Arris 2307'
       }
     }
   });
@@ -1220,6 +1221,10 @@ table.insert(fingerprints, {
       },
       {
         path = '/wp-login.php',
+        method = 'HEAD'
+      },
+      {
+        path = '/wp-json',
         method = 'HEAD'
       },
       {
@@ -4685,6 +4690,98 @@ table.insert(fingerprints, {
     category = 'management',
     probes = {
       {
+        path = '/actuator/',
+        method = 'GET'
+      },
+      {
+        path = '/auditevents/',
+        method = 'GET'
+      },
+      {
+        path = '/autoconfig/',
+        method = 'GET'
+      },
+      {
+        path = '/beans/',
+        method = 'GET'
+      },
+      {
+        path = '/configprops/',
+        method = 'GET'
+      },
+      {
+        path = '/env/',
+        method = 'GET'
+      },
+      {
+        path = '/flyway/',
+        method = 'GET'
+      },
+      {
+        path = '/health/',
+        method = 'GET'
+      },
+      {
+        path = '/healthcheck/',
+        method = 'GET'
+      },
+      {
+        path = '/healthchecks/',
+        method = 'GET'
+      },
+      {
+        path = '/loggers/',
+        method = 'GET'
+      },
+      {
+        path = '/liquibase/',
+        method = 'GET'
+      },
+      {
+        path = '/metrics/',
+        method = 'GET'
+      },
+      {
+        path = '/mappings/',
+        method = 'GET'
+      },
+      {
+        path = '/trace/',
+        method = 'GET'
+      }
+    },
+    matches = {
+      {
+        output = 'Spring Boot Actuator endpoint'
+      }
+    }
+  });
+
+table.insert(fingerprints, {
+    category = 'management',
+    probes = {
+      {
+        path = '/heapdump/',
+        method = 'GET'
+      },
+      {
+        path = '/jolokia/',
+        method = 'GET'
+      }
+    },
+    matches = {
+      {
+        output = 'Spring MVC Endpoint'
+      }
+    }
+  });
+
+
+
+table.insert(fingerprints, {
+    category = 'management',
+    probes = {
+      {
         path = '/vmware/',
         method = 'HEAD'
       },
@@ -5167,14 +5264,14 @@ table.insert(fingerprints, {
     category = 'management',
     probes = {
       {
-        path = '/lc/system/console',
+        path = '/system/console',
         method = 'HEAD'
       },
     },
     matches = {
       {
         match = 'OSGi Management Console',
-        output = 'Adobe LiveCycle Management Console'
+        output = 'OSGi Management Console'
       }
     }
   });
@@ -5212,7 +5309,143 @@ table.insert(fingerprints, {
         output = "WebSphere Commerce"
       },
     }
-  })
+  });
+
+table.insert(fingerprints, {
+    category = 'management',
+    probes = {
+      {
+        path = '/rest/applinks/1.0/manifest',
+        method = 'GET'
+      },
+      {
+        path = '/jira/rest/applinks/1.0/manifest',
+        method = 'GET'
+      },
+      {
+        path = '/secure/rest/applinks/1.0/manifest',
+        method = 'GET'
+      },
+    },
+    matches = {
+      {
+        match = '<typeId>jira</typeId>.*<version>([^<]+)</version>',
+        output = 'Atlassian Jira \\1'
+      }
+    }
+  });
+
+table.insert(fingerprints, {
+    category = 'management',
+    probes = {
+      {
+        path = '/rest/servicedeskapi/info',
+        method = 'GET'
+      },
+      {
+        path = '/jira/rest/servicedeskapi/info',
+        method = 'GET'
+      },
+      {
+        path = '/secure/rest/servicedeskapi/info',
+        method = 'GET'
+      },
+    },
+    matches = {
+      {
+        match = '"version":%s*"([^-"]+)',
+        output = 'Atlassian Jira Service Desk \\1'
+      }
+    }
+  });
+
+table.insert(fingerprints, {
+    category = 'management',
+    probes = {
+      {
+        path = '/rest/applinks/1.0/manifest',
+        method = 'GET'
+      },
+      {
+        path = '/confluence/rest/applinks/1.0/manifest',
+        method = 'GET'
+      },
+      {
+        path = '/wiki/rest/applinks/1.0/manifest',
+        method = 'GET'
+      },
+    },
+    matches = {
+      {
+        match = '<typeId>confluence</typeId>.*<version>([^<]+)</version>',
+        output = 'Atlassian Confluence \\1'
+      }
+    }
+  });
+
+table.insert(fingerprints, {
+    category = 'management',
+    probes = {
+      {
+        path = '/rest/applinks/1.0/manifest',
+        method = 'GET'
+      },
+      {
+        path = '/bitbucket/rest/applinks/1.0/manifest',
+        method = 'GET'
+      },
+    },
+    matches = {
+      {
+        match = '<typeId>stash</typeId>.*<version>([^<]+)</version>',
+        output = 'Atlassian Bitbucket Server \\1'
+      },
+      {
+        match = '<typeId>bitbucket</typeId>.*<version>([^<]+)</version>',
+        output = 'Atlassian Bitbucket Server \\1'
+      }
+    }
+  });
+
+table.insert(fingerprints, {
+    category = 'management',
+    probes = {
+      {
+        path = '/rest/applinks/1.0/manifest',
+        method = 'GET'
+      },
+      {
+        path = '/bamboo/rest/applinks/1.0/manifest',
+        method = 'GET'
+      },
+    },
+    matches = {
+      {
+        match = '<typeId>bamboo</typeId>.*<version>([^<]+)</version>',
+        output = 'Atlassian Bamboo \\1'
+      }
+    }
+  });
+
+table.insert(fingerprints, {
+    category = 'management',
+    probes = {
+      {
+        path = '/rest/applinks/1.0/manifest',
+        method = 'GET'
+      },
+      {
+        path = '/crowd/rest/applinks/1.0/manifest',
+        method = 'GET'
+      },
+    },
+    matches = {
+      {
+        match = '<typeId>crowd</typeId>.*<version>([^<]+)</version>',
+        output = 'Atlassian Crowd \\1'
+      }
+    }
+  });
 
 ------------------------------------------------
 ----     PRINTERS, WEBCAMS, PROJECTORS      ----
@@ -6149,6 +6382,22 @@ table.insert(fingerprints, {
     }
   });
 
+table.insert(fingerprints, {
+    category = 'database',
+    probes = {
+      {
+        path = '/_api/version',
+        method = 'GET'
+      }
+    },
+    matches = {
+      {
+        match = '"server":"arango",.-"version":"([^"])"',
+        output = 'ArangoDB \\1'
+      }
+    }
+  });
+
 ------------------------------------------------
 ----              MICROSOFT                 ----
 ------------------------------------------------
@@ -6867,7 +7116,7 @@ table.insert(fingerprints, {
     matches = {
       {
         match = '200',
-        output = 'Possible DD-WRT router Information Disclosure (OSVDB 70230)'
+        output = 'Possible DD-WRT router Information Disclosure (BID 45598)'
       }
     }
   });
@@ -7040,11 +7289,279 @@ table.insert(fingerprints, {
     }
   });
 
+-- Progress Telerik UI for ASP.NET CVE-2017-9248
+table.insert(fingerprints, {
+    category = 'attacks',
+    probes = {
+      {
+        path = '/Telerik.Web.UI.DialogHandler.aspx?dp=////',
+        method = 'GET'
+      },
+      {
+        path = '/Telerik.Web.UI.DialogHandler.ashx?dp=////',
+        method = 'GET'
+      },
+      {
+        path = '/DesktopModules/Admin/RadEditorProvider/DialogHandler.aspx?dp=////',
+        method = 'GET'
+      }
+    },
+    matches = {
+      {
+        dontmatch = 'cannot be less than zero',
+        match = 'Base%-64',
+        output = 'Progress Telerik UI for ASP.NET Cryptographic Weakness (CVE-2017-9248)'
+      }
+    }
+  });
+
+table.insert(fingerprints, {
+    category = 'attacks',
+    probes = {
+      {
+        path = '/uir//etc/passwd',
+        method = 'GET'
+      }
+    },
+    matches = {
+      {
+        match = '200',
+        output = 'Possible D-Link router directory traversal vulnerability (CVE-2018-10822)'
+      },
+      {
+        match = 'root:',
+	output = 'D-Link router directory traversal vulnerability (CVE-2018-10822)'
+      }
+     }
+  });
+
+table.insert(fingerprints, {
+    category = 'attacks',
+    probes = {
+      {
+        path = '/uir//tmp/csman/0',
+        method = 'GET'
+      }
+    },
+    matches = {
+      {
+        match = '200',
+        output = 'Possible D-Link router plaintext password file exposure (CVE-2018-10824)'
+      }
+    }
+  });
+
+table.insert(fingerprints, {
+    category = 'attacks',
+    probes = {
+      {
+        path = '/cgi-bin/export_debug_msg.exp',
+        method = 'GET'
+      },
+      {
+        path = '/cgi-bin/config.exp',
+        method = 'GET'
+      }
+    },
+    matches = {
+      {
+        match = '200 OK',
+        output = 'Cisco RV320/RV325 Unauthenticated Diagnostic Data & Configuration Export (CVE-2019-1653)'
+      }
+    }
+  });
+
+table.insert(fingerprints, {
+    category = 'attacks',
+    probes = {
+      {
+        path = '/',
+        method = 'GET'
+      }
+    },
+    matches = {
+      {
+        match = 'var admin_name=".*";\nvar guest_name=".*";\nvar admin_pwd=".*";',
+        output = 'Cisco RV110W Wireless-N VPN Firewall Password Disclosure (CVE-2014-0683)'
+      }
+    }
+  });
 ------------------------------------------------
 ----        Open Source CMS checks          ----
 ------------------------------------------------
 
--- Broad wordpress version identification
+-- Wordpress versions (Scraping readme file)
+table.insert(fingerprints, {
+  category = 'cms',
+  probes = {
+    {
+      path = '/readme.html',
+      method = 'GET'
+    }
+  },
+  matches = {
+    {
+      match = '<img alt="WordPress" src=".+wordpress.+".+[V|v]ersion ([0-9 .]*)',
+      output = 'Wordpress version: \\1'
+    }
+  }
+});
+
+-- Wordpress versions (Scraping metatags and wp-includes)
+table.insert(fingerprints, {
+  category = 'cms',
+  probes = {
+    {
+      path = '/',
+      method = 'GET'
+    }
+  },
+  matches = {
+    {
+      match = '<meta name="generator" content="WordPress ([0-9 .]*)" />',
+      output = 'WordPress version: \\1'
+    },
+    {
+      match = '/wp-includes/js/wp-emoji-release.min.js?ver=([0-9 .]*)',
+      output = 'WordPress version: \\1'
+    }
+  }
+});
+
+-- Wordpress versions (Scraping rss feed)
+table.insert(fingerprints, {
+  category = 'cms',
+  probes = {
+    {
+      path = '?feed=rss',
+      method = 'GET'
+    },
+    {
+      path = '?feed=rss2',
+      method = 'GET'
+    },
+    {
+      path = '?feed=atom',
+      method = 'GET'
+    },
+    {
+      path = '/feed',
+      method = 'GET'
+    },
+    {
+      path = '/feed/',
+      method = 'GET'
+    },
+    {
+      path = '/feed/rss',
+      method = 'GET'
+    },
+    {
+      path = '/feed/rss2',
+      method = 'GET'
+    },
+    {
+      path = '/feed/atom',
+      method = 'GET'
+    }
+  },
+  matches = {
+    {
+      match = '[v|V]=([0-9 .]*)</generator>',
+      output = 'Wordpress version: \\1'
+    }
+  }
+});
+
+-- Wordpress detection indentified by Version-specific files.
+-- These are the 6 new web-accessible files that was added in each release.
+
+table.insert(fingerprints, {
+  category = 'cms',
+  probes = {
+    {
+      path = "/wp-includes/images/rss.png"
+    }
+  },
+  matches = {
+    {
+      output = "Wordpress version 2.2 found."
+    }
+  }
+});
+
+table.insert(fingerprints, {
+  category = 'cms',
+  probes = {
+    {
+      path = "/wp-includes/js/scriptaculous/sound.js"
+    }
+  },
+  matches = {
+    {
+      output = "Wordpress version 2.3 found."
+    }
+  }
+});
+
+table.insert(fingerprints, {
+  category = 'cms',
+  probes = {
+    {
+      path = "/wp-includes/js/jquery/suggest.js"
+    }
+  },
+  matches = {
+    {
+      output = "Wordpress version 2.5 found."
+    }
+  }
+});
+
+table.insert(fingerprints, {
+  category = 'cms',
+  probes = {
+    {
+      path = "/wp-includes/images/blank.gif"
+    }
+  },
+  matches = {
+    {
+      output = "Wordpress version 2.6 found."
+    }
+  }
+});
+
+table.insert(fingerprints, {
+  category = 'cms',
+  probes = {
+    {
+      path = "/wp-includes/js/comment-reply.js"
+    }
+  },
+  matches = {
+    {
+      output = "Wordpress version 2.7 found."
+    }
+  }
+});
+
+table.insert(fingerprints, {
+  category = 'cms',
+  probes = {
+    {
+      path = "/wp-includes/js/codepress/codepress.js"
+    }
+  },
+  matches = {
+    {
+      output = "Wordpress version 2.8 found."
+    }
+  }
+});
+
+
+-- Broad wordpress version identification (Gives major only versions)
 table.insert(fingerprints, {
     category = 'cms',
     probes = {
@@ -7062,28 +7579,39 @@ table.insert(fingerprints, {
       },
       {
         path = '/weblog/wp-login.php'
+      },
+      {
+        path = '/wp-admin/upgrade.php'
       }
     },
     matches = {
       {
-        match = 'ver=20080708',
+        match = '[ver|version]=20080708',
         output = 'WordPress 2.6.x found'
       },
       {
-        match = 'ver=20081210',
+        match = '[ver|version]=20081210',
         output = 'WordPress 2.7.x found'
       },
       {
-        match = 'ver=20090514',
+        match = '[ver|version]=20090514',
         output = 'WordPress 2.8.x found'
       },
       {
-        match = 'ver=20091217',
+        match = '[ver|version]=20091217',
         output = 'WordPress 2.9.x found'
       },
       {
-        match = 'ver=20100601',
+        match = '[ver|version]=20100601',
         output = 'WordPress 3.0.x found'
+      },
+      {
+        match = '[ver|version]=20110121',
+        output = 'WordPress 3.1.x found'
+      },
+      {
+        match = '[ver|version]=20121105',
+        output = 'WordPress 3.7.x found'
       },
       {
         output = 'Wordpress login page.'
@@ -8063,6 +8591,145 @@ table.insert(fingerprints, {
     }
   });
 
+-- Apache Ambari Web UI
+table.insert(fingerprints, {
+    category = 'management',
+    probes = {
+      {
+        path = '/',
+        method = 'GET'
+      },
+    },
+    matches = {
+      {
+        match = '<title>Ambari</title>',
+        output = 'Apache Ambari WebUI'
+      }
+    }
+  });
+
+-- Apache Oozie Web Console
+table.insert(fingerprints, {
+    category = 'management',
+    probes = {
+      {
+        path = '/oozie/',
+        method = 'GET'
+      },
+    },
+    matches = {
+      {
+        match = '<title>Oozie Web Console</title>',
+        output = 'Apache Oozie Web Console'
+      }
+    }
+  });
+
+-- Apache Ranger Web UI
+table.insert(fingerprints, {
+    category = 'management',
+    probes = {
+      {
+        path = '/login.jsp',
+        method = 'GET'
+      },
+    },
+    matches = {
+      {
+        match = '<title>%s*Ranger %- Sign In%s*</title>',
+        output = 'Apache Ranger WebUI'
+      }
+    }
+  });
+
+-- Cloudera Hue
+table.insert(fingerprints, {
+    category = 'management',
+    probes = {
+      {
+        path = '/about/',
+        method = 'GET'
+      },
+    },
+    matches = {
+      {
+        match = 'Hue&trade;%s(.-)%s[-]%s<a href="http://gethue%.com"',
+        output = 'Cloudera Hue \\1'
+      }
+    }
+  });
+
+-- Cloudera Manager login page
+table.insert(fingerprints, {
+    category = 'management',
+    probes = {
+      {
+        path = '/cmf/login',
+        method = 'GET'
+      },
+    },
+    matches = {
+      {
+        match = 'var%s+clouderaManager%s*=%s*{.-version:%s*\'(.-)\'',
+        output = 'Cloudera Manager version \\1 '
+      }
+    }
+  });
+
+-- Hadoop MapReduce JobHistory WebUI
+table.insert(fingerprints, {
+    category = 'management',
+    probes = {
+      {
+        path = '/jobhistory',
+        method = 'GET'
+      },
+    },
+    matches = {
+      {
+        match = '<title>%s*JobHistory%s*</title>',
+        output = 'Hadoop MapReduce JobHistory WebUI'
+      }
+    }
+  });
+
+-- Hadoop YARN Resource Manager
+table.insert(fingerprints, {
+    category = 'management',
+    probes = {
+      {
+        path = '/cluster/cluster',
+        method = 'GET'
+      },
+    },
+    matches = {
+      {
+        match = 'ResourceManager state:.-<td>%s*([^%s<]*)'
+                .. '.-ResourceManager version:.-<td>%s*([^%s<]*)'
+                .. '.-Hadoop version:.-<td>%s*([^%s<]*)',
+        output = 'Hadoop YARN Resource Manager version \\2, state "\\1", Hadoop version \\3'
+      },
+    }
+  });
+
+-- Hadoop Node Resource Manager
+table.insert(fingerprints, {
+    category = 'info',
+    probes = {
+      {
+        path = '/node',
+        method = 'GET'
+      },
+    },
+    matches = {
+      {
+        match = 'Node Manager Version:.-<td>%s*([^%s<]*)'
+                .. '.-Hadoop Version:.-<td>%s*([^%s<]*)',
+        output = 'Hadoop YARN Node Manager version \\1, Hadoop version \\2'
+      },
+    }
+  });
+
 table.insert(fingerprints, {
     category = 'cms',
     probes = {
@@ -8230,18 +8897,30 @@ table.insert(fingerprints, {
     }
   });
 
--- Joomla! version
+-- Joomla versions
 table.insert(fingerprints, {
     category = 'cms',
     probes = {
       {
-        path = '/language/en-GB/en-GB.xml'
+        -- Detects versions >= 1.60
+        path = '/administrator/manifests/files/joomla.xml',
+        method = 'GET'
+      },
+      {
+        -- Detects version >= 1.50 and <= 1.5.26
+        path = '/language/en-GB/en-GB.xml',
+        method = 'GET'
+      },
+      {
+        -- Detects version < 1.50
+        path = '/modules/custom.xml',
+        method = 'GET'
       }
     },
     matches = {
       {
         match = '<version>(.-)</version>',
-        output = 'Joomla! '
+        output = 'Joomla version \\1'
       }
     }
   });
@@ -8283,6 +8962,24 @@ table.insert(fingerprints, {
       }
     }
   });
+
+-- Drupal version
+table.insert(fingerprints, {
+  category = 'cms',
+  probes = {
+    {
+      -- Must be executed on both ports 80, 443 for accurate results
+      path = '/',
+      method = 'GET'
+    }
+  },
+  matches = {
+    {
+      match = '<meta name="[G|g]enerator" content="Drupal ([0-9 .]*)',
+      output = 'Drupal version \\1'
+    }
+  }
+});
 
 -- Moodle
 table.insert(fingerprints, {
@@ -8439,6 +9136,27 @@ table.insert(fingerprints, {
         match = '',
         output = 'RoundCube'
       }
+    }
+  });
+
+-- Bitwarden Vault
+table.insert(fingerprints, {
+    category = 'general',
+    probes = {
+      {
+        path = '/manifest.json',
+        method = 'GET'
+      }
+    },
+    matches = {
+      {
+        match = '([\'"])name%1%s*:%s*[\'"][Bb]itwarden',
+        output = 'Bitwarden Vault Manifest File'
+      },
+      {
+        match = '',
+        output = 'Manifest JSON File'
+      },
     }
   });
 
@@ -8836,6 +9554,14 @@ table.insert(fingerprints, {
       },
       {
         path = '/apache/',
+        method = 'GET'
+      },
+      {
+        path = '/api/',
+        method = 'GET'
+      },
+      {
+        path = '/api-docs/',
         method = 'GET'
       },
       {
@@ -9712,6 +10438,10 @@ table.insert(fingerprints, {
       },
       {
         path = '/enviamail/',
+        method = 'GET'
+      },
+      {
+        path = '/error.html',
         method = 'GET'
       },
       {
@@ -12034,10 +12764,12 @@ local stdnse = require "stdnse"
 local nmap = require "nmap"
 
 nikto_db_path = stdnse.get_script_args("http-fingerprints.nikto-db-path") or "db_tests"
-local f = nmap.fetchfile(nikto_db_path) or io.open(nikto_db_path, "r")
+nikto_db_path = nmap.fetchfile(nikto_db_path) or nikto_db_path
+local f = io.open(nikto_db_path, "r")
 
 if f then
 
+  f:close()
   stdnse.debug1("Found nikto db.")
 
   local nikto_db = {}
