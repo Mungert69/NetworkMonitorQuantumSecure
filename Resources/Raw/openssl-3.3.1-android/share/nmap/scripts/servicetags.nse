@@ -1,8 +1,10 @@
 local nmap = require "nmap"
+local match = require "match"
 local os = require "os"
 local shortport = require "shortport"
 local stdnse = require "stdnse"
 local string = require "string"
+local stringaux = require "stringaux"
 local table = require "table"
 
 description = [[
@@ -165,7 +167,7 @@ action = function(host, port)
     -- We should get a response back that has contains one line for the
     -- agent URN and TCP port
     local urn, xport, split
-    split = stdnse.strsplit(" ", response)
+    split = stringaux.strsplit(" ", response)
     urn = split[1]
     xport = split[2]
     table.insert(output, "URN: " .. urn)
@@ -210,7 +212,7 @@ function get_agent(host, port, output)
         socket:close()
         return nil, err
     end
-    status, response = socket:receive_buf("</st1:response>", true)
+    status, response = socket:receive_buf(match.pattern_limit("</st1:response>", 2048), true)
     if not status then
         socket:close()
         return nil, response
@@ -242,7 +244,7 @@ function get_svctag_list(host, port)
         socket:close()
         return nil, err
     end
-    status, response = socket:receive_buf("</service_tags>", true)
+    status, response = socket:receive_buf(match.pattern_limit("</service_tags>", 2048), true)
     if not status then
         socket:close()
         return nil, response
@@ -272,7 +274,7 @@ function get_svctag(host, port, svctag)
         socket:close()
         return nil, err
     end
-    status, response = socket:receive_buf("</st1:response>", true)
+    status, response = socket:receive_buf(match.pattern_limit("</st1:response>", 2048), true)
     if not status then
         socket:close()
         return nil, response

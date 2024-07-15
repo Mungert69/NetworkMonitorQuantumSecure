@@ -1,6 +1,5 @@
 local shortport = require "shortport"
 local stdnse = require "stdnse"
-local table = require "table"
 local math = require "math"
 local nmap = require "nmap"
 local os = require "os"
@@ -38,9 +37,10 @@ Original idea by Jacob Appelbaum and his TeaTime and tlsdate tools:
 author = {"Aleksandar Nikolic", "nnposter"}
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
 categories = {"discovery", "safe", "default"}
+dependencies = {"https-redirect"}
 
 portrule = function(host, port)
-  return shortport.ssl(host, port) or sslcert.getPrepareTLSWithoutReconnect(port)
+  return port.protocol == "tcp" and (shortport.ssl(host, port) or sslcert.getPrepareTLSWithoutReconnect(port))
 end
 
 -- Miscellaneous script-wide constants
@@ -75,7 +75,7 @@ local client_hello = function(host, port)
     status, err = sock:connect(host, port)
     if not status then
       sock:close()
-      stdnse.debug("Can't send: %s", err)
+      stdnse.debug("Can't connect: %s", err)
       return false
     end
   else
@@ -86,23 +86,24 @@ local client_hello = function(host, port)
   end
 
 
-  -- Send Client Hello to the target server
-  status, err = sock:send(cli_h)
-  if not status then
-    stdnse.debug("Couldn't send: %s", err)
-    sock:close()
-    return false
-  end
+  repeat -- only once
+    -- Send Client Hello to the target server
+    status, err = sock:send(cli_h)
+    if not status then
+      stdnse.debug("Couldn't send: %s", err)
+      break
+    end
 
-  -- Read response
-  status, response, err = tls.record_buffer(sock)
-  if not status then
-    stdnse.debug("Couldn't receive: %s", err)
-    sock:close()
-    return false
-  end
+    -- Read response
+    status, response, err = tls.record_buffer(sock)
+    if not status then
+      stdnse.debug("Couldn't receive: %s", err)
+      break
+    end
+  until true
 
-  return true, response
+  sock:close()
+  return status, response
 end
 
 -- extract time from ServerHello response
@@ -139,7 +140,7 @@ local get_time_sample = function (host, port)
   -- extract time from response
   local tstatus, ttm = extract_time(response)
   if not tstatus then return nil end
-  stdnse.debug(detail_debug, "TLS sample: %s", stdnse.format_timestamp(ttm, 0))
+  stdnse.debug(detail_debug, "TLS sample: %s", datetime.format_timestamp(ttm, 0))
   return {target=ttm, scanner=stm, delta=os.difftime(ttm, stm)}
 end
 
@@ -204,11 +205,11 @@ action = function(host, port)
 
   datetime.record_skew(host, tm.target, tm.scanner)
   local output = {
-                 date = stdnse.format_timestamp(tm.target, 0),
+                 date = datetime.format_timestamp(tm.target, 0),
                  delta = tm.delta,
                  }
   return output,
          string.format("%s; %s from scanner time.", output.date,
-                 stdnse.format_difftime(os.date("!*t", tm.target),
+                 datetime.format_difftime(os.date("!*t", tm.target),
                                         os.date("!*t", tm.scanner)))
 end

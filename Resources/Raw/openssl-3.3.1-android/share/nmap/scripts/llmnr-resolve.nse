@@ -1,8 +1,6 @@
 local nmap = require "nmap"
 local stdnse = require "stdnse"
 local table = require "table"
-local bin = require "bin"
-local bit = require "bit"
 local packet = require "packet"
 local ipOps = require "ipOps"
 local target = require "target"
@@ -31,7 +29,7 @@ For more information, see:
 --
 --@output
 -- Pre-scan script results:
--- | llmnr-query:
+-- | llmnr-resolve:
 -- |   acer-PC : 192.168.1.4
 -- |_  Use the newtargets script-arg to add the results as targets
 --
@@ -55,14 +53,14 @@ categories = {"discovery", "safe", "broadcast"}
 -- @param hostname Hostname to query for.
 -- @return query Raw llmnr query.
 local llmnrQuery = function(hostname)
-  return bin.pack(">S6pCS2",
+  return string.pack(">I2I2I2I2I2I2 s1x I2I2",
     math.random(0,65535), -- transaction ID
     0x0000, -- Flags: Standard Query
     0x0001, -- Questions = 1
     0x0000, -- Answer RRs = 0
     0x0000, -- Authority RRs = 0
     0x0000, -- Additional RRs = 0
-    hostname, 0x00, -- Hostname
+    hostname, -- Hostname
     0x0001, -- Type: Host Address
     0x0001) -- Class: IN
 end
@@ -103,32 +101,28 @@ local llmnrListen = function(interface, timeout, result)
       -- Skip IP and UDP headers
       local llmnr = string.sub(l3data, p.ip_hl*4 + 8 + 1)
       -- Flags
-      local _, trans = bin.unpack(">S", llmnr)
-      local _, flags = bin.unpack(">S", llmnr, 3)
-      -- Questions number
-      local _, questions = bin.unpack(">S", llmnr, 5)
+      local trans, flags, questions = string.unpack(">I2 I2 I2", llmnr)
 
       -- Make verifications
       -- Message == Response bit
       -- and 1 Question (hostname we requested) and
-      if (bit.rshift(flags, 15) == 1) and questions == 0x01 then
+      if ((flags >> 15) == 1) and questions == 0x01 then
         stdnse.debug1("got response from %s", p.ip_src)
         -- Skip header's 12 bytes
         -- extract host length
-        local index, qlen = bin.unpack(">C", llmnr, 13)
+        local qlen, index = string.unpack(">B", llmnr, 13)
         -- Skip hostname, null byte, type field and class field
         index = index + qlen + 1 + 2 + 2
 
         -- Now, answer record
         local response, alen = {}
-        index, alen = bin.unpack(">C", llmnr, index)
         -- Extract hostname with the correct case sensitivity.
-        index, response.hostname = bin.unpack(">A".. alen, llmnr, index)
+        response.hostname, index = string.unpack(">s1x", llmnr, index)
 
-        -- skip null byte, type, class, ttl, dlen
-        index = index + 1 + 2 + 2 + 4 + 2
-        index, response.address = bin.unpack("<I", llmnr, index)
-        response.address = ipOps.fromdword(response.address)
+        -- skip type, class, ttl, dlen
+        index = index + 2 + 2 + 4 + 2
+        response.address, index = string.unpack(">c4", llmnr, index)
+        response.address = ipOps.str_to_ip(response.address)
         table.insert(result, response)
       else
         stdnse.debug1("skipped llmnr response.")
@@ -141,7 +135,7 @@ end
 -- Returns the network interface used to send packets to a target host.
 --@param target host to which the interface is used.
 --@return interface Network interface used for target host.
-local getInterface = function(target)
+local getInterface = function(interfaces, target)
   -- First, create dummy UDP connection to get interface
   local sock = nmap.new_socket()
   local status, err = sock:connect(target, "12345", "udp")
@@ -154,10 +148,16 @@ local getInterface = function(target)
     stdnse.verbose1("%s", err)
     return
   end
-  for _, interface in pairs(nmap.list_interfaces()) do
+  for _, interface in pairs(interfaces) do
     if interface.address == address then
       return interface
     end
+  end
+end
+
+local filter_interfaces = function (if_table)
+  if if_table.up == "up" and if_table.address:match("%d+%.%d+%.%d+%.%d+") then
+    return if_table
   end
 end
 
@@ -177,12 +177,15 @@ action = function()
   end
 
   -- Check if a valid interface was provided
-  local interface = nmap.get_interface()
-  if interface then
-    interface = nmap.get_interface_info(interface)
-  else
-    interface = getInterface(mcast)
+  local interface
+  local interfaces = stdnse.get_script_interfaces(filter_interfaces)
+  if #interfaces > 1 then
+    -- TODO: send on multiple interfaces
+    interface = getInterface(interfaces, mcast)
+  elseif #interfaces == 1 then
+    interface = interfaces[1]
   end
+
   if not interface then
     return stdnse.format_output(false, ("Couldn't get interface for %s"):format(mcast))
   end

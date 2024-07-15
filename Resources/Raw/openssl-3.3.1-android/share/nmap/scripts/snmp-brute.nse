@@ -6,7 +6,6 @@ local packet = require "packet"
 local shortport = require "shortport"
 local snmp = require "snmp"
 local stdnse = require "stdnse"
-local string = require "string"
 local unpwdb = require "unpwdb"
 
 description = [[
@@ -57,7 +56,7 @@ license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
 categories = {"intrusive", "brute"}
 
 
-portrule = shortport.portnumber(161, "udp", {"open", "open|filtered"})
+portrule = shortport.port_or_service(161, "snmp", "udp", {"open", "open|filtered"})
 
 local communitiestable = {}
 
@@ -130,7 +129,7 @@ local communities = function()
       count_limit = tonumber(stdnse.get_script_args("unpwdb.passlimit"))
     end
 
-    return true, unpwdb.limited_iterator(iterator, time_limit, count_limit)
+    return true, unpwdb.limited_iterator(iterator, time_limit, count_limit, "communities")
   else
     stdnse.debug1("Cannot read the communities file, using the nmap username/password database instead")
 
@@ -152,7 +151,7 @@ local send_snmp_queries = function(socket, result, nextcommunity)
       condvar("signal")
       return
     end
-    payload = snmp.encode(snmp.buildPacket(request, 0, community))
+    payload = snmp.encode(snmp.buildPacket(request, nil, community))
     status, err = socket:send(payload)
     if not status then
       result.status = false
@@ -172,7 +171,8 @@ local sniff_snmp_responses = function(host, port, lport, result)
   local condvar = nmap.condvar(result)
   local pcap = nmap.new_socket()
   pcap:set_timeout(host.times.timeout * 1000 * 3)
-  pcap:pcap_open(host.interface, 300, false, "src host ".. host.ip .." and udp and src port 161 and dst port "..lport)
+  pcap:pcap_open(host.interface, 300, false,
+    ("src host %s and udp and src port %d and dst port %d"):format(host.ip, port.number, lport))
 
   local communities = creds.Credentials:new(SCRIPT_NAME, host, port)
 
@@ -181,6 +181,11 @@ local sniff_snmp_responses = function(host, port, lport, result)
 
   -- receive even when status=false until all the probes are sent
   while true do
+    if coroutine.status(result.main_thread) == "dead" then
+      -- Oops, main thread quit. Time to bail.
+      return
+    end
+
     local status, plen, l2, l3, _ = pcap:pcap_receive()
 
     if status then
@@ -194,8 +199,7 @@ local sniff_snmp_responses = function(host, port, lport, result)
       end
 
       local response = p:raw(p.udp_offset + 8, #p.buf)
-      local res
-      _, res = snmp.decode(response)
+      local res = snmp.decode(response)
 
       if type(res) == "table" then
         communities:add(nil, res[2], creds.State.VALID)
@@ -206,7 +210,7 @@ local sniff_snmp_responses = function(host, port, lport, result)
         return
       end
     else
-      if last_run then
+      if last_run or not result.status then
         condvar "signal"
         return
       else
@@ -238,6 +242,7 @@ action = function(host, port)
   result.sent = false --whether the probes are sent
   result.msg = "" -- Error/Status msg
   result.status = true -- Status (is everything ok)
+  result.main_thread = coroutine.running() -- to check if the main thread is dead.
 
   local socket = nmap.new_socket("udp")
   status = socket:connect(host, port)
@@ -259,6 +264,7 @@ action = function(host, port)
     condvar "wait"
     recv_dead = (coroutine.status(recv_co) == "dead")
     send_dead = (coroutine.status(send_co) == "dead")
+    if send_dead then result.sent = true end
     if recv_dead then break end
   end
 
@@ -270,4 +276,3 @@ action = function(host, port)
     stdnse.debug1("An error occurred: "..result.msg)
   end
 end
-

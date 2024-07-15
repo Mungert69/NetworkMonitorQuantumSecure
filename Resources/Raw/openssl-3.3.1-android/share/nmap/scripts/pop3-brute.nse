@@ -46,7 +46,7 @@ Driver = {
   -- @return false, brute.Error object on failure
   connect = function(self)
 
-    self.socket = nmap.new_socket()
+    self.socket = brute.new_socket()
     local opts = {timeout=10000, recv_before=true}
     local best_opt, line, _
     self.socket, _, best_opt, line = comm.tryssl(self.host, self.port, "" , opts)
@@ -81,12 +81,18 @@ Driver = {
     pstatus, perror = self.login_function(self.socket, username, password, self.additional)
     if pstatus then
       return true, creds.Account:new(username, password, creds.State.VALID)
-    elseif (perror == pop3.err.pwError) then
-      return false, brute.Error:new("Wrong password.")
-    elseif (perror == pop3.err.userError) then
-      return false, brute.Error:new("Wrong username.")
+    else
+      local err
+      if (perror == pop3.err.pwError) then
+        err = brute.Error:new("Wrong password.")
+      elseif (perror == pop3.err.userError) then
+        err = brute.Error:new("Wrong username.")
+        err:setInvalidAccount(username)
+      else
+        err = brute.Error:new("Login failed.")
+      end
+      return false, err
     end
-    return false, brute.Error:new("Login failed.")
   end, --login
 
   disconnect = function(self)

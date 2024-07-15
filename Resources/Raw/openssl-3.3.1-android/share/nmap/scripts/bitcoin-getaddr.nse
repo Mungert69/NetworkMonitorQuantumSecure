@@ -1,4 +1,4 @@
-local os = require "os"
+local datetime = require "datetime"
 local shortport = require "shortport"
 local stdnse = require "stdnse"
 local tab = require "tab"
@@ -51,23 +51,23 @@ action = function(host, port)
 
   local status, ver = bcoin:exchVersion()
   if ( not(status) ) then
-    return fail("Failed to extract version information")
+    return fail("Failed to extract version information: " .. ver)
   end
 
   local status, nodes = bcoin:getNodes()
   if ( not(status) ) then
-    return fail("Failed to extract address information")
+    return fail("Failed to extract address information" .. nodes)
   end
   bcoin:close()
 
   local response = tab.new(2)
   tab.addrow(response, "ip", "timestamp")
 
-  for _, node in ipairs(nodes.addresses or {}) do
+  for _, node in ipairs(nodes or {}) do
     if ( target.ALLOW_NEW_TARGETS ) then
       target.add(node.address.host)
     end
-    tab.addrow(response, ("%s:%d"):format(node.address.host, node.address.port), os.date("%x %X", node.ts))
+    tab.addrow(response, ("%s:%d"):format(node.address.host, node.address.port), datetime.format_timestamp(node.ts))
   end
 
   if ( #response > 1 ) then

@@ -1,4 +1,4 @@
-local bit = require "bit"
+local geoip = require "geoip"
 local io = require "io"
 local ipOps = require "ipOps"
 local math = require "math"
@@ -25,10 +25,21 @@ the commercial ones.
 --
 -- @output
 -- | ip-geolocation-maxmind:
--- | 74.207.244.221 (scanme.nmap.org)
--- |   coordinates (lat,lon): 39.4899,-74.4773
--- |_  city: Absecon, Philadelphia, PA, United States
----
+-- | coordinates: 39.4899, -74.4773
+-- |_location: Absecon, Philadelphia, PA, United States
+--
+-- @xmloutput
+-- <elem key="latitude">39.4899</elem>
+-- <elem key="longitude">-74.4773</elem>
+-- <elem key="city">Absecon</elem>
+-- <elem key="region">Philadelphia, PA</elem>
+-- <elem key="country">United States</elem>
+--
+-- @see ip-geolocation-geoplugin.nse
+-- @see ip-geolocation-ipinfodb.nse
+-- @see ip-geolocation-map-bing.nse
+-- @see ip-geolocation-map-google.nse
+-- @see ip-geolocation-map-kml.nse
 
 author = "Gorjan Petrovski"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
@@ -468,7 +479,7 @@ local GeoIP = {
           -- the original representation in the MaxMind API is ANSI C integer
           -- which should not overflow the greatest value Lua can offer ;)
           for j=0,(MaxmindDef.SEGMENT_RECORD_LENGTH-1) do
-            o._databaseSegments = o._databaseSegments + bit.lshift( buf:byte(j+1), j*8)
+            o._databaseSegments = o._databaseSegments + ( buf:byte(j+1) << j*8)
           end
 
           if o._databaseType == MaxmindDef.ORG_EDITION or o._databaseType == MaxmindDef.ISP_EDITION then
@@ -492,8 +503,14 @@ local GeoIP = {
   output_record_by_addr = function(self,addr)
     local loc = self:record_by_addr(addr)
     if not loc then return nil end
-    setmetatable(loc, record_metatable)
-    return loc
+    geoip.add(addr, loc.latitude, loc.longitude)
+    local output = geoip.Location:new()
+    output:set_latitude(loc.latitude)
+    output:set_longitude(loc.longitude)
+    output:set_city(loc.city)
+    output:set_region(loc.metro_code)
+    output:set_country(loc.country_name)
+    return output
   end,
 
   record_by_addr=function(self,addr)
@@ -541,16 +558,16 @@ local GeoIP = {
     start_pos = end_pos + 1
 
     local c1,c2,c3=record_buf:byte(start_pos,start_pos+3)
-    record.latitude = (( bit.lshift(c1,0*8) + bit.lshift(c2,1*8) + bit.lshift(c3,2*8) )/10000) - 180
+    record.latitude = (( (c1 << 0*8) + (c2 << 1*8) + (c3 << 2*8) )/10000) - 180
     start_pos = start_pos +3
 
     c1,c2,c3=record_buf:byte(start_pos,start_pos+3)
-    record.longitude = (( bit.lshift(c1,0*8) + bit.lshift(c2,1*8) + bit.lshift(c3,2*8) )/10000) - 180
+    record.longitude = (( (c1 << 0*8) + (c2 << 1*8) + (c3 << 2*8) )/10000) - 180
     start_pos = start_pos +3
 
     if self._databaseType == MaxmindDef.CITY_EDITION_REV1 and record.country_code=='US' then
       c1,c2,c3=record_buf:byte(start_pos,start_pos+3)
-      local dmaarea_combo= bit.lshift(c1,0*8) + bit.lshift(c2,1*8) + bit.lshift(c3,2*8)
+      local dmaarea_combo= (c1 << 0*8) + (c2 << 1*8) + (c3 << 2*8)
       record.dma_code = math.floor(dmaarea_combo/1000)
       record.area_code = dmaarea_combo % 1000
     else
@@ -578,11 +595,11 @@ local GeoIP = {
 
       for i=0,1 do
         for j=0,(self._recordLength-1) do
-          x[i] = x[i] + bit.lshift(buf:byte((self._recordLength * i + j) +1 ), j*8)
+          x[i] = x[i] + (buf:byte((self._recordLength * i + j) +1 ) << j*8)
         end
       end
       -- Gotta test this out thoroughly because of the ipnum
-      if bit.band(ipnum, bit.lshift(1,depth)) ~= 0 then
+      if (ipnum & (1 << depth)) ~= 0 then
         if x[1] >= self._databaseSegments then
           return x[1]
         end

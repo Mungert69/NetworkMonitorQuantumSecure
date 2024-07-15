@@ -1,7 +1,7 @@
-local bin = require "bin"
 local rmi = require "rmi"
 local shortport = require "shortport"
 local string = require "string"
+local stdnse = require "stdnse"
 local vulns = require "vulns"
 
 description = [[
@@ -24,7 +24,7 @@ References:
 -- @output
 -- PORT     STATE SERVICE
 -- 1099/tcp open  rmiregistry
--- | rmi-vuln:
+-- | rmi-vuln-classloader:
 -- |   VULNERABLE:
 -- |   RMI registry default configuration remote code execution vulnerability
 -- |     State: VULNERABLE
@@ -42,12 +42,7 @@ categories = {
 };
 
 
-
-portrule = shortport.port_or_service({
-    1099
-  }, {
-    "rmiregistry"
-  });
+portrule = shortport.port_or_service({1098, 1099, 1090, 8901, 8902, 8903}, {"java-rmi", "rmiregistry"})
 
 action = function (host, port)
   local registry = rmi.Registry:new(host, port);
@@ -79,7 +74,7 @@ action = function (host, port)
     title = "RMI registry default configuration remote code execution vulnerability",
 
     description = [[
-Default configuration of RMI registry allows loading classes from remote URLs which can lead to remote code executeion.
+Default configuration of RMI registry allows loading classes from remote URLs which can lead to remote code execution.
 ]],
     references = {
       'https://github.com/rapid7/metasploit-framework/blob/master/modules/exploits/multi/misc/java_rmi_server.rb',
@@ -90,7 +85,7 @@ Default configuration of RMI registry allows loading classes from remote URLs wh
   local report = vulns.Report:new(SCRIPT_NAME, host, port);
   rmi_vuln.state = vulns.STATE.NOT_VULN;
 
-  rmiArgs:addRaw(bin.pack("H", argsRaw));
+  rmiArgs:addRaw(stdnse.fromhex( argsRaw));
 
   -- reference: java/rmi/dgc/DGCImpl_Stub.java and java/rmi/dgc/DGCImpl_Skel.java
   -- we are calling DGC's (its objectId is 2) method with opnum 0
@@ -105,6 +100,10 @@ Default configuration of RMI registry allows loading classes from remote URLs wh
     -- 0x51 : Returndata
     return false, "No return data received from server";
   end
+  -- Need to make sure we get a good chunk of data. It's going to be a java
+  -- stack trace. But if we don't get enough, I guess we can check with
+  -- whatever we get.
+  registry.out.dis:canRead(256)
   local data = registry.out.dis.bReader.readBuffer;
 
   if string.find(data, "RMI class loader disabled") == nil then

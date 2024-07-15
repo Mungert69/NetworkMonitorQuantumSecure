@@ -33,9 +33,7 @@ local libs = {
 "asn1",
 "base32",
 "base64",
-"bin",
 "bitcoin",
-"bit",
 "bits",
 "bittorrent",
 "bjnp",
@@ -48,34 +46,43 @@ local libs = {
 "cvs",
 "datafiles",
 "datetime",
-"dhcp6",
 "dhcp",
-"dnsbl",
+"dhcp6",
 "dns",
+"dnsbl",
 "dnssd",
 "drda",
 "eap",
 "eigrp",
 "formulas",
 "ftp",
+"geoip",
 "giop",
 "gps",
 "http",
 "httpspider",
 "iax2",
+"idna",
 "ike",
 "imap",
 "informix",
 "ipOps",
 "ipmi",
 "ipp",
+"irc",
 "iscsi",
 "isns",
 "jdwp",
 "json",
+"knx",
 "ldap",
 "lfs",
+"libssh2",
+"libssh2-utility",
 "listop",
+"lpeg",
+"lpeg-utility",
+"ls",
 "match",
 "membase",
 "mobileme",
@@ -88,6 +95,7 @@ local libs = {
 "multicast",
 "mysql",
 "natpmp",
+"nbd",
 "ncp",
 "ndmp",
 "netbios",
@@ -97,26 +105,29 @@ local libs = {
 "omp2",
 "openssl",
 "ospf",
+"outlib",
 "packet",
-"pcre",
 "pgsql",
 "pop3",
 "pppoe",
 "proxy",
+"punycode",
+"rand",
 "rdp",
-"redis",
 "re",
+"redis",
 "rmi",
-"rpcap",
 "rpc",
+"rpcap",
 "rsync",
 "rtsp",
 "sasl",
 "shortport",
 "sip",
 "slaxml",
-"smbauth",
 "smb",
+"smb2",
+"smbauth",
 "smtp",
 "snmp",
 "socks",
@@ -128,11 +139,14 @@ local libs = {
 "stdnse",
 "strbuf",
 --"strict", -- behaves oddly
+"stringaux",
 "stun",
 "tab",
+"tableaux",
 "target",
 "tftp",
 "tls",
+"tn3270",
 "tns",
 "unicode",
 "unittest",
@@ -146,6 +160,7 @@ local libs = {
 "wsdd",
 "xdmcp",
 "xmpp",
+"zlib",
 }
 
 -- This script-arg is documented in the unittest script to avoid cluttering
@@ -175,7 +190,7 @@ run_tests = function(to_test)
     stdnse.debug1("Testing %s", lib)
     local status, thelib = pcall(require, lib)
     if not status then
-      stdnse.debug1("Failed to load %s: %s", lib, thelib)
+      fails[lib] = ("Failed to load: %s"):format(thelib)
     else
       local failed = 0
       if rawget(thelib,"test_suite") ~= nil then
@@ -273,7 +288,11 @@ make_test = function(test, fmt)
     local nargs = select("#", ...)
     return function(suite)
       if not test(table.unpack(args,1,nargs)) then
-        return false, string.format(fmt, table.unpack(listop.map(nsedebug.tostr, args),1,nargs))
+        local dbgargs = {}
+        for i = 1, nargs do
+          dbgargs[i] = nsedebug.tostr(args[i]):gsub("\n*$", '')
+        end
+        return false, string.format(fmt, table.unpack(dbgargs,1,nargs))
       end
       return true
     end
@@ -286,7 +305,7 @@ end
 is_nil = function(value)
   return value == nil
 end
-is_nil = make_test(is_nil, "Expected not nil, got %s")
+is_nil = make_test(is_nil, "Expected nil, got %s")
 
 --- Test for not nil
 -- @param value The value to test
@@ -295,6 +314,15 @@ not_nil = function(value)
   return value ~= nil
 end
 not_nil = make_test(not_nil, "Expected not nil, got %s")
+
+--- Test for Lua type
+-- @param typ The type that value should be
+-- @param value The value to test
+-- @return bool True if type(value) == typ
+type_is = function (typ, value)
+  return type(value) == typ
+end
+type_is = make_test(type_is, "Value is not a '%s': %s")
 
 --- Test tables for equality, 1 level deep
 -- @param a The first table to test
@@ -348,7 +376,7 @@ end
 --         distinguishability otherwise.
 identical = function(a, b)
   return function(suite)
-    function identical(val1, val2, path)
+    local function _identical(val1, val2, path)
       local table_size = function(tbl)
         local count = 0
         for k in pairs(tbl) do
@@ -381,7 +409,7 @@ identical = function(a, b)
       for k,v in pairs(val1) do
         -- Check that the key's value is identical in both tables, passing
         -- along the path of keys we have taken to get here.
-        local status, note = identical(val1[k], val2[k], string.format('%s["%s"]', path, k))
+        local status, note = _identical(val1[k], val2[k], string.format('%s["%s"]', path, k))
         if not status then
           return false, note
         end
@@ -390,7 +418,7 @@ identical = function(a, b)
       return true
     end
 
-    return identical(a, b, "<top>")
+    return _identical(a, b, "<top>")
   end
 end
 
@@ -490,6 +518,7 @@ test_suite:add_test(expected_failure(keys_equal({one=1,two=2},{[3]="three",one=1
 test_suite:add_test(identical(0, 0), "integer === integer")
 test_suite:add_test(identical(nil, nil), "nil === nil")
 test_suite:add_test(identical({}, {}), "{} === {}")
-test_suite:add_test(length_is(test_suite.tests, 15), "Number of tests is 15")
+test_suite:add_test(type_is("table", {}), "{} is a table")
+test_suite:add_test(length_is(test_suite.tests, 16), "Number of tests is 16")
 
 return _ENV;

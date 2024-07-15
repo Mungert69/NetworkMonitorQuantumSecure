@@ -20,7 +20,7 @@
 -- * QueryPacket: Class used to hold a query and convert it to a string suitable for transmission over a socket.
 -- * LoginPacket: Class used to hold login specific data which can easily be converted to a string suitable for transmission over a socket.
 -- * PreLoginPacket: Class used to (partially) implement the TDS PreLogin packet
--- * TDSStream: Class that handles communication over the Tabular Data Stream protocol used by SQL serve. It is used to transmit the the Query- and Login-packets to the server.
+-- * TDSStream: Class that handles communication over the Tabular Data Stream protocol used by SQL serve. It is used to transmit the Query- and Login-packets to the server.
 -- * Helper: Class which facilitates the use of the library by through action oriented functions with descriptive names.
 -- * Util: A "static" class containing mostly character and type conversion functions.
 --
@@ -39,8 +39,9 @@
 -- with pre-discovered instances (e.g. by <code>ms-sql-discover</code> or <code>broadcast-ms-sql-discover</code>):
 --
 -- <code>
--- local instance = mssql.Helper.GetDiscoveredInstances( host, port )
--- if ( instance ) then
+-- local instances = mssql.Helper.GetDiscoveredInstances( host, port )
+-- if ( instances ) then
+--   local instance = next(instances)
 --   local helper = mssql.Helper:new()
 --   status, result = helper:ConnectEx( instance )
 --   status, result = helper:LoginEx( instance )
@@ -74,12 +75,19 @@
 --       argument is not given but <code>mssql.username</code>, a blank password
 --       is used.
 --
--- @args mssql.instance-name The name of the instance to connect to.
+-- @args mssql.instance-name In addition to instances discovered via port
+--                           scanning and version detection, run scripts on
+--                           these named instances (string or list of strings)
 --
--- @args mssql.instance-port The port of the instance to connect to.
+-- @args mssql.instance-port In addition to instances discovered via port
+--                           scanning and version detection, run scripts on
+--                           the instances running on these ports (number or list of numbers)
 --
--- @args mssql.instance-all Targets all SQL server instances discovered
---       through the browser service.
+-- @args mssql.instance-all In addition to instances discovered via port
+--                           scanning and version detection, run scripts on all
+--                           discovered instances. These include named-pipe
+--                           instances via SMB and those discovered via the
+--                           browser service.
 --
 -- @args mssql.domain The domain against which to perform integrated
 --       authentication. When set, the scripts assume integrated authentication
@@ -103,19 +111,19 @@
 --       listening on 43210/tcp, which was not scanned) will be reported but
 --       will not be stored for use by other ms-sql-* scripts.
 
-local bin = require "bin"
-local bit = require "bit"
 local math = require "math"
 local match = require "match"
 local nmap = require "nmap"
-local os = require "os"
-local shortport = require "shortport"
+local datetime = require "datetime"
+local outlib = require "outlib"
 local smb = require "smb"
 local smbauth = require "smbauth"
 local stdnse = require "stdnse"
 local strbuf = require "strbuf"
 local string = require "string"
 local table = require "table"
+local tableaux = require "tableaux"
+local unicode = require "unicode"
 _ENV = stdnse.module("mssql", stdnse.seeall)
 
 -- Created 01/17/2010 - v0.1 - created by Patrik Karlsson <patrik@cqure.net>
@@ -151,12 +159,27 @@ do
   end
   MSSQL_TIMEOUT = timeout
 
-  SCANNED_PORTS_ONLY = false
-  if ( stdnse.get_script_args( "mssql.scanned-ports-only" ) ) then
-    SCANNED_PORTS_ONLY = true
-  end
 end
 
+-- Make args either a list or nil
+local function list_of (input, transform)
+  if not input then return nil end
+  if type(input) ~= "table" then
+    return {transform(input)}
+  end
+  for i, v in ipairs(input) do
+    input[i] = transform(v)
+  end
+  return input
+end
+
+local SCANNED_PORTS_ONLY = not not stdnse.get_script_args("mssql.scanned-ports-only")
+local targetInstanceNames = list_of(stdnse.get_script_args("mssql.instance-name"), string.upper)
+local targetInstancePorts = list_of(stdnse.get_script_args("mssql.instance-port"), tonumber)
+local targetAllInstances = not not stdnse.get_script_args("mssql.instance-all")
+
+-- This constant is number of seconds from 1900-01-01 to 1970-01-01
+local tds_offset_seconds = -2208988800 - datetime.utc_offset()
 
 -- *************************************
 -- Informational Classes
@@ -289,16 +312,17 @@ SqlServerVersionInfo =
   -- @param versionNumber a version number string (e.g. "9.00.1399.00")
   -- @param source a string indicating the source of the version info (e.g. "SSRP", "SSNetLib")
   SetVersionNumber = function(self, versionNumber, source)
-    local major, minor, revision, subBuild
-    if versionNumber:match( "^%d+%.%d+%.%d+.%d+" ) then
-      major, minor, revision, subBuild = versionNumber:match( "^(%d+)%.(%d+)%.(%d+)" )
-    elseif versionNumber:match( "^%d+%.%d+%.%d+" ) then
-      major, minor, revision = versionNumber:match( "^(%d+)%.(%d+)%.(%d+)" )
-    else
+    local parts = {versionNumber:match("^(%d+)%.(%d+)%.(%d+)")}
+    if not parts[1] then
       stdnse.debug1("%s: SetVersionNumber: versionNumber is not in correct format: %s", "MSSQL", versionNumber or "nil" )
+      return
     end
 
-    self:SetVersion( major, minor, revision, subBuild, source )
+    -- If it doesn't match, subBuild will be nil
+    parts[4] = versionNumber:match( "^%d+%.%d+%.%d+%.(%d+)" )
+    parts[5] = source
+
+    self:SetVersion( table.unpack(parts) )
   end,
 
   --- Sets the version using the individual numeric components of the version
@@ -323,6 +347,8 @@ SqlServerVersionInfo =
       ["^6%.0"] = "6.0", ["^6%.5"] = "6.5", ["^7%.0"] = "7.0",
       ["^8%.0"] = "2000", ["^9%.0"] = "2005", ["^10%.0"] = "2008",
       ["^10%.50"] = "2008 R2", ["^11%.0"] = "2012", ["^12%.0"] = "2014",
+      ["^13%.0"] = "2016", ["^14%.0"] = "2017", ["^15%.0"] = "2019",
+      ["^16%.0"] = "2022",
     }
 
     local product = ""
@@ -340,50 +366,375 @@ SqlServerVersionInfo =
   end,
 
 
-  --- Returns a lookup table that maps revision numbers to service pack levels for
-  --  the applicable SQL Server version (e.g. { {1600, "RTM"}, {2531, "SP1"} }).
+  --- Returns a lookup table that maps revision numbers to service pack and
+  --  cumulative update levels for the applicable SQL Server version,
+  --  e.g., {{1913, "RC1"}, {2100, "RTM"}, {2316, "RTMCU1"}, ...,
+  --        {3000, "SP1"}, {3321, "SP1CU1"}, ..., {3368, "SP1CU4"}, ...}
   _GetSpLookupTable = function(self)
 
     -- Service pack lookup tables:
-    -- For instances where a revised service pack was released (e.g. 2000 SP3a), we will include the
-    -- build number for the original SP and the build number for the revision. However, leaving it
-    -- like this would make it appear that subsequent builds were a patched version of the revision
-    -- (e.g. a patch applied to 2000 SP3 that increased the build number to 780 would get displayed
-    -- as "SP3a+", when it was actually SP3+). To avoid this, we will include an additional fake build
-    -- number that combines the two.
-    local SP_LOOKUP_TABLE_6_5 = { {201, "RTM"}, {213, "SP1"}, {240, "SP2"}, {258, "SP3"}, {281, "SP4"},
-      {415, "SP5"}, {416, "SP5a"}, {417, "SP5/SP5a"}, }
+    -- For instances where a revised service pack was released, e.g. 2000 SP3a,
+    -- we will include the build number for the original SP and the build number
+    -- for the revision. However, leaving it like this would make it appear that
+    -- subsequent builds were a patched version of the revision, e.g., a patch
+    -- applied to 2000 SP3 that increased the build number to 780 would get
+    -- displayed as "SP3a+", when it was actually SP3+. To avoid this, we will
+    -- include an additional fake build number that combines the two.
+    -- Source: https://sqlserverbuilds.blogspot.com/
+    local SP_LOOKUP_TABLE = {
+      ["6.5"] = {
+        {201, "RTM"},
+        {213, "SP1"},
+        {240, "SP2"},
+        {258, "SP3"},
+        {281, "SP4"},
+        {415, "SP5"},
+        {416, "SP5a"},
+        {417, "SP5/SP5a"},
+      },
 
-    local SP_LOOKUP_TABLE_7 = { {623, "RTM"}, {699, "SP1"}, {842, "SP2"}, {961, "SP3"}, {1063, "SP4"}, }
+      ["7.0"] = {
+        {623, "RTM"},
+        {699, "SP1"},
+        {842, "SP2"},
+        {961, "SP3"},
+        {1063, "SP4"},
+      },
 
-    local SP_LOOKUP_TABLE_2000 = { {194, "RTM"}, {384, "SP1"}, {532, "SP2"}, {534, "SP2"}, {760, "SP3"},
-      {766, "SP3a"}, {767, "SP3/SP3a"}, {2039, "SP4"}, }
+      ["2000"] = {
+        {194, "RTM"},
+        {384, "SP1"},
+        {532, "SP2"},
+        {534, "SP2"},
+        {760, "SP3"},
+        {766, "SP3a"},
+        {767, "SP3/SP3a"},
+        {2039, "SP4"},
+      },
 
-    local SP_LOOKUP_TABLE_2005 = { {1399, "RTM"}, {2047, "SP1"}, {3042, "SP2"}, {4035, "SP3"}, {5000, "SP4"}, }
+      ["2005"] = {
+        {1399, "RTM"},
+        {2047, "SP1"},
+        {3042, "SP2"},
+        {4035, "SP3"},
+        {5000, "SP4"},
+      },
 
-    local SP_LOOKUP_TABLE_2008 = { {1600, "RTM"}, {2531, "SP1"}, {4000, "SP2"}, {5500, "SP3"}, {6000, "SP4"}, }
+      ["2008"] = {
+        {1600, "RTM"},
+        {2531, "SP1"},
+        {4000, "SP2"},
+        {5500, "SP3"},
+        {6000, "SP4"},
+      },
 
-    local SP_LOOKUP_TABLE_2008R2 = { {1600, "RTM"}, {2500, "SP1"}, {4000, "SP2"}, {6000, "SP3"}, }
+      ["2008 R2"] = {
+        {1600, "RTM"},
+        {2500, "SP1"},
+        {4000, "SP2"},
+        {6000, "SP3"},
+      },
 
-    local SP_LOOKUP_TABLE_2012 = { {2100, "RTM"}, {3000, "SP1"}, {5058, "SP2"}, {6020, "SP3"}, }
+      ["2012"] = {
+        {1103, "CTP1"},
+        {1440, "CTP3"},
+        {1750, "RC0"},
+        {1913, "RC1"},
+        {2100, "RTM"},
+        {2316, "RTMCU1"},
+        {2325, "RTMCU2"},
+        {2332, "RTMCU3"},
+        {2383, "RTMCU4"},
+        {2395, "RTMCU5"},
+        {2401, "RTMCU6"},
+        {2405, "RTMCU7"},
+        {2410, "RTMCU8"},
+        {2419, "RTMCU9"},
+        {2420, "RTMCU10"},
+        {2424, "RTMCU11"},
+        {3000, "SP1"},
+        {3321, "SP1CU1"},
+        {3339, "SP1CU2"},
+        {3349, "SP1CU3"},
+        {3368, "SP1CU4"},
+        {3373, "SP1CU5"},
+        {3381, "SP1CU6"},
+        {3393, "SP1CU7"},
+        {3401, "SP1CU8"},
+        {3412, "SP1CU9"},
+        {3431, "SP1CU10"},
+        {3449, "SP1CU11"},
+        {3470, "SP1CU12"},
+        {3482, "SP1CU13"},
+        {3486, "SP1CU14"},
+        {3487, "SP1CU15"},
+        {3492, "SP1CU16"},
+        {5058, "SP2"},
+        {5532, "SP2CU1"},
+        {5548, "SP2CU2"},
+        {5556, "SP2CU3"},
+        {5569, "SP2CU4"},
+        {5582, "SP2CU5"},
+        {5592, "SP2CU6"},
+        {5623, "SP2CU7"},
+        {5634, "SP2CU8"},
+        {5641, "SP2CU9"},
+        {5644, "SP2CU10"},
+        {5646, "SP2CU11"},
+        {5649, "SP2CU12"},
+        {5655, "SP2CU13"},
+        {5657, "SP2CU14"},
+        {5676, "SP2CU15"},
+        {5678, "SP2CU16"},
+        {6020, "SP3"},
+        {6518, "SP3CU1"},
+        {6523, "SP3CU2"},
+        {6537, "SP3CU3"},
+        {6540, "SP3CU4"},
+        {6544, "SP3CU5"},
+        {6567, "SP3CU6"},
+        {6579, "SP3CU7"},
+        {6594, "SP3CU8"},
+        {6598, "SP3CU9"},
+        {6607, "SP3CU10"},
+        {7001, "SP4"},
+      },
 
-    local SP_LOOKUP_TABLE_2014 = { {2000, "RTM"}, {4100, "SP1"}, }
+      ["2014"] = {
+        {1524, "CTP2"},
+        {2000, "RTM"},
+        {2342, "RTMCU1"},
+        {2370, "RTMCU2"},
+        {2402, "RTMCU3"},
+        {2430, "RTMCU4"},
+        {2456, "RTMCU5"},
+        {2480, "RTMCU6"},
+        {2495, "RTMCU7"},
+        {2546, "RTMCU8"},
+        {2553, "RTMCU9"},
+        {2556, "RTMCU10"},
+        {2560, "RTMCU11"},
+        {2564, "RTMCU12"},
+        {2568, "RTMCU13"},
+        {2569, "RTMCU14"},
+        {4100, "SP1"},
+        {4416, "SP1CU1"},
+        {4422, "SP1CU2"},
+        {4427, "SP1CU3"},
+        {4436, "SP1CU4"},
+        {4439, "SP1CU5"},
+        {4449, "SP1CU6"},
+        {4459, "SP1CU7"},
+        {4468, "SP1CU8"},
+        {4474, "SP1CU9"},
+        {4491, "SP1CU10"},
+        {4502, "SP1CU11"},
+        {4511, "SP1CU12"},
+        {4522, "SP1CU13"},
+        {5000, "SP2"},
+        {5511, "SP2CU1"},
+        {5522, "SP2CU2"},
+        {5538, "SP2CU3"},
+        {5540, "SP2CU4"},
+        {5546, "SP2CU5"},
+        {5553, "SP2CU6"},
+        {5556, "SP2CU7"},
+        {5557, "SP2CU8"},
+        {5563, "SP2CU9"},
+        {5571, "SP2CU10"},
+        {5579, "SP2CU11"},
+        {5589, "SP2CU12"},
+        {5590, "SP2CU13"},
+        {5600, "SP2CU14"},
+        {5605, "SP2CU15"},
+        {5626, "SP2CU16"},
+        {5632, "SP2CU17"},
+        {5687, "SP2CU18"},
+        {6024, "SP3"},
+        {6205, "SP3CU1"},
+        {6214, "SP3CU2"},
+        {6259, "SP3CU3"},
+        {6329, "SP3CU4"},
+      },
+
+      ["2016"] = {
+        { 200, "CTP2"},
+        { 300, "CTP2.1"},
+        { 407, "CTP2.2"},
+        { 500, "CTP2.3"},
+        { 600, "CTP2.4"},
+        { 700, "CTP3.0"},
+        { 800, "CTP3.1"},
+        { 900, "CTP3.2"},
+        {1000, "CTP3.3"},
+        {1100, "RC0"},
+        {1200, "RC1"},
+        {1300, "RC2"},
+        {1400, "RC3"},
+        {1601, "RTM"},
+        {2149, "RTMCU1"},
+        {2164, "RTMCU2"},
+        {2186, "RTMCU3"},
+        {2193, "RTMCU4"},
+        {2197, "RTMCU5"},
+        {2204, "RTMCU6"},
+        {2210, "RTMCU7"},
+        {2213, "RTMCU8"},
+        {2216, "RTMCU9"},
+        {4001, "SP1"},
+        {4411, "SP1CU1"},
+        {4422, "SP1CU2"},
+        {4435, "SP1CU3"},
+        {4446, "SP1CU4"},
+        {4451, "SP1CU5"},
+        {4457, "SP1CU6"},
+        {4466, "SP1CU7"},
+        {4474, "SP1CU8"},
+        {4502, "SP1CU9"},
+        {4514, "SP1CU10"},
+        {4528, "SP1CU11"},
+        {4541, "SP1CU12"},
+        {4550, "SP1CU13"},
+        {4560, "SP1CU14"},
+        {4574, "SP1CU15"},
+        {5026, "SP2"},
+        {5149, "SP2CU1"},
+        {5153, "SP2CU2"},
+        {5216, "SP2CU3"},
+        {5233, "SP2CU4"},
+        {5264, "SP2CU5"},
+        {5292, "SP2CU6"},
+        {5337, "SP2CU7"},
+        {5426, "SP2CU8"},
+        {5479, "SP2CU9"},
+        {5492, "SP2CU10"},
+        {5598, "SP2CU11"},
+        {5698, "SP2CU12"},
+        {5820, "SP2CU13"},
+        {5830, "SP2CU14"},
+        {5850, "SP2CU15"},
+        {5882, "SP2CU16"},
+        {5888, "SP2CU17"},
+        {6300, "SP3"},
+      },
+
+      ["2017"] = {
+        {   1, "CTP1"},
+        { 100, "CTP1.1"},
+        { 200, "CTP1.2"},
+        { 304, "CTP1.3"},
+        { 405, "CTP1.4"},
+        { 500, "CTP2.0"},
+        { 600, "CTP2.1"},
+        { 800, "RC1"},
+        { 900, "RC2"},
+        {1000, "RTM"},
+        {3006, "CU1"},
+        {3008, "CU2"},
+        {3015, "CU3"},
+        {3022, "CU4"},
+        {3023, "CU5"},
+        {3025, "CU6"},
+        {3026, "CU7"},
+        {3029, "CU8"},
+        {3030, "CU9"},
+        {3037, "CU10"},
+        {3038, "CU11"},
+        {3045, "CU12"},
+        {3048, "CU13"},
+        {3076, "CU14"},
+        {3162, "CU15"},
+        {3223, "CU16"},
+        {3238, "CU17"},
+        {3257, "CU18"},
+        {3281, "CU19"},
+        {3294, "CU20"},
+        {3335, "CU21"},
+        {3356, "CU22"},
+        {3381, "CU23"},
+        {3391, "CU24"},
+        {3401, "CU25"},
+        {3411, "CU26"},
+        {3421, "CU27"},
+        {3430, "CU28"},
+        {3436, "CU29"},
+        {3451, "CU30"},
+        {3456, "CU31"},
+      },
+
+      ["2019"] = {
+        {1000, "CTP2.0"},
+        {1100, "CTP2.1"},
+        {1200, "CTP2.2"},
+        {1300, "CTP2.3"},
+        {1400, "CTP2.4"},
+        {1500, "CTP2.5"},
+        {1600, "CTP3.0"},
+        {1700, "CTP3.1"},
+        {1800, "CTP3.2"},
+        {1900, "RC1"},
+        {2000, "RTM"},
+        {2070, "GDR1"},
+        {4003, "CU1"},
+        {4013, "CU2"},
+        {4023, "CU3"},
+        {4033, "CU4"},
+        {4043, "CU5"},
+        {4053, "CU6"},
+        {4063, "CU7"},
+        {4073, "CU8"},
+        {4102, "CU9"},
+        {4123, "CU10"},
+        {4138, "CU11"},
+        {4153, "CU12"},
+        {4178, "CU13"},
+        {4188, "CU14"},
+        {4198, "CU15"},
+        {4223, "CU16"},
+        {4249, "CU17"},
+        {4261, "CU18"},
+        {4298, "CU19"},
+        {4312, "CU20"},
+        {4316, "CU21"},
+        {4322, "CU22"},
+        {4335, "CU23"},
+        {4345, "CU24"},
+        {4355, "CU25"},
+      },
+
+      ["2022"] = {
+        {100, "CTP1.0"},
+        {101, "CTP1.1"},
+        {200, "CTP1.2"},
+        {300, "CTP1.3"},
+        {400, "CTP1.4"},
+        {500, "CTP1.5"},
+        {600, "CTP2.0"},
+        {700, "CTP2.1"},
+        {900, "RC0"},
+        {950, "RC1"},
+        {1000, "RTM"},
+        {4003, "CU1"},
+        {4015, "CU2"},
+        {4025, "CU3"},
+        {4035, "CU4"},
+        {4045, "CU5"},
+        {4055, "CU6"},
+        {4065, "CU7"},
+        {4075, "CU8"},
+        {4085, "CU9"},
+        {4095, "CU10"},
+        {4105, "CU11"},
+      },
+    }
 
 
     if ( not self.brandedVersion ) then
       self:_InferProductVersion()
     end
 
-    local spLookupTable
-    if self.brandedVersion == "6.5" then spLookupTable = SP_LOOKUP_TABLE_6_5
-    elseif self.brandedVersion == "7.0" then spLookupTable = SP_LOOKUP_TABLE_7
-    elseif self.brandedVersion == "2000" then spLookupTable = SP_LOOKUP_TABLE_2000
-    elseif self.brandedVersion == "2005" then spLookupTable = SP_LOOKUP_TABLE_2005
-    elseif self.brandedVersion == "2008" then spLookupTable = SP_LOOKUP_TABLE_2008
-    elseif self.brandedVersion == "2008 R2" then spLookupTable = SP_LOOKUP_TABLE_2008R2
-    elseif self.brandedVersion == "2012" then spLookupTable = SP_LOOKUP_TABLE_2012
-    elseif self.brandedVersion == "2014" then spLookupTable = SP_LOOKUP_TABLE_2014
-    end
+    local spLookupTable = SP_LOOKUP_TABLE[self.brandedVersion]
+    stdnse.debug1("brandedVersion: %s, #lookup: %d", self.brandedVersion, spLookupTable and #spLookupTable or 0)
 
     return spLookupTable
 
@@ -539,7 +890,7 @@ SSRP =
 
       table.insert( instanceStrings, instanceString )
     until (not firstInstanceEnd)
-    stdnse.debug2("%s: SSRP Substrings:\n  %s", SSRP.DEBUG_ID, stdnse.strjoin( "\n  ", instanceStrings ) )
+    stdnse.debug2("%s: SSRP Substrings:\n  %s", SSRP.DEBUG_ID, table.concat(instanceStrings , "\n  ") )
 
     local instances = {}
     for _, instanceString in ipairs( instanceStrings ) do
@@ -576,7 +927,7 @@ SSRP =
     local instances
 
     local pos, messageType, dataLength = 1, nil, nil
-    pos, messageType, dataLength = bin.unpack("<CS", responseData, 1)
+    messageType, dataLength, pos = string.unpack("<BI2", responseData, 1)
     -- extract the response data (i.e. everything after the 3-byte header)
     responseData = responseData:sub(4)
     stdnse.debug2("%s: SSRP Data: %s", SSRP.DEBUG_ID, responseData )
@@ -617,7 +968,7 @@ SSRP =
 
     local status, err = socket:connect( host, port )
     if ( not(status) ) then return false, err end
-    status, err = socket:send( bin.pack( "C", SSRP.MESSAGE_TYPE.ClientUnicast ) )
+    status, err = socket:send( string.pack( "B", SSRP.MESSAGE_TYPE.ClientUnicast ) )
     if ( not(status) ) then return false, err end
 
     local responseData, instances_host
@@ -652,7 +1003,7 @@ SSRP =
       stdnse.debug1("%S: DiscoverInstances_Broadcast() called with non-standard port (%d)", SSRP.DEBUG_ID, port.number )
     end
 
-    local status, err = socket:sendto(host, port, bin.pack( "C", SSRP.MESSAGE_TYPE.ClientBroadcast ))
+    local status, err = socket:sendto(host, port, string.pack( "B", SSRP.MESSAGE_TYPE.ClientBroadcast ))
     if ( not(status) ) then return false, err end
 
     while ( status ) do
@@ -761,14 +1112,14 @@ ColumnInfo =
       local colinfo = {}
       local tmp
 
-      pos, colinfo.unknown, colinfo.codepage, colinfo.flags, colinfo.charset = bin.unpack("<ISSC", data, pos )
+      colinfo.unknown, colinfo.codepage, colinfo.flags, colinfo.charset, pos = string.unpack("<I4I2I2B", data, pos )
 
-      pos, colinfo.tablenamelen = bin.unpack("s", data, pos )
-      pos, colinfo.tablename = bin.unpack("A" .. (colinfo.tablenamelen * 2), data, pos)
-      pos, colinfo.msglen = bin.unpack("<C", data, pos )
-      pos, tmp = bin.unpack("A" .. (colinfo.msglen * 2), data, pos)
+      colinfo.tablenamelen, pos = string.unpack("<i2", data, pos )
+      colinfo.tablename, pos = string.unpack("c" .. (colinfo.tablenamelen * 2), data, pos)
+      colinfo.msglen, pos = string.unpack("<B", data, pos )
+      tmp, pos = string.unpack("c" .. (colinfo.msglen * 2), data, pos)
 
-      colinfo.text = Util.FromWideChar(tmp)
+      colinfo.text = unicode.utf16to8(tmp)
 
       return pos, colinfo
     end,
@@ -781,9 +1132,9 @@ ColumnInfo =
       local colinfo = {}
       local tmp
 
-      pos, colinfo.unknown, colinfo.msglen = bin.unpack("<CC", data, pos)
-      pos, tmp = bin.unpack("A" .. (colinfo.msglen * 2), data, pos )
-      colinfo.text = Util.FromWideChar(tmp)
+      colinfo.unknown, colinfo.msglen, pos = string.unpack("<BB", data, pos)
+      tmp, pos = string.unpack("c" .. (colinfo.msglen * 2), data, pos )
+      colinfo.text = unicode.utf16to8(tmp)
 
       return pos, colinfo
     end,
@@ -800,9 +1151,9 @@ ColumnInfo =
       local colinfo = {}
       local tmp
 
-      pos, colinfo.msglen = bin.unpack("C", data, pos)
-      pos, tmp = bin.unpack("A" .. (colinfo.msglen * 2), data, pos )
-      colinfo.text = Util.FromWideChar(tmp)
+      colinfo.msglen, pos = string.unpack("B", data, pos)
+      tmp, pos = string.unpack("c" .. (colinfo.msglen * 2), data, pos )
+      colinfo.text = unicode.utf16to8(tmp)
 
       return pos, colinfo
     end,
@@ -819,10 +1170,10 @@ ColumnInfo =
       local colinfo = {}
       local tmp
 
-      pos, colinfo.unknown, colinfo.precision, colinfo.scale = bin.unpack("<CCC", data, pos)
-      pos, colinfo.msglen = bin.unpack("<C",data,pos)
-      pos, tmp = bin.unpack("A" .. (colinfo.msglen * 2), data, pos )
-      colinfo.text = Util.FromWideChar(tmp)
+      colinfo.unknown, colinfo.precision, colinfo.scale, pos = string.unpack("<BBB", data, pos)
+      colinfo.msglen, pos = string.unpack("<B",data,pos)
+      tmp, pos = string.unpack("c" .. (colinfo.msglen * 2), data, pos )
+      colinfo.text = unicode.utf16to8(tmp)
 
       return pos, colinfo
     end,
@@ -847,9 +1198,9 @@ ColumnInfo =
       local colinfo = {}
       local tmp
 
-      pos, colinfo.lts, colinfo.msglen = bin.unpack("<SC", data, pos)
-      pos, tmp = bin.unpack("A" .. (colinfo.msglen * 2), data, pos )
-      colinfo.text = Util.FromWideChar(tmp)
+      colinfo.lts, colinfo.msglen, pos = string.unpack("<I2B", data, pos)
+      tmp, pos = string.unpack("c" .. (colinfo.msglen * 2), data, pos )
+      colinfo.text = unicode.utf16to8(tmp)
 
       return pos, colinfo
     end,
@@ -870,10 +1221,10 @@ ColumnInfo =
       local colinfo = {}
       local tmp
 
-      pos, colinfo.lts, colinfo.codepage, colinfo.flags, colinfo.charset,
-      colinfo.msglen = bin.unpack("<SSSCC", data, pos )
-      pos, tmp = bin.unpack("A" .. (colinfo.msglen * 2), data, pos)
-      colinfo.text = Util.FromWideChar(tmp)
+      colinfo.lts, colinfo.codepage, colinfo.flags, colinfo.charset,
+      colinfo.msglen, pos = string.unpack("<I2I2I2BB", data, pos )
+      tmp, pos = string.unpack("c" .. (colinfo.msglen * 2), data, pos)
+      colinfo.text = unicode.utf16to8(tmp)
 
       return pos, colinfo
     end,
@@ -896,7 +1247,7 @@ ColumnData =
 
       -- The first len value is the size of the meta data block
       -- for non-null values this seems to be 0x10 / 16 bytes
-      pos, len = bin.unpack( "<C", data, pos )
+      len, pos = string.unpack( "<B", data, pos )
 
       if ( len == 0 ) then
         return pos, 'Null'
@@ -910,8 +1261,7 @@ ColumnData =
       pos = pos + 8
 
       -- extract the actual data
-      pos, len = bin.unpack( "<I", data, pos )
-      pos, coldata = bin.unpack( "A"..len, data, pos )
+      coldata, pos = string.unpack( "<s4", data, pos )
 
       return pos, coldata
     end,
@@ -919,29 +1269,15 @@ ColumnData =
     [DataTypes.GUIDTYPE] = function( data, pos )
       local len, coldata, index, nextdata
       local hex = {}
-      pos, len = bin.unpack("C", data, pos)
+      len, pos = string.unpack("B", data, pos)
 
       if ( len == 0 ) then
         return pos, 'Null'
 
       elseif ( len == 16 ) then
-
-        -- Return the first 8 bytes
-        for index=1, 8 do
-          pos, hex[index] = bin.unpack("H", data, pos)
-        end
-
-        -- reorder the bytes
-        coldata = hex[4] .. hex[3] .. hex[2] .. hex[1]
-        coldata = coldata .. '-' .. hex[6] .. hex[5]
-        coldata = coldata .. '-' .. hex[8] .. hex[7]
-
-        pos, nextdata = bin.unpack("H2", data, pos)
-        coldata = coldata .. '-' .. nextdata
-
-        pos, nextdata = bin.unpack("H6", data, pos)
-        coldata = coldata .. '-' .. nextdata
-
+        -- Mixed-endian; first 3 parts are little-endian, next 2 are big-endian
+        local A, B, C, D, E, pos = string.unpack("<I4I2I2>c2c6", data, pos)
+        coldata = ("%08x-%04x-%04x-%s-%s"):format(A, B, C, stdnse.tohex(D), stdnse.tohex(E))
       else
         stdnse.debug1("Unhandled length (%d) for GUIDTYPE", len)
         return pos + len, 'Unsupported Data'
@@ -952,18 +1288,13 @@ ColumnData =
 
     [DataTypes.SYBINTN] = function( data, pos )
       local len, num
-      pos, len = bin.unpack("C", data, pos)
+      len, pos = string.unpack("B", data, pos)
 
       if ( len == 0 ) then
         return pos, 'Null'
-      elseif ( len == 1 ) then
-        return bin.unpack("C", data, pos)
-      elseif ( len == 2 ) then
-        return bin.unpack("<s", data, pos)
-      elseif ( len == 4 ) then
-        return bin.unpack("<i", data, pos)
-      elseif ( len == 8 ) then
-        return bin.unpack("<l", data, pos)
+      elseif ( len <= 16 ) then
+        local v, pos = string.unpack("<i" .. len, data, pos)
+        return pos, v
       else
         return -1, ("Unhandled length (%d) for SYBINTN"):format(len)
       end
@@ -973,32 +1304,26 @@ ColumnData =
 
     [DataTypes.SYBINT2] = function( data, pos )
       local num
-      pos, num = bin.unpack("<S", data, pos)
+      num, pos = string.unpack("<I2", data, pos)
 
       return pos, num
     end,
 
     [DataTypes.SYBINT4] = function( data, pos )
       local num
-      pos, num = bin.unpack("<I", data, pos)
+      num, pos = string.unpack("<I4", data, pos)
 
       return pos, num
     end,
 
     [DataTypes.SYBDATETIME] = function( data, pos )
-      local hi, lo, result_seconds, result
-      local tds_epoch, system_epoch, tds_offset_seconds
+      local hi, lo
 
-      pos, hi, lo = bin.unpack("<iI", data, pos)
+      hi, lo, pos = string.unpack("<i4I4", data, pos)
 
-      tds_epoch = os.time( {year = 1900, month = 1, day = 1, hour = 00, min = 00, sec = 00, isdst = nil} )
-      -- determine the offset between the tds_epoch and the local system epoch
-      system_epoch       = os.time( os.date("*t", 0))
-      tds_offset_seconds = os.difftime(tds_epoch,system_epoch)
+      local result_seconds = (hi*24*60*60) + (lo/300)
 
-      result_seconds = (hi*24*60*60) + (lo/300)
-
-      result = os.date("!%b %d, %Y %H:%M:%S", tds_offset_seconds + result_seconds )
+      local result = datetime.format_timestamp(tds_offset_seconds + result_seconds)
       return pos, result
     end,
 
@@ -1006,7 +1331,7 @@ ColumnData =
       local len, coldata
 
       -- The first len value is the size of the meta data block
-      pos, len = bin.unpack( "<C", data, pos )
+      len, pos = string.unpack( "<B", data, pos )
 
       if ( len == 0 ) then
         return pos, 'Null'
@@ -1020,10 +1345,9 @@ ColumnData =
       pos = pos + 8
 
       -- extract the actual data
-      pos, len = bin.unpack( "<I", data, pos )
-      pos, coldata = bin.unpack( "A"..len, data, pos )
+      coldata, pos = string.unpack( "<s4", data, pos )
 
-      return pos, Util.FromWideChar(coldata)
+      return pos, unicode.utf16to8(coldata)
     end,
 
     [DataTypes.BITNTYPE] = function( data, pos )
@@ -1033,23 +1357,19 @@ ColumnData =
     [DataTypes.DECIMALNTYPE] = function( precision, scale, data, pos )
       local len, sign, format_string, coldata
 
-      pos, len = bin.unpack("<C", data, pos)
+      len, pos = string.unpack("<B", data, pos)
 
       if ( len == 0 ) then
         return pos, 'Null'
       end
 
-      pos, sign = bin.unpack("<C", data, pos)
+      sign, pos = string.unpack("<B", data, pos)
 
       -- subtract 1 from data len to account for sign byte
       len = len - 1
 
-      if ( len == 2 ) then
-        pos, coldata = bin.unpack("<S", data, pos)
-      elseif ( len == 4 ) then
-        pos, coldata = bin.unpack("<I", data, pos)
-      elseif ( len == 8 ) then
-        pos, coldata = bin.unpack("<L", data, pos)
+      if ( len > 0 and len <= 16 ) then
+        coldata, pos = string.unpack("<I" .. len, data, pos)
       else
         stdnse.debug1("Unhandled length (%d) for DECIMALNTYPE", len)
         return pos + len, 'Unsupported Data'
@@ -1071,23 +1391,6 @@ ColumnData =
       return ColumnData.Parse[DataTypes.DECIMALNTYPE]( precision, scale, data, pos )
     end,
 
-    [DataTypes.SYBDATETIME] = function( data, pos )
-      local hi, lo, result_seconds, result
-      local tds_epoch, system_epoch, tds_offset_seconds
-
-      pos, hi, lo = bin.unpack("<iI", data, pos)
-
-      tds_epoch = os.time( {year = 1900, month = 1, day = 1, hour = 00, min = 00, sec = 00, isdst = nil} )
-      -- determine the offset between the tds_epoch and the local system epoch
-      system_epoch       = os.time( os.date("*t", 0))
-      tds_offset_seconds = os.difftime(tds_epoch,system_epoch)
-
-      result_seconds = (hi*24*60*60) + (lo/300)
-
-      result = os.date("!%b %d, %Y %H:%M:%S", tds_offset_seconds + result_seconds )
-      return pos, result
-    end,
-
     [DataTypes.BITNTYPE] = function( data, pos )
       return ColumnData.Parse[DataTypes.SYBINTN](data, pos)
     end,
@@ -1096,7 +1399,7 @@ ColumnData =
       local len, coldata
 
       -- The first len value is the size of the meta data block
-      pos, len = bin.unpack( "<C", data, pos )
+      len, pos = string.unpack( "<B", data, pos )
 
       if ( len == 0 ) then
         return pos, 'Null'
@@ -1110,22 +1413,21 @@ ColumnData =
       pos = pos + 8
 
       -- extract the actual data
-      pos, len = bin.unpack( "<I", data, pos )
-      pos, coldata = bin.unpack( "A"..len, data, pos )
+      coldata, pos = string.unpack( "<s4", data, pos )
 
-      return pos, Util.FromWideChar(coldata)
+      return pos, unicode.utf16to8(coldata)
     end,
 
     [DataTypes.FLTNTYPE] = function( data, pos )
       local len, coldata
-      pos, len = bin.unpack("<C", data, pos)
+      len, pos = string.unpack("<B", data, pos)
 
       if ( len == 0 ) then
         return pos, 'Null'
       elseif ( len == 4 ) then
-        pos, coldata = bin.unpack("f", data, pos)
+        coldata, pos = string.unpack("<f", data, pos)
       elseif ( len == 8 ) then
-        pos, coldata = bin.unpack("<d", data, pos)
+        coldata, pos = string.unpack("<d", data, pos)
       end
 
       return pos, coldata
@@ -1133,17 +1435,17 @@ ColumnData =
 
     [DataTypes.MONEYNTYPE] = function( data, pos )
       local len, value, coldata, hi, lo
-      pos, len = bin.unpack("C", data, pos)
+      len, pos = string.unpack("B", data, pos)
 
       if ( len == 0 ) then
         return pos, 'Null'
       elseif ( len == 4 ) then
         --type smallmoney
-        pos, value = bin.unpack("<i", data, pos)
+        value, pos = string.unpack("<i4", data, pos)
       elseif ( len == 8 ) then
         -- type money
-        pos, hi,lo = bin.unpack("<II", data, pos)
-        value = ( hi * 4294967296 ) + lo
+        hi, lo, pos = string.unpack("<I4I4", data, pos)
+        value = ( hi * 0x100000000 ) + lo
       else
         return -1, ("Unhandled length (%d) for MONEYNTYPE"):format(len)
       end
@@ -1158,22 +1460,17 @@ ColumnData =
     [DataTypes.SYBDATETIMN] = function( data, pos )
       local len, coldata
 
-      pos, len = bin.unpack( "<C", data, pos )
+      len, pos = string.unpack( "<B", data, pos )
 
       if ( len == 0 ) then
         return pos, 'Null'
       elseif ( len == 4 ) then
         -- format is smalldatetime
         local days, mins
-        pos, days, mins = bin.unpack("<SS", data, pos)
-
-        local tds_epoch = os.time( {year = 1900, month = 1, day = 1, hour = 00, min = 00, sec = 00, isdst = nil} )
-        -- determine the offset between the tds_epoch and the local system epoch
-        local system_epoch = os.time( os.date("*t", 0))
-        local tds_offset_seconds = os.difftime(tds_epoch,system_epoch)
+        days, mins, pos = string.unpack("<I2I2", data, pos)
 
         local result_seconds = (days*24*60*60) + (mins*60)
-        coldata = os.date("!%b %d, %Y %H:%M:%S", tds_offset_seconds + result_seconds )
+        coldata = datetime.format_timestamp(tds_offset_seconds + result_seconds)
 
         return pos,coldata
 
@@ -1189,13 +1486,13 @@ ColumnData =
     [DataTypes.XSYBVARBINARY] = function( data, pos )
       local len, coldata
 
-      pos, len = bin.unpack( "<S", data, pos )
+      len, pos = string.unpack( "<I2", data, pos )
 
       if ( len == 65535 ) then
         return pos, 'Null'
       else
-        pos, coldata = bin.unpack( "A"..len, data, pos )
-        return pos, "0x" .. select(2, bin.unpack("H"..coldata:len(), coldata ) )
+        coldata, pos = string.unpack( "c"..len, data, pos )
+        return pos, "0x" .. stdnse.tohex(coldata)
       end
 
       return -1, "Error"
@@ -1204,12 +1501,12 @@ ColumnData =
     [DataTypes.XSYBVARCHAR] = function( data, pos )
       local len, coldata
 
-      pos, len = bin.unpack( "<S", data, pos )
+      len, pos = string.unpack( "<I2", data, pos )
       if ( len == 65535 ) then
         return pos, 'Null'
       end
 
-      pos, coldata = bin.unpack( "A"..len, data, pos )
+      coldata, pos = string.unpack( "c"..len, data, pos )
 
       return pos, coldata
     end,
@@ -1225,13 +1522,13 @@ ColumnData =
     [DataTypes.XSYBNVARCHAR] = function( data, pos )
       local len, coldata
 
-      pos, len = bin.unpack( "<S", data, pos )
+      len, pos = string.unpack( "<I2", data, pos )
       if ( len == 65535 ) then
         return pos, 'Null'
       end
-      pos, coldata = bin.unpack( "A"..len, data, pos )
+      coldata, pos = string.unpack( "c"..len, data, pos )
 
-      return pos, Util.FromWideChar(coldata)
+      return pos, unicode.utf16to8(coldata)
     end,
 
     [DataTypes.SQLNCHAR] = function( data, pos )
@@ -1257,16 +1554,16 @@ Token =
       local tmp
 
       token.type = TokenType.ErrorMessage
-      pos, token.size, token.errno, token.state, token.severity, token.errlen = bin.unpack( "<SICCS", data, pos )
-      pos, tmp = bin.unpack("A" .. (token.errlen * 2), data, pos )
-      token.error = Util.FromWideChar(tmp)
-      pos, token.srvlen = bin.unpack("C", data, pos)
-      pos, tmp = bin.unpack("A" .. (token.srvlen * 2), data, pos )
-      token.server = Util.FromWideChar(tmp)
-      pos, token.proclen = bin.unpack("C", data, pos)
-      pos, tmp = bin.unpack("A" .. (token.proclen * 2), data, pos )
-      token.proc = Util.FromWideChar(tmp)
-      pos, token.lineno = bin.unpack("<S", data, pos)
+      token.size, token.errno, token.state, token.severity, token.errlen, pos = string.unpack( "<I2I4BBI2", data, pos )
+      tmp, pos = string.unpack("c" .. (token.errlen * 2), data, pos )
+      token.error = unicode.utf16to8(tmp)
+      token.srvlen, pos = string.unpack("B", data, pos)
+      tmp, pos = string.unpack("c" .. (token.srvlen * 2), data, pos )
+      token.server = unicode.utf16to8(tmp)
+      token.proclen, pos = string.unpack("B", data, pos)
+      tmp, pos = string.unpack("c" .. (token.proclen * 2), data, pos )
+      token.proc = unicode.utf16to8(tmp)
+      token.lineno, pos = string.unpack("<I2", data, pos)
 
       return pos, token
     end,
@@ -1283,7 +1580,7 @@ Token =
       local tmp
 
       token.type = TokenType.EnvironmentChange
-      pos, token.size = bin.unpack("<S", data, pos)
+      token.size, pos = string.unpack("<I2", data, pos)
 
       return pos + token.size, token
     end,
@@ -1311,9 +1608,9 @@ Token =
       local _
 
       token.type = TokenType.LoginAcknowledgement
-      pos, token.size, _, _, _, _, token.textlen = bin.unpack( "<SCCCSC", data, pos )
-      pos, token.text = bin.unpack("A" .. token.textlen * 2, data, pos)
-      pos, token.version = bin.unpack("<I", data, pos )
+      token.size, _, _, _, _, token.textlen, pos = string.unpack( "<I2BBBI2B", data, pos )
+      token.text, pos = string.unpack("c" .. token.textlen * 2, data, pos)
+      token.version, pos = string.unpack("<I4", data, pos )
 
       return pos, token
     end,
@@ -1328,7 +1625,7 @@ Token =
       local token = {}
 
       token.type = TokenType.Done
-      pos, token.flags, token.operation, token.rowcount = bin.unpack( "<SSI", data, pos )
+      token.flags, token.operation, token.rowcount, pos = string.unpack( "<I2I2I4", data, pos )
 
       return pos, token
     end,
@@ -1371,7 +1668,7 @@ Token =
     [TokenType.ReturnStatus] = function( data, pos )
       local token = {}
 
-      pos, token.value = bin.unpack("<i", data, pos)
+      token.value, pos = string.unpack("<i4", data, pos)
       token.type = TokenType.ReturnStatus
       return pos, token
     end,
@@ -1385,7 +1682,7 @@ Token =
     [TokenType.OrderBy] = function( data, pos )
       local token = {}
 
-      pos, token.size = bin.unpack("<S", data, pos)
+      token.size, pos = string.unpack("<I2", data, pos)
       token.type = TokenType.OrderBy
       return pos + token.size, token
     end,
@@ -1402,14 +1699,14 @@ Token =
       local _
 
       token.type = TokenType.TDS7Results
-      pos, token.count = bin.unpack( "<S", data, pos )
+      token.count, pos = string.unpack( "<I2", data, pos )
       token.colinfo = {}
 
       for i=1, token.count do
         local colinfo = {}
         local usertype, flags, ttype
 
-        pos, usertype, flags, ttype = bin.unpack("<SSC", data, pos )
+        usertype, flags, ttype, pos = string.unpack("<I2I2B", data, pos )
         if ( not(ColumnInfo.Parse[ttype]) ) then
           return -1, ("Unhandled data type: 0x%X"):format(ttype)
         end
@@ -1426,14 +1723,14 @@ Token =
 
 
     [TokenType.NTLMSSP_CHALLENGE] = function(data, pos)
-      local pos, len, ntlmssp, msgtype = bin.unpack("<SA8I", data, pos)
+      local len, ntlmssp, msgtype, pos = string.unpack("<I2c8I4", data, pos)
       local NTLMSSP_CHALLENGE = 2
 
       if ( ntlmssp ~= "NTLMSSP\0" or msgtype ~= NTLMSSP_CHALLENGE ) then
         return -1, "Failed to process NTLMSSP Challenge"
       end
 
-      local ntlm_challenge = data:sub( 28, 35 )
+      local ntlm_challenge = {nonce=data:sub( 28, 35 ), type=TokenType.NTLMSSP_CHALLENGE}
       pos = pos + len - 13
       return pos, ntlm_challenge
     end,
@@ -1447,7 +1744,7 @@ Token =
   -- @return token table containing token specific fields or error message on error
   ParseToken = function( data, pos )
     local ttype
-    pos, ttype = bin.unpack("C", data, pos)
+    ttype, pos = string.unpack("B", data, pos)
     if ( not(Token.Parse[ttype]) ) then
       stdnse.debug1("%s: No parser for token type 0x%X", "MSSQL", ttype )
       return -1, ("No parser for token type: 0x%X"):format( ttype )
@@ -1477,7 +1774,7 @@ QueryPacket =
   --
   -- @return string containing the authentication packet
   ToString = function( self )
-    return PacketType.Query, Util.ToWideChar( self.query )
+    return PacketType.Query, unicode.utf8to16( self.query )
   end,
 
 }
@@ -1560,7 +1857,7 @@ PreLoginPacket =
       [PreLoginPacket.OPTION_TYPE.Terminator] = 0,
     }
 
-    local data, optionLength, optionType = "", 0, 0
+    local optionLength, optionType = 0, 0
     local offset = 1 -- Terminator
     offset = offset + 5 -- Version
     offset = offset + 5 -- Encryption
@@ -1575,44 +1872,42 @@ PreLoginPacket =
 
     optionType = PreLoginPacket.OPTION_TYPE.Version
     optionLength = OPTION_LENGTH_CLIENT[ optionType ]
-    data = data .. bin.pack( ">CSS", optionType, offset, optionLength )
+    local data = { string.pack( ">BI2I2", optionType, offset, optionLength ) }
     offset = offset + optionLength
 
     optionType = PreLoginPacket.OPTION_TYPE.Encryption
     optionLength = OPTION_LENGTH_CLIENT[ optionType ]
-    data = data .. bin.pack( ">CSS", optionType, offset, optionLength )
+    data[#data+1] = string.pack( ">BI2I2", optionType, offset, optionLength )
     offset = offset + optionLength
 
     optionType = PreLoginPacket.OPTION_TYPE.InstOpt
     optionLength = #self._instanceName + 1 --(string length + null-terminator)
-    data = data .. bin.pack( ">CSS", optionType, offset, optionLength )
+    data[#data+1] = string.pack( ">BI2I2", optionType, offset, optionLength )
     offset = offset + optionLength
 
     optionType = PreLoginPacket.OPTION_TYPE.ThreadId
     optionLength = OPTION_LENGTH_CLIENT[ optionType ]
-    data = data .. bin.pack( ">CSS", optionType, offset, optionLength )
+    data[#data+1] = string.pack( ">BI2I2", optionType, offset, optionLength )
     offset = offset + optionLength
 
     if self.requestMars then
       optionType = PreLoginPacket.OPTION_TYPE.MARS
       optionLength = OPTION_LENGTH_CLIENT[ optionType ]
-      data = data .. bin.pack( ">CSS", optionType, offset, optionLength )
+      data[#data+1] = string.pack( ">BI2I2", optionType, offset, optionLength )
       offset = offset + optionLength
     end
 
-    data = data .. bin.pack( "C", PreLoginPacket.OPTION_TYPE.Terminator )
+    data[#data+1] = string.pack( "B", PreLoginPacket.OPTION_TYPE.Terminator )
 
     -- Now that the pre-login headers are done, write the data
-    data = data .. bin.pack( ">CCSS", self.versionInfo.major, self.versionInfo.minor,
+    data[#data+1] = string.pack( ">BBI2I2", self.versionInfo.major, self.versionInfo.minor,
     self.versionInfo.build, self.versionInfo.subBuild )
-    data = data .. bin.pack( "C", self._requestEncryption )
-    data = data .. bin.pack( "z", self._instanceName )
-    data = data .. bin.pack( "<I", self._threadId )
+    data[#data+1] = string.pack( "<BzI4", self._requestEncryption, self._instanceName, self._threadId )
     if self.requestMars then
-      data = data .. bin.pack( "C", self._requestMars )
+      data[#data+1] = string.pack( "B", self._requestMars )
     end
 
-    return PacketType.PreLogin, data
+    return PacketType.PreLogin, table.concat(data)
   end,
 
   --- Reads a byte-string and creates a PreLoginPacket object from it. This is
@@ -1634,7 +1929,11 @@ PreLoginPacket =
     while true do
 
       local optionType, optionPos, optionLength, optionData, expectedOptionLength, _
-      pos, optionType = bin.unpack("C", bytes, pos)
+      if pos > #bytes then
+        stdnse.debug2("%s: Could not extract optionType.", "MSSQL" )
+        return false, "Invalid pre-login response"
+      end
+      optionType, pos = ("B"):unpack(bytes, pos)
       if ( optionType == PreLoginPacket.OPTION_TYPE.Terminator ) then
         status = true
         break
@@ -1645,19 +1944,13 @@ PreLoginPacket =
         expectedOptionLength = -1
       end
 
-      pos, optionPos, optionLength = bin.unpack(">SS", bytes, pos)
-      if not (optionPos and optionLength) then
+      if pos + 4 > #bytes + 1 then
         stdnse.debug2("%s: Could not unpack optionPos and optionLength.", "MSSQL" )
         return false, "Invalid pre-login response"
       end
+      optionPos, optionLength, pos = (">I2I2"):unpack(bytes, pos)
 
       optionPos = optionPos + 1 -- convert from 0-based index to 1-based index
-      if ( (optionPos + optionLength) > (#bytes + 1) ) then
-        stdnse.debug2("%s: Pre-login response: pos+len for option type %s is beyond end of data.", "MSSQL", optionType )
-        stdnse.debug2("%s:   (optionPos: %s) (optionLength: %s)", "MSSQL", optionPos, optionLength )
-        return false, "Invalid pre-login response"
-      end
-
 
       if ( optionLength ~= expectedOptionLength and expectedOptionLength ~= -1 ) then
         stdnse.debug2("%s: Option data is incorrect size in pre-login response. ", "MSSQL" )
@@ -1671,23 +1964,18 @@ PreLoginPacket =
       end
 
       if ( optionType == PreLoginPacket.OPTION_TYPE.Version ) then
-        local major, minor, build, subBuild, version
-        major = string.byte( optionData:sub( 1, 1 ) )
-        minor = string.byte( optionData:sub( 2, 2 ) )
-        build = (string.byte( optionData:sub( 3, 3 ) ) * 256) + string.byte( optionData:sub( 4, 4 ) )
-        subBuild = (string.byte( optionData:sub( 5, 5 ) ) * 256) + string.byte( optionData:sub( 6, 6 ) )
-
-        version = SqlServerVersionInfo:new()
+        local major, minor, build, subBuild = (">BBI2I2"):unpack(optionData)
+        local version = SqlServerVersionInfo:new()
         version:SetVersion( major, minor, build, subBuild, "SSNetLib" )
         preLoginPacket.versionInfo = version
       elseif ( optionType == PreLoginPacket.OPTION_TYPE.Encryption ) then
-        preLoginPacket:SetRequestEncryption( bin.unpack( "C", optionData ) )
+        preLoginPacket:SetRequestEncryption( ("B"):unpack(optionData) )
       elseif ( optionType == PreLoginPacket.OPTION_TYPE.InstOpt ) then
-        preLoginPacket:SetInstanceName( bin.unpack( "z", optionData ) )
+        preLoginPacket:SetInstanceName( ("z"):unpack(optionData) )
       elseif ( optionType == PreLoginPacket.OPTION_TYPE.ThreadId ) then
         -- Do nothing. According to the TDS spec, this option is empty when sent from the server
       elseif ( optionType == PreLoginPacket.OPTION_TYPE.MARS ) then
-        preLoginPacket:SetRequestMars( bin.unpack( "C", optionData ) )
+        preLoginPacket:SetRequestMars( ("B"):unpack(optionData) )
       end
     end
 
@@ -1788,91 +2076,102 @@ LoginPacket =
     local authLen = 0
 
     self.cli_pid = math.random(100000)
+    local u_client = unicode.utf8to16(self.client)
+    local u_app = unicode.utf8to16(self.app)
+    local u_server = unicode.utf8to16(self.server)
+    local u_library = unicode.utf8to16(self.library)
+    local u_locale = unicode.utf8to16(self.locale)
+    local u_database = unicode.utf8to16(self.database)
+    local u_username, uc_password
 
-    self.length = offset + 2 * ( self.client:len() + self.app:len() + self.server:len() + self.library:len() + self.database:len() )
+    self.length = offset + #u_client + #u_app + #u_server + #u_library + #u_database
 
     if ( ntlmAuth ) then
       authLen = 32 + #self.domain
       self.length = self.length + authLen
       self.options_2 = self.options_2 + 0x80
     else
-      self.length = self.length + 2 * (self.username:len() + self.password:len())
+      u_username = unicode.utf8to16(self.username)
+      uc_password = Auth.TDS7CryptPass(self.password, unicode.utf8_dec)
+      self.length = self.length + #u_username + #uc_password
     end
 
-    data = bin.pack("<IIIIII", self.length, self.version, self.size, self.cli_version, self.cli_pid, self.conn_id )
-    data = data .. bin.pack("CCCC", self.options_1, self.options_2, self.sqltype_flag, self.reserved_flag )
-    data = data .. bin.pack("<II", self.time_zone, self.collation )
+    data = {
+      string.pack("<I4I4I4I4I4I4", self.length, self.version, self.size, self.cli_version, self.cli_pid, self.conn_id ),
+      string.pack("BBBB", self.options_1, self.options_2, self.sqltype_flag, self.reserved_flag ),
+      string.pack("<I4I4", self.time_zone, self.collation ),
 
-    -- offsets begin
-    data = data .. bin.pack("<SS", offset, self.client:len() )
-    offset = offset + self.client:len() * 2
+      -- offsets begin
+      string.pack("<I2I2", offset, #u_client/2 ),
+    }
+    offset = offset + #u_client
 
     if ( not(ntlmAuth) ) then
-      data = data .. bin.pack("<SS", offset, self.username:len() )
+      data[#data+1] = string.pack("<I2I2", offset, #u_username/2 )
 
-      offset = offset + self.username:len() * 2
-      data = data .. bin.pack("<SS", offset, self.password:len() )
-      offset = offset + self.password:len() * 2
+      offset = offset + #u_username
+      data[#data+1] = string.pack("<I2I2", offset, #uc_password/2 )
+      offset = offset + #uc_password
     else
-      data = data .. bin.pack("<SS", offset, 0 )
-      data = data .. bin.pack("<SS", offset, 0 )
+      data[#data+1] = string.pack("<I2I2", offset, 0 )
+      data[#data+1] = string.pack("<I2I2", offset, 0 )
     end
 
-    data = data .. bin.pack("<SS", offset, self.app:len() )
-    offset = offset + self.app:len() * 2
+    data[#data+1] = string.pack("<I2I2", offset, #u_app/2 )
+    offset = offset + #u_app
 
-    data = data .. bin.pack("<SS", offset, self.server:len() )
-    offset = offset + self.server:len() * 2
+    data[#data+1] = string.pack("<I2I2", offset, #u_server/2 )
+    offset = offset + #u_server
 
     -- Offset to unused placeholder (reserved for future use in TDS spec)
-    data = data .. bin.pack("<SS", 0, 0 )
+    data[#data+1] = string.pack("<I2I2", 0, 0 )
 
-    data = data .. bin.pack("<SS", offset, self.library:len() )
-    offset = offset + self.library:len() * 2
+    data[#data+1] = string.pack("<I2I2", offset, #u_library/2 )
+    offset = offset + #u_library
 
-    data = data .. bin.pack("<SS", offset, self.locale:len() )
-    offset = offset + self.locale:len() * 2
+    data[#data+1] = string.pack("<I2I2", offset, #u_locale/2 )
+    offset = offset + #u_locale
 
-    data = data .. bin.pack("<SS", offset, self.database:len() )
-    offset = offset + self.database:len() * 2
+    data[#data+1] = string.pack("<I2I2", offset, #u_database/2 )
+    offset = offset + #u_database
 
     -- client MAC address, hardcoded to 00:00:00:00:00:00
-    data = data .. bin.pack("A", self.MAC)
+    data[#data+1] = self.MAC
 
     -- offset to auth info
-    data = data .. bin.pack("<S", offset)
+    data[#data+1] = string.pack("<I2", offset)
     -- length of nt auth (should be 0 for sql auth)
-    data = data .. bin.pack("<S", authLen)
+    data[#data+1] = string.pack("<I2", authLen)
     -- next position (same as total packet length)
-    data = data .. bin.pack("<S", self.length)
+    data[#data+1] = string.pack("<I2", self.length)
     -- zero pad
-    data = data .. bin.pack("<S", 0)
+    data[#data+1] = string.pack("<I2", 0)
 
     -- Auth info wide strings
-    data = data .. bin.pack("A", Util.ToWideChar(self.client) )
+    data[#data+1] = u_client
     if ( not(ntlmAuth) ) then
-      data = data .. bin.pack("A", Util.ToWideChar(self.username) )
-      data = data .. bin.pack("A", Auth.TDS7CryptPass(self.password) )
+      data[#data+1] = u_username
+      data[#data+1] = uc_password
     end
-    data = data .. bin.pack("A", Util.ToWideChar(self.app) )
-    data = data .. bin.pack("A", Util.ToWideChar(self.server) )
-    data = data .. bin.pack("A", Util.ToWideChar(self.library) )
-    data = data .. bin.pack("A", Util.ToWideChar(self.locale) )
-    data = data .. bin.pack("A", Util.ToWideChar(self.database) )
+    data[#data+1] = u_app
+    data[#data+1] = u_server
+    data[#data+1] = u_library
+    data[#data+1] = u_locale
+    data[#data+1] = u_database
 
     if ( ntlmAuth ) then
       local NTLMSSP_NEGOTIATE = 1
       local flags = 0x0000b201
       local workstation = ""
 
-      data = data .. "NTLMSSP\0"
-      data = data .. bin.pack("<II", NTLMSSP_NEGOTIATE, flags)
-      data = data .. bin.pack("<SSI", #self.domain, #self.domain, 32)
-      data = data .. bin.pack("<SSI", #workstation, #workstation, 32)
-      data = data .. bin.pack("A", self.domain:upper())
+      data[#data+1] = "NTLMSSP\0"
+      data[#data+1] = string.pack("<I4I4", NTLMSSP_NEGOTIATE, flags)
+      data[#data+1] = string.pack("<I2I2I4", #self.domain, #self.domain, 32)
+      data[#data+1] = string.pack("<I2I2I4", #workstation, #workstation, 32)
+      data[#data+1] = self.domain:upper()
     end
 
-    return PacketType.Login, data
+    return PacketType.Login, table.concat(data)
   end,
 
 }
@@ -1893,8 +2192,8 @@ NTAuthenticationPacket = {
   ToString = function(self)
     local ntlmssp = "NTLMSSP\0"
     local NTLMSSP_AUTH = 3
-    local domain = Util.ToWideChar(self.domain:upper())
-    local user = Util.ToWideChar(self.username)
+    local domain = unicode.utf8to16(self.domain:upper())
+    local user = unicode.utf8to16(self.username)
     local hostname, sessionkey = "", ""
     local flags = 0x00008201
     local ntlm_response = Auth.NtlmResponse(self.password, self.nonce)
@@ -1907,15 +2206,15 @@ NTAuthenticationPacket = {
     local hostname_offset = ntlm_response_offset + #ntlm_response
     local sessionkey_offset = hostname_offset + #hostname
 
-    local data = bin.pack("<AISSI", ntlmssp, NTLMSSP_AUTH, #lm_response, #lm_response, lm_response_offset)
-    .. bin.pack("<SSI", #ntlm_response, #ntlm_response, ntlm_response_offset)
-    .. bin.pack("<SSI", #domain, #domain, domain_offset)
-    .. bin.pack("<SSI", #user, #user, username_offset)
-    .. bin.pack("<SSI", #hostname, #hostname, hostname_offset)
-    .. bin.pack("<SSI", #sessionkey, #sessionkey, sessionkey_offset)
-    .. bin.pack("<I", flags)
-    .. bin.pack("A", domain)
-    .. bin.pack("A", user )
+    local data = ntlmssp .. string.pack("<I4I2I2I4", NTLMSSP_AUTH, #lm_response, #lm_response, lm_response_offset)
+    .. string.pack("<I2I2I4", #ntlm_response, #ntlm_response, ntlm_response_offset)
+    .. string.pack("<I2I2I4", #domain, #domain, domain_offset)
+    .. string.pack("<I2I2I4", #user, #user, username_offset)
+    .. string.pack("<I2I2I4", #hostname, #hostname, hostname_offset)
+    .. string.pack("<I2I2I4", #sessionkey, #sessionkey, sessionkey_offset)
+    .. string.pack("<I4", flags)
+    .. domain
+    .. user
     .. lm_response .. ntlm_response
 
     return PacketType.NTAuthentication, data
@@ -1967,7 +2266,7 @@ TDSStream = {
 
     local status, result, connectionType, errorMessage
     stdnse.debug3("%s: Connection preferences for %s: %s",
-    "MSSQL", instanceInfo:GetName(), stdnse.strjoin( ", ", connectionPreference ) )
+    "MSSQL", instanceInfo:GetName(), table.concat(connectionPreference, ", ") )
 
     for _, connectionType in ipairs( connectionPreference ) do
       if connectionType == "TCP" then
@@ -2139,7 +2438,7 @@ TDSStream = {
 
 
     if ( packetType ~= PacketType.NTAuthentication ) then self._packetId = self._packetId + 1 end
-    local assembledPacket = bin.pack(">CCSSCCA", packetType, messageStatus, packetLength, spid, self._packetId, window, packetData )
+    local assembledPacket = string.pack(">BBI2I2BB", packetType, messageStatus, packetLength, spid, self._packetId, window) .. packetData
 
     if ( self._socket ) then
       return self._socket:send( assembledPacket )
@@ -2201,8 +2500,8 @@ TDSStream = {
       end
 
       -- read in the TDS headers
-      pos, packetType, messageStatus, packetLength = bin.unpack(">CCS", readBuffer, pos )
-      pos, spid, self._packetId, window = bin.unpack(">SCC", readBuffer, pos )
+      packetType, messageStatus, packetLength, pos = string.unpack(">BBI2", readBuffer, pos )
+      spid, self._packetId, window, pos = string.unpack(">I2BB", readBuffer, pos )
 
       -- TDS packet validity check: packet type is Response (0x4)
       if ( packetType ~= PacketType.Response ) then
@@ -2240,7 +2539,7 @@ TDSStream = {
 
       -- Check the status flags in the TDS packet to see if the message is
       -- continued in another TDS packet.
-      tdsPacketAvailable = (bit.band( messageStatus, TDSStream.MESSAGE_STATUS_FLAGS.EndOfMessage) ~=
+      tdsPacketAvailable = (( messageStatus & TDSStream.MESSAGE_STATUS_FLAGS.EndOfMessage) ~=
         TDSStream.MESSAGE_STATUS_FLAGS.EndOfMessage)
     end
 
@@ -2262,8 +2561,8 @@ Helper =
 
   --- Establishes a connection to the SQL server
   --
-  -- @param host table containing host information
-  -- @param port table containing port information
+  -- @param instanceInfo A SqlServerInstanceInfo object for the instance
+  --                     to connect to
   -- @return status true on success, false on failure
   -- @return result containing error message on failure
   ConnectEx = function( self, instanceInfo )
@@ -2339,6 +2638,9 @@ Helper =
   --- Gets a table containing SqlServerInstanceInfo objects discovered on
   --  the specified host (and port, if specified).
   --
+  --  This table is the NSE registry table itself, not a copy, so do not alter
+  --  it unintentionally.
+  --
   --  @param host A host table for the target host
   --  @param port (Optional) If omitted, all of the instances for the host
   --    will be returned.
@@ -2348,12 +2650,12 @@ Helper =
     nmap.registry.mssql.instances = nmap.registry.mssql.instances or {}
     nmap.registry.mssql.instances[ host.ip ] = nmap.registry.mssql.instances[ host.ip ] or {}
 
+    local instances = nmap.registry.mssql.instances[ host.ip ]
     if ( not port ) then
-      local instances = nmap.registry.mssql.instances[ host.ip ]
       if ( instances and #instances == 0 ) then instances = nil end
       return instances
     else
-      for _, instance in ipairs( nmap.registry.mssql.instances[ host.ip ] ) do
+      for _, instance in ipairs(instances) do
         if ( instance.port and instance.port.number == port.number and
           instance.port.protocol == port.protocol ) then
           return { instance }
@@ -2438,28 +2740,32 @@ Helper =
   DiscoverByTcp = function( host, port )
     local version, instance, status
     -- Check to see if we've already discovered an instance on this port
-    instance = Helper.GetDiscoveredInstances( host, port )
-    if ( not instance ) then
-      instance =  SqlServerInstanceInfo:new()
-      instance.host = host
-      instance.port = port
+    local instances = Helper.GetDiscoveredInstances(host, port)
+    if instances then
+      return true, instances
+    end
+    instance =  SqlServerInstanceInfo:new()
+    instance.host = host
+    instance.port = port
 
-      status, version = Helper.GetInstanceVersion( instance )
-      if ( status ) then
-        Helper.AddOrMergeInstance( instance )
-        -- The point of this wasn't to get the version, just to use the
-        -- pre-login packet to determine whether there was a SQL Server on
-        -- the port. However, since we have the version now, we'll store it.
-        instance.version = version
-        -- Give some version info back to Nmap
-        if ( instance.port and instance.version ) then
-          instance.version:PopulateNmapPortVersion( instance.port )
-          nmap.set_port_version( host, instance.port)
-        end
-      end
+    -- -sV may have gotten a version, but for now, it doesn't extract subBuild.
+    status, version = Helper.GetInstanceVersion( instance )
+    if not status then
+      return false, version
     end
 
-    return (instance ~= nil), { instance }
+    Helper.AddOrMergeInstance( instance )
+    -- The point of this wasn't to get the version, just to use the
+    -- pre-login packet to determine whether there was a SQL Server on
+    -- the port. However, since we have the version now, we'll store it.
+    instance.version = version
+    -- Give some version info back to Nmap
+    if ( instance.port and instance.version ) then
+      instance.version:PopulateNmapPortVersion( instance.port )
+      nmap.set_port_version( host, instance.port)
+    end
+
+    return true, { instance }
   end,
 
   ---  Attempts to discover SQL Server instances listening on default named
@@ -2510,39 +2816,47 @@ Helper =
   --
   --  @param host Host table as received by the script action function
   Discover = function( host )
-    nmap.registry.mssql = nmap.registry.mssql or {}
-    nmap.registry.mssql.discovery_performed = nmap.registry.mssql.discovery_performed or {}
-    nmap.registry.mssql.discovery_performed[ host.ip ] = false
-
     local mutex = nmap.mutex( "discovery_performed for " .. host.ip )
     mutex( "lock" )
+    nmap.registry.mssql = nmap.registry.mssql or {}
+    nmap.registry.mssql.discovery_performed = nmap.registry.mssql.discovery_performed or {}
+    if nmap.registry.mssql.discovery_performed[ host.ip ] then
+      mutex "done"
+      return
+    end
+    nmap.registry.mssql.discovery_performed[ host.ip ] = false
 
-    local sqlDefaultPort = nmap.get_port_state( host, {number = 1433, protocol = "tcp"} ) or {number = 1433, protocol = "tcp"}
-    local sqlBrowserPort = nmap.get_port_state( host, {number = 1434, protocol = "udp"} ) or {number = 1434, protocol = "udp"}
-    local smbPort
-    -- smb.get_port() will return nil if no SMB port was scanned OR if SMB ports were scanned but none was open
-    local smbPortNumber = smb.get_port( host )
-    if ( smbPortNumber ) then
-      smbPort = nmap.get_port_state( host, {number = smbPortNumber, protocol = "tcp"} )
-      -- There's no use in manually setting an SMB port; if no SMB port was
-      -- scanned and found open, the SMB library won't work
-    end
-    -- if the user has specified ports, we'll check those too
-    local targetInstancePorts = stdnse.get_script_args( "mssql.instance-port" )
-
-    if ( sqlBrowserPort and sqlBrowserPort.state ~= "closed" ) then
-      Helper.DiscoverBySsrp( host, sqlBrowserPort )
-    end
-    if ( sqlDefaultPort and sqlDefaultPort.state ~= "closed" ) then
-      Helper.DiscoverByTcp( host, sqlDefaultPort )
-    end
-    if ( smbPort ) then
-      Helper.DiscoverBySmb( host, smbPort )
-    end
-    if ( targetInstancePorts ) then
-      if ( type( targetInstancePorts ) == "string" ) then
-        targetInstancePorts = { targetInstancePorts }
+    -- First, do SSRP discovery. Check any open (got response) ports first:
+    local port = nmap.get_ports(host, nil, "udp", "open")
+    while port do
+      if port.version and port.version.name == "ms-sql-m" then
+        Helper.DiscoverBySsrp(host, port)
       end
+      port = nmap.get_ports(host, port, "udp", "open")
+    end
+    -- Then check if default SSRP port hasn't been done yet.
+    port = nmap.get_port_state(host, SSRP.PORT)
+    if not port or port.state == "open|filtered" then
+      -- Either it wasn't scanned or it wasn't strictly "open" so we missed it above
+        Helper.DiscoverBySsrp(host, port)
+    end
+
+    -- Next, do TCP discovery. Check any ports with an appropriate service name
+    port = nmap.get_ports(host, nil, "tcp", "open")
+    while port do
+      if port.version and port.version.name == "ms-sql-s" then
+        Helper.DiscoverByTcp(host, port)
+      end
+      port = nmap.get_ports(host, port, "tcp", "open")
+    end
+
+    -- smb.get_port() will return nil if no SMB port was scanned OR if SMB ports were scanned but none was open
+    if smb.get_port(host) then
+      Helper.DiscoverBySmb( host )
+    end
+
+    -- if the user has specified ports, we'll check those too
+    if ( targetInstancePorts ) then
       for _, portNumber in ipairs( targetInstancePorts ) do
         portNumber = tonumber( portNumber )
         Helper.DiscoverByTcp( host, {number = portNumber, protocol = "tcp"} )
@@ -2694,15 +3008,7 @@ Helper =
       return false, data
     end
 
-    if ( ntlmAuth ) then
-      local pos, nonce = Token.ParseToken( data, pos )
-      local authpacket = NTAuthenticationPacket:new( username, password, domain, nonce )
-      status, result = self.stream:Send( authpacket:ToString() )
-      status, data = self.stream:Receive()
-      if ( not(status) ) then
-        return false, data
-      end
-    end
+    local doNTLM = ntlmAuth
 
     while( pos < data:len() ) do
       pos, token = Token.ParseToken( data, pos )
@@ -2723,6 +3029,21 @@ Helper =
         return false, errorMessage, token.errno
       elseif ( token.type == TokenType.LoginAcknowledgement ) then
         return true, "Login Success"
+      elseif doNTLM and token.type == TokenType.NTLMSSP_CHALLENGE then
+        local authpacket = NTAuthenticationPacket:new( username, password, domain, token.nonce )
+        status, result = self.stream:Send( authpacket:ToString() )
+        status, data = self.stream:Receive()
+        if not status then
+          return false, data
+        end
+        doNTLM = false -- don't try again.
+      else
+        local found, ttype = tableaux.contains(TokenType, token.type)
+        if found then
+          stdnse.debug2("Unexpected token type: %s", ttype)
+        else
+          stdnse.debug2("Unknown token type: 0x%02x", token.type)
+        end
       end
     end
 
@@ -2780,9 +3101,9 @@ Helper =
 
     -- Iterate over tokens until we get to a rowtag
     while( pos < data:len() ) do
-      local rowtag = select(2, bin.unpack("C", data, pos))
+      local rowtag = string.unpack("B", data, pos)
 
-      if ( rowtag == TokenType.Row ) then
+      if rowtag == TokenType.Row or rowtag == TokenType.Done then
         break
       end
 
@@ -2802,7 +3123,7 @@ Helper =
 
     while(true) do
       local rowtag
-      pos, rowtag = bin.unpack("C", data, pos )
+      rowtag, pos = string.unpack("B", data, pos )
 
       if ( rowtag ~= TokenType.Row ) then
         break
@@ -2814,12 +3135,13 @@ Helper =
         for i=1, #colinfo do
           local val
 
-          if ( ColumnData.Parse[colinfo[i].type] ) then
-            if not ( colinfo[i].type == 106 or colinfo[i].type == 108) then
-              pos, val = ColumnData.Parse[colinfo[i].type](data, pos)
-            else
+          local coltype = colinfo[i].type
+          if ( ColumnData.Parse[coltype] ) then
+            if coltype == DataTypes.DECIMALNTYPE or coltype == DataTypes.NUMERICNTYPE then
               -- decimal / numeric types need precision and scale passed.
-              pos, val = ColumnData.Parse[colinfo[i].type]( colinfo[i].precision,  colinfo[i].scale, data, pos)
+              pos, val = ColumnData.Parse[coltype]( colinfo[i].precision,  colinfo[i].scale, data, pos)
+            else
+              pos, val = ColumnData.Parse[coltype](data, pos)
             end
 
             if ( -1 == pos ) then
@@ -2827,7 +3149,7 @@ Helper =
             end
             table.insert(columns, val)
           else
-            return false, ("unknown datatype=0x%X"):format(colinfo[i].type)
+            return false, ("unknown datatype=0x%X"):format(coltype)
           end
         end
         table.insert(rows, columns)
@@ -2900,27 +3222,18 @@ Helper =
   --    more SqlServerInstanceInfo objects. If status is false, this will be
   --    an error message.
   GetTargetInstances = function( host, port )
-    if ( port ) then
-      local status = true
-      local instance = Helper.GetDiscoveredInstances( host, port )
+    -- Perform discovery. This won't do anything if it's already been done.
+    -- It's important because otherwise we might miss some ports when not using -sV
+    Helper.Discover( host )
 
-      if ( not instance ) then
-        status, instance = Helper.DiscoverByTcp( host, port )
-      end
-      if ( instance ) then
-        return true, instance
+    if ( port ) then
+      local instances = Helper.GetDiscoveredInstances(host, port)
+      if instances then
+        return true, instances
       else
         return false, "No SQL Server instance detected on this port"
       end
     else
-      local targetInstanceNames = stdnse.get_script_args( "mssql.instance-name" )
-      local targetInstancePorts = stdnse.get_script_args( "mssql.instance-port" )
-      local targetAllInstances = stdnse.get_script_args( "mssql.instance-all" )
-
-      if ( targetInstanceNames and targetInstancePorts ) then
-        return false, "Connections can be made either by instance name or port."
-      end
-
       if ( targetAllInstances and ( targetInstanceNames or targetInstancePorts ) ) then
         return false, "All instances cannot be specified together with an instance name or port."
       end
@@ -2929,53 +3242,43 @@ Helper =
         return false, "No instance(s) specified."
       end
 
-      if ( not Helper.WasDiscoveryPerformed( host ) ) then
-        stdnse.debug2("%s: Discovery has not been performed prior to GetTargetInstances() call. Performing discovery now.", "MSSQL" )
-        Helper.Discover( host )
-      end
-
       local instanceList = Helper.GetDiscoveredInstances( host )
       if ( not instanceList ) then
         return false, "No instances found on target host"
       end
 
       local targetInstances = {}
-      if ( targetAllInstances ) then
-        targetInstances = instanceList
-      else
-        -- We want an easy way to look up whether an instance's name was
-        -- in our target list. So, we'll make a table of { instanceName = true, ... }
-        local temp = {}
-        if ( targetInstanceNames ) then
-          if ( type( targetInstanceNames ) == "string" ) then
-            targetInstanceNames = { targetInstanceNames }
-          end
-          for _, instanceName in ipairs( targetInstanceNames ) do
-            temp[ string.upper( instanceName ) ] = true
-          end
-        end
-        targetInstanceNames = temp
 
-        -- Do the same for the target ports
-        temp = {}
-        if ( targetInstancePorts ) then
-          if ( type( targetInstancePorts ) == "string" ) then
-            targetInstancePorts = { targetInstancePorts }
+      for _, instance in ipairs( instanceList ) do
+        repeat -- just so we can use break
+          if instance.port then
+            local scanport = nmap.get_port_state(host, instance.port)
+            -- If scanned-ports-only and it's on a non-scanned port
+            if (SCANNED_PORTS_ONLY and not scanport)
+              -- or if a portrule script will run on it
+              or (scanport and scanport.state == "open") then
+              break -- not interested
+            end
+            -- If they want everything
+            if targetAllInstances or
+              -- or if it's in the instance-port arg
+              (targetInstancePorts and
+                tableaux.contains(targetInstancePorts, instance.port.number)) then
+              -- keep it and move on
+              targetInstances[#targetInstances+1] = instance
+              break
+            end
           end
-          for _, portNumber in ipairs( targetInstancePorts ) do
-            portNumber = tonumber( portNumber )
-            temp[portNumber] = true
+          -- If they want everything
+          if targetAllInstances or
+            -- or if it's in the instance-name arg
+            (instance.instanceName and targetInstanceNames and
+              tableaux.contains(targetInstanceNames, string.upper(instance.instanceName))) then
+            --keep it and move on
+            targetInstances[#targetInstances+1] = instance
+            break
           end
-        end
-        targetInstancePorts = temp
-
-        for _, instance in ipairs( instanceList ) do
-          if ( instance.instanceName and targetInstanceNames[ string.upper( instance.instanceName ) ] ) then
-            table.insert( targetInstances, instance )
-          elseif ( instance.port and targetInstancePorts[ tonumber( instance.port.number ) ] ) then
-            table.insert( targetInstances, instance )
-          end
-        end
+        until false
       end
 
       if ( #targetInstances > 0 ) then
@@ -2992,90 +3295,97 @@ Helper =
   --  the database when normal connection attempts fail, for example, when
   --  the server is hanging, out of memory or other bad states.
   --
-  --  @param host Host table as received by the script action function
-  --  @param instanceName the instance name to probe for a DAC port
+  --  @param instance the <code>SqlServerInstanceInfo</code> object to probe for a DAC port
   --  @return number containing the DAC port on success or nil on failure
-  DiscoverDACPort = function(host, instanceName)
-    local socket = nmap.new_socket()
+  DiscoverDACPort = function(instance)
+    local instanceName = instance.instanceName or instance.pipeName
+    if not instanceName then
+      return nil
+    end
+    local socket = nmap.new_socket("udp")
     socket:set_timeout(5000)
 
-    if ( not(socket:connect(host, 1434, "udp")) ) then
+    if ( not(socket:connect(instance.host, 1434, "udp")) ) then
       return false, "Failed to connect to sqlbrowser service"
     end
 
-    if ( not(socket:send(bin.pack("Hz", "0F01", instanceName))) ) then
+    if ( not(socket:send(string.pack("c2z", "\x0F\x01", instanceName))) ) then
       socket:close()
       return false, "Failed to send request to sqlbrowser service"
     end
 
     local status, data = socket:receive_buf(match.numbytes(6), true)
+    socket:close()
     if ( not(status) ) then
-      socket:close()
       return nil
     end
-    socket:close()
 
     if ( #data < 6 ) then
       return nil
     end
-    return select(2, bin.unpack("<S", data, 5))
+    return string.unpack("<I2", data, 5)
   end,
 
-  --- Returns a hostrule for standard SQL Server scripts, which will return
-  --  true if one or more instances have been targeted with the <code>mssql.instance</code>
-  --  script argument.
+  ---  Returns an action, portrule, and hostrule for standard SQL Server scripts
   --
-  --  However, if a previous script has failed to find any
-  --  SQL Server instances on the host, the hostrule function will return
-  --  false to keep further scripts from running unnecessarily on that host.
+  -- The action function performs discovery if necessary and dispatches the
+  -- process_instance function on all discovered instances.
   --
-  --  @return A hostrule function (use as <code>hostrule = mssql.GetHostrule_Standard()</code>)
-  GetHostrule_Standard = function()
-    return function( host )
-      if ( stdnse.get_script_args( {"mssql.instance-all", "mssql.instance-name", "mssql.instance-port"} ) ~= nil ) then
-        if ( Helper.WasDiscoveryPerformed( host ) ) then
-          return Helper.GetDiscoveredInstances( host ) ~= nil
-        else
-          return true
-        end
-      else
-        return false
+  -- The portrule returns true if the port has been identified as "ms-sql-s" or
+  -- discovery has found an instance on that port.
+  --
+  -- The hostrule returns true if any of the <code>mssql.instance-*</code>
+  -- script-args has been set and either a matching instance exists or
+  -- discovery has not yet been done.
+  -- @usage action, portrule, hostrule = mssql.Helper.InitScript(do_something)
+  --
+  -- @param process_instance A function that takes a single parameter, a
+  --                         <code>SqlServerInstanceInfo</code> object, and
+  --                         returns output suitable for an action function to
+  --                         return.
+  --
+  -- @return An action function
+  -- @return A portrule function
+  -- @return A hostrule function
+  InitScript = function(process_instance)
+    local action = function(host, port)
+      local status, instances = Helper.GetTargetInstances(host, port)
+      if not status then
+        stdnse.debug1("GetTargetInstances: %s", instances)
+        return nil
       end
+      local output = {}
+      for _, instance in ipairs(instances) do
+        output[instance:GetName()] = process_instance(instance)
+      end
+      if next(output) then
+        return outlib.sorted_by_key(output)
+      end
+      return nil
     end
-  end,
 
-
-  ---  Returns a portrule for standard SQL Server scripts
-  --
-  -- The portrule return true if BOTH of the following conditions are met:
-  --  * The port has been identified as "ms-sql-s"
-  --  * The <code>mssql.instance</code> script argument has NOT been used
-  --
-  --  @return A portrule function (use as <code>portrule = mssql.GetPortrule_Standard()</code>)
-  GetPortrule_Standard = function()
-    return function( host, port )
-      return ( shortport.service( "ms-sql-s" )(host, port) and
-      stdnse.get_script_args( {"mssql.instance-all", "mssql.instance-name", "mssql.instance-port"} ) == nil)
-    end
+    -- GetTargetInstances does the right thing depending on whether port is
+    -- provided, which corresponds to portrule vs hostrule.
+    return action, Helper.GetTargetInstances, Helper.GetTargetInstances
   end,
 }
 
+local TDS7Crypt_enc = function (cp)
+      local c = cp ~ 0x5a5a
+      local m1= ( c >> 4 ) & 0x0F0F
+      local m2= ( c << 4 ) & 0xF0F0
+      return string.pack("<I2", m1 | m2 )
+end
 
 Auth = {
 
   --- Encrypts a password using the TDS7 *ultra secure* XOR encryption
   --
   -- @param password string containing the password to encrypt
+  -- @param decoder a unicode.lua decoder function to convert password to code points
   -- @return string containing the encrypted password
-  TDS7CryptPass = function(password)
-    local xormask = 0x5a5a
-
-    return password:gsub(".", function(i)
-      local c = bit.bxor( string.byte( i ), xormask )
-      local m1= bit.band( bit.rshift( c, 4 ), 0x0F0F )
-      local m2= bit.band( bit.lshift( c, 4 ), 0xF0F0 )
-      return bin.pack("S", bit.bor( m1, m2 ) )
-    end)
+  TDS7CryptPass = function(password, decoder)
+    return unicode.transcode(password, decoder, TDS7Crypt_enc)
   end,
 
   LmResponse = function( password, nonce )
@@ -3130,37 +3440,12 @@ Auth = {
 --- "static" Utility class containing mostly conversion functions
 Util =
 {
-  --- Converts a string to a wide string
-  --
-  -- @param str string to be converted
-  -- @return string containing a two byte representation of str where a zero
-  --         byte character has been tagged on to each character.
-  ToWideChar = function( str )
-    return str:gsub("(.)", "%1\0" )
-  end,
-
-
-  --- Concerts a wide string to string
-  --
-  -- @param wstr containing the wide string to convert
-  -- @return string with every other character removed
-  FromWideChar = function( wstr )
-    local str = ""
-    if ( nil == wstr ) then
-      return nil
-    end
-    for i=1, wstr:len(), 2 do
-      str = str .. wstr:sub(i, i)
-    end
-    return str
-  end,
-
   --- Takes a table as returned by Query and does some fancy formatting
-  --  better suitable for <code>stdnse.output_result</code>
+  --  better suitable for <code>stdnse.format_output</code>
   --
   -- @param tbl as received by <code>Helper.Query</code>
   -- @param with_headers boolean true if output should contain column headers
-  -- @return table suitable for <code>stdnse.output_result</code>
+  -- @return table suitable for <code>stdnse.format_output</code>
   FormatOutputTable = function ( tbl, with_headers )
     local new_tbl = {}
     local col_names = {}
@@ -3174,18 +3459,33 @@ Util =
       for k, v in pairs( tbl.colinfo ) do
         table.insert( col_names, v.text)
       end
-      headers = stdnse.strjoin("\t", col_names)
+      headers = table.concat(col_names, "\t")
       table.insert( new_tbl, headers)
       headers = headers:gsub("[^%s]", "=")
       table.insert( new_tbl, headers )
     end
 
     for _, v in ipairs( tbl.rows ) do
-      table.insert( new_tbl, stdnse.strjoin("\t", v) )
+      table.insert( new_tbl, table.concat(v, "\t") )
     end
 
     return new_tbl
   end,
 }
 
-return _ENV;
+local unittest = require "unittest"
+if not unittest.testing() then
+  return _ENV
+end
+
+local tests = {
+  {"host", "\x23\xa5\x53\xa5\x92\xa5\xe2\xa5", unicode.utf8_dec},
+  {"p@ssword12-", "\xa2\xa5\xa1\xa5\x92\xa5\x92\xa5\xd2\xa5\x53\xa5\x82\xa5\xe3\xa5\xb6\xa5\x86\xa5\x77\xa5", unicode.utf8_dec},
+}
+test_suite = unittest.TestSuite:new()
+
+for _, test in ipairs(tests) do
+  test_suite:add_test(unittest.equal(Auth.TDS7CryptPass(test[1], test[3]), test[2]), ("TDS7 crypt %s"):format(test[1]))
+end
+
+return _ENV

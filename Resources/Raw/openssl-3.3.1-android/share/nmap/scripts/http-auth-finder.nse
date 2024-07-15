@@ -35,6 +35,9 @@ detected method.
 -- @args http-auth-finder.withindomain only spider URLs within the same
 --       domain. This widens the scope from <code>withinhost</code> and can
 --       not be used in combination. (default: false)
+--
+-- @see http-auth.nse
+-- @see http-brute.nse
 
 author = "Patrik Karlsson"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
@@ -94,7 +97,7 @@ action = function(host, port)
             table.insert(schemes, item.scheme)
           end
         end
-        tab.addrow(auth_urls, r.url, ("HTTP: %s"):format(stdnse.strjoin(", ", schemes)))
+        tab.addrow(auth_urls, r.url, ("HTTP: %s"):format(table.concat(schemes, ", ")))
       else
         tab.addrow(auth_urls, r.url, ("HTTP: %s"):format(auth))
       end

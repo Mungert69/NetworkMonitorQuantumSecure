@@ -3,10 +3,10 @@
 --
 -- @copyright Same as Nmap--See https://nmap.org/book/man-legal.html
 
-local bin = require "bin"
-local bit = require "bit"
+local math = require "math"
 local stdnse = require "stdnse"
 local string = require "string"
+local stringaux = require "stringaux"
 local table = require "table"
 local type     = type
 local ipairs   = ipairs
@@ -15,6 +15,9 @@ local unittest = require "unittest"
 
 
 _ENV = stdnse.module("ipOps", stdnse.seeall)
+
+local pack = string.pack
+local unpack = string.unpack
 
 ---
 -- Checks to see if the supplied IP address is part of a non-routable
@@ -163,13 +166,7 @@ fromdword = function( ip )
     stdnse.debug1("Error in ipOps.fromdword: Expected 32-bit number.")
     return nil
   end
-
-  local n1 = bit.band(bit.rshift(ip, 0),  0x000000FF)
-  local n2 = bit.band(bit.rshift(ip, 8),  0x000000FF)
-  local n3 = bit.band(bit.rshift(ip, 16), 0x000000FF)
-  local n4 = bit.band(bit.rshift(ip, 24), 0x000000FF)
-
-  return string.format("%d.%d.%d.%d", n1, n2, n3, n4)
+  return string.format("%d.%d.%d.%d", unpack("BBBB", pack(">I4", ip)))
 end
 
 ---
@@ -243,13 +240,9 @@ compare_ip = function( left, op, right )
     return nil, table.concat( err, " " )
   end
 
-  if #left > #right then
-    left = bin.pack( "CA", 0x06, left )
-    right = bin.pack( "CA", 0x04, right )
-  elseif #right > #left then
-    right = bin.pack( "CA", 0x06, right )
-    left = bin.pack( "CA", 0x04, left )
-  end
+  -- by prepending the length, IPv4 (length 4) sorts before IPv6 (length 16)
+  left = pack("s1", left)
+  right = pack("s1", right)
 
   if ( op == "eq" ) then
     return ( left == right )
@@ -268,7 +261,17 @@ compare_ip = function( left, op, right )
   return nil, "Error in ipOps.compare_ip: Invalid Operator."
 end
 
-
+--- Sorts a table of IP addresses
+--
+-- An in-place sort using <code>table.sort</code> to sort by IP address.
+-- Sorting non-IP addresses is likely to result in a bad sort and possibly an infinite loop.
+--
+-- @param ips The table of IP addresses to sort
+-- @param op The comparison operation to use. Default: "lt" (ascending)
+ip_sort = function (ips, op)
+  op = op or "lt"
+  return table.sort(ips, function(a, b) return compare_ip(a, op, b) end)
+end
 
 ---
 -- Checks whether the supplied IP address is within the supplied range of IP
@@ -384,7 +387,7 @@ expand_ip = function( ip, family )
   if hexadectets[#hexadectets]:match( "[%.]+" ) then
     hexadectets[#hexadectets], err = expand_ip( hexadectets[#hexadectets] )
     if err then return nil, ( err:gsub( "IPv4", "IPv4in6" ) ) end
-    t = stdnse.strsplit( "[%.]+", hexadectets[#hexadectets] )
+    t = stringaux.strsplit( "[%.]+", hexadectets[#hexadectets] )
     for i, v in ipairs( t ) do
       t[i] = tonumber( v, 10 )
     end
@@ -443,37 +446,78 @@ get_ips_from_range = function( range )
     return nil, nil, "Error in ipOps.get_ips_from_range: Expected a range as a string."
   end
 
-  local first, last, prefix
-  if range:match( "/" ) then
-    first, prefix = range:match( "([%x%d:%.]+)/(%d+)" )
-  elseif range:match( "-" ) then
-    first, last = range:match( "([%x%d:%.]+)%s*%-%s*([%x%d:%.]+)" )
+  local ip, prefix = range:match("^%s*([%x:.]+)/(%d+)%s*$")
+  if ip then
+    return get_first_last_ip(ip, prefix)
   end
-
-  local err = {}
-  if first and ( last or prefix ) then
-    first, err[#err+1] = expand_ip( first )
-  else
+  local first, last = range:match("^%s*([%x:.]+)%s*%-%s*([%x:.]+)%s*$")
+  if not first then
     return nil, nil, "Error in ipOps.get_ips_from_range: The range supplied could not be interpreted."
   end
-  if last then
-    last, err[#err+1] = expand_ip( last )
-  elseif first and prefix then
-    last, err[#err+1] = get_last_ip( first, prefix )
-  end
 
-  if first and last then
-    if ( first:match( ":" ) and not last:match( ":" ) ) or ( not first:match( ":" ) and last:match( ":" ) ) then
-      return nil, nil, "Error in ipOps.get_ips_from_range: First IP address is of a different address family to last IP address."
+  local err
+  first, err = expand_ip(first)
+  if not err then
+    last, err = expand_ip(last)
+  end
+  if not err then
+    local af = function (ip) return ip:find(":") and 6 or 4 end
+    if af(first) ~= af(last) then
+      err = "Error in ipOps.get_ips_from_range: First IP address is of a different address family to last IP address."
     end
-    return first, last
-  else
-    return nil, nil, table.concat( err, " " )
   end
-
+  if err then
+      return nil, nil, err
+  end
+  return first, last
 end
 
+---
+-- Calculates the first and last IP addresses of a range of addresses,
+-- given an IP address in the range and a prefix length for that range
+-- @param ip String representing an IPv4 or IPv6 address.  Shortened notation
+--           is permitted.
+-- @param prefix Number or a string representing a decimal number corresponding
+--               to a prefix length.
+-- @usage
+-- first, last = ipOps.get_first_last_ip( "192.0.0.0", 26)
+-- @return String representing the first IP address of the range denoted by
+--         the supplied parameters (or <code>nil</code> in case of an error).
+-- @return String representing the last IP address of the range denoted by
+--         the supplied parameters (or <code>nil</code> in case of an error).
+-- @return String error message in case of an error.
+get_first_last_ip = function(ip, prefix)
+  local err
+  ip, err = ip_to_bin(ip)
+  if err then return nil, nil, err end
 
+  prefix = tonumber(prefix)
+  if not prefix or prefix ~= math.floor(prefix) or prefix < 0 or prefix > #ip then
+    return nil, nil, "Error in ipOps.get_first_last_ip: Invalid prefix."
+  end
+
+  local net = ip:sub(1, prefix)
+  local first = bin_to_ip(net .. ("0"):rep(#ip - prefix))
+  local last  = bin_to_ip(net .. ("1"):rep(#ip - prefix))
+  return first, last
+end
+
+---
+-- Calculates the first IP address of a range of addresses given an IP address in
+-- the range and prefix length for that range.
+-- @param ip String representing an IPv4 or IPv6 address.  Shortened notation
+--           is permitted.
+-- @param prefix Number or a string representing a decimal number corresponding
+--               to a prefix length.
+-- @usage
+-- first = ipOps.get_first_ip( "192.0.0.0", 26 )
+-- @return String representing the first IP address of the range denoted by the
+--         supplied parameters (or <code>nil</code> in case of an error).
+-- @return String error message in case of an error.
+get_first_ip = function(ip, prefix)
+  local first, last, err = get_first_last_ip(ip, prefix)
+  return first, err
+end
 
 ---
 -- Calculates the last IP address of a range of addresses given an IP address in
@@ -487,29 +531,15 @@ end
 -- @return String representing the last IP address of the range denoted by the
 --         supplied parameters (or <code>nil</code> in case of an error).
 -- @return String error message in case of an error.
-get_last_ip = function( ip, prefix )
-
-  local first, err = ip_to_bin( ip )
-  if err then return nil, err end
-
-  prefix = tonumber( prefix )
-  if not prefix or ( prefix < 0 ) or ( prefix > # first  ) then
-    return nil, "Error in ipOps.get_last_ip: Invalid prefix length."
-  end
-
-  local hostbits = string.sub( first, prefix + 1 )
-  hostbits = string.gsub( hostbits, "0", "1" )
-  local last = string.sub( first, 1, prefix ) .. hostbits
-  last, err = bin_to_ip( last )
-  if err then return nil, err end
-  return last
-
+get_last_ip = function(ip, prefix)
+  local first, last, err = get_first_last_ip(ip, prefix)
+  return last, err
 end
 
 ---
 -- Converts an IP address into an opaque string (big-endian)
 -- @param ip  String representing an IPv4 or IPv6 address.
--- @param family (optional) Address family to convert to. "ipv6" converts IPv4
+-- @param family (optional) Address family to convert to. "inet6" converts IPv4
 -- addresses to IPv4-mapped IPv6.
 -- @usage
 -- opaque = ipOps.ip_to_str( "192.168.3.4" )
@@ -527,12 +557,12 @@ ip_to_str = function( ip, family )
   if not ip:match( ":" ) then
     -- ipv4 string
     for octet in string.gmatch( ip, "%d+" ) do
-      t[#t+1] = bin.pack( ">C", tonumber(octet) )
+      t[#t+1] = pack("B", octet)
     end
   else
     -- ipv6 string
     for hdt in string.gmatch( ip, "%x+" ) do
-      t[#t+1] = bin.pack( ">S", tonumber(hdt, 16) )
+      t[#t+1] = pack( ">I2", tonumber(hdt, 16) )
     end
   end
 
@@ -550,11 +580,9 @@ end
 -- @return String error message in case of an error
 str_to_ip = function (ip)
   if #ip == 4 then
-    local _, a, b, c, d = bin.unpack("C4", ip)
-    return ("%d.%d.%d.%d"):format(a, b, c, d)
+    return ("%d.%d.%d.%d"):format(unpack("BBBB", ip))
   elseif #ip == 16 then
-    local _, a, b, c, d, e, f, g, h = bin.unpack(">S8", ip)
-    local full = ("%x:%x:%x:%x:%x:%x:%x:%x"):format(a, b, c, d, e, f, g, h)
+    local full = ("%x:%x:%x:%x:%x:%x:%x:%x"):format(unpack((">I2"):rep(8), ip))
     full = full:gsub(":[:0]+", "::", 1) -- Collapse the first (should be longest?) series of :0:
     full = full:gsub("^0::", "::", 1) -- handle special case of ::1
     return full
@@ -651,6 +679,29 @@ end
 
 
 
+local bin_lookup = {
+  ["0"]="0000",
+  ["1"]="0001",
+  ["2"]="0010",
+  ["3"]="0011",
+  ["4"]="0100",
+  ["5"]="0101",
+  ["6"]="0110",
+  ["7"]="0111",
+  ["8"]="1000",
+  ["9"]="1001",
+  ["a"]="1010",
+  ["b"]="1011",
+  ["c"]="1100",
+  ["d"]="1101",
+  ["e"]="1110",
+  ["f"]="1111",
+}
+setmetatable(bin_lookup, {
+    __index = function()
+      error("Error in ipOps.hex_to_bin: Expected string representing a hexadecimal number.")
+    end
+  })
 ---
 -- Converts a string of hexadecimal digits into the corresponding string of
 -- binary digits.
@@ -663,14 +714,41 @@ end
 -- <code>nil</code> in case of an error).
 -- @return     String error message in case of an error.
 hex_to_bin = function( hex )
-
-  if type( hex ) ~= "string" or hex == "" or hex:match( "[^%x]+" ) then
-    return nil, "Error in ipOps.hex_to_bin: Expected string representing a hexadecimal number."
+  if type( hex ) ~= "string" then
+    return nil, "Error in ipOps.hex_to_bin: Expected string"
   end
 
-  local d = bin.pack("H", hex)
-  local _, b = bin.unpack("B" .. #d, d)
-  return b:sub(1, #hex * 4)
+  local status, result = pcall( string.gsub, string.lower(hex), ".", bin_lookup)
+  if status then
+    return result
+  end
+  return status, result
+end
+
+---
+-- Convert a CIDR subnet mask to dotted decimal notation.
+--
+-- @param subnet CIDR string representing the subnet mask.
+-- @usage
+-- local netmask = ipOps.cidr_to_subnet( "/16" )
+-- @return Dotted decimal representation of the suppliet subnet mask (e.g. "255.255.0.0")
+cidr_to_subnet = function( subnet )
+  local bits = subnet:match("/(%d%d)$")
+  if not bits then return nil end
+  return fromdword((0xFFFFFFFF >> tonumber(bits)) ~ 0xFFFFFFFF)
+end
+
+---
+-- Convert a dotted decimal subnet mask to CIDR notation.
+--
+-- @param subnet Dotted decimal string representing the subnet mask.
+-- @usage
+-- local cidr = ipOps.subnet_to_cidr( "255.255.0.0" )
+-- @return CIDR representation of the supplied subnet mask (e.g. "/16").
+subnet_to_cidr = function( subnet )
+  local dword, err = todword(subnet)
+  if not dword then return nil, err end
+  return "/" .. tostring(32 - (math.tointeger(math.log((dword ~ 0xFFFFFFFF) + 1, 2))))
 end
 
 --Ignore the rest if we are not testing.
@@ -682,7 +760,9 @@ test_suite = unittest.TestSuite:new()
 test_suite:add_test(unittest.is_true(isPrivate("192.168.123.123")), "192.168.123.123 is private")
 test_suite:add_test(unittest.is_false(isPrivate("1.1.1.1")), "1.1.1.1 is not private")
 test_suite:add_test(unittest.equal(todword("65.66.67.68"),0x41424344), "todword")
+test_suite:add_test(unittest.equal(todword("127.0.0.1"),0x7f000001), "todword")
 test_suite:add_test(unittest.equal(fromdword(0xffffffff),"255.255.255.255"), "fromdword")
+test_suite:add_test(unittest.equal(fromdword(0x7f000001),"127.0.0.1"), "fromdword")
 test_suite:add_test(unittest.equal(str_to_ip("\x01\x02\x03\x04"),"1.2.3.4"), "str_to_ip (ipv4)")
 test_suite:add_test(unittest.equal(str_to_ip("\0\x01\xbe\xef\0\0\0\0\0\0\x02\x03\0\0\0\x01"),"1:beef::203:0:1"), "str_to_ip (ipv6)")
 test_suite:add_test(unittest.equal(str_to_ip(("\0"):rep(15) .. "\x01"),"::1"), "str_to_ip (ipv6)")
@@ -750,11 +830,29 @@ do
 end
 
 do
+  for _, h in ipairs({
+      {"a", "1010"},
+      {"aA", "10101010"},
+      {"12", "00010010"},
+      {"54321", "01010100001100100001"},
+      {"123error", false},
+      {"", ""},
+      {"bad 123", false},
+    }) do
+    test_suite:add_test(unittest.equal(hex_to_bin(h[1]), h[2]))
+  end
+end
+
+do
   for _, op in ipairs({
     {"192.168.13.1", "192/8", unittest.is_true, "IPv4 CIDR"},
     {"193.168.13.1", "192/8", unittest.is_false, "IPv4 CIDR"},
+    {"192.168.13.0", "192.168.13.128/24", unittest.is_true, "IPv4 CIDR"},
+    {"193.168.13.0", "192.168.13.128/24", unittest.is_false, "IPv4 CIDR"},
     {"2001:db8::9", "2001:db8/32", unittest.is_true, "IPv6 CIDR"},
     {"2001:db7::9", "2001:db8/32", unittest.is_false, "IPv6 CIDR"},
+    {"2001:db8::9", "2001:db8::1:0/32", unittest.is_true, "IPv6 CIDR"},
+    {"2001:db7::9", "2001:db8::1:0/32", unittest.is_false, "IPv6 CIDR"},
     {"192.168.13.1", "192.168.10.33-192.168.80.80", unittest.is_true, "IPv4 range"},
     {"193.168.13.1", "192.168.1.1 - 192.168.5.0", unittest.is_false, "IPv4 range"},
     {"2001:db8::9", "2001:db8::1-2001:db8:1::1", unittest.is_true, "IPv6 range"},
@@ -784,5 +882,7 @@ do
   test_suite:add_test(unittest.is_nil(expand_ip("2001:db8::1", "ipv4")),
       "IPv6 to IPv4")
 end
+test_suite:add_test(unittest.equal(cidr_to_subnet("/16"), "255.255.0.0"), "cidr_to_subnet")
+test_suite:add_test(unittest.equal(subnet_to_cidr("255.255.0.0"), "/16"), "subnet_to_cidr")
 
 return _ENV;

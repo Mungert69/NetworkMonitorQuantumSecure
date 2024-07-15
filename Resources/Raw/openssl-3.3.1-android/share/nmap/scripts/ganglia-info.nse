@@ -1,9 +1,7 @@
 local comm = require "comm"
-local nmap = require "nmap"
 local shortport = require "shortport"
 local slaxml = require "slaxml"
 local stdnse = require "stdnse"
-local string = require "string"
 local table = require "table"
 
 description = [[
@@ -244,4 +242,3 @@ action = function( host, port )
   if #state.result then return state.result end
 
 end
-

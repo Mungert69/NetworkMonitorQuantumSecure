@@ -1,8 +1,8 @@
 local nmap = require "nmap"
 local shortport = require "shortport"
 local stdnse = require "stdnse"
+local string = require "string"
 local table = require "table"
-local bin = require "bin"
 local sslcert = require "sslcert"
 local tls = require "tls"
 
@@ -40,9 +40,10 @@ author = "Hani Benhabiles"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
 
 categories = {"discovery", "safe", "default"}
+dependencies = {"https-redirect"}
 
 portrule = function(host, port)
-  return shortport.ssl(host, port) or sslcert.getPrepareTLSWithoutReconnect(port)
+  return port.protocol == "tcp" and (shortport.ssl(host, port) or sslcert.getPrepareTLSWithoutReconnect(port))
 end
 
 
@@ -57,6 +58,9 @@ local client_hello = function(host, port)
   local sock, status, response, err, cli_h
 
   cli_h = tls.client_hello({
+      -- TLSv1.3 does not send this extension plaintext.
+      -- TODO: implement key exchange crypto to retrieve encrypted extensions
+      protocol = "TLSv1.2",
     ["extensions"] = {
       ["next_protocol_negotiation"] = "",
     },
@@ -124,10 +128,10 @@ local check_npn = function(response)
       return nil
     end
     -- Parse data
-    i = 0
+    i = 1
     local protocol
-    while i < #npndata do
-      i, protocol = bin.unpack(">p", npndata, i)
+    while i <= #npndata do
+      protocol, i = string.unpack(">s1", npndata, i)
       table.insert(results, protocol)
     end
 

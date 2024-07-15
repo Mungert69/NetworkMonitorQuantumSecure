@@ -72,6 +72,8 @@ supported version numbers, port number and protocol, and program name.
 --    </table>
 --  </table>
 --</table>
+--
+-- @see rpc-grind.nse
 
 author = "Patrik Karlsson"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
@@ -79,7 +81,10 @@ categories = {"discovery", "default", "safe", "version"}
 
 
 -- don't match "rpcbind" because that's what version scan labels any RPC service
-portrule = shortport.portnumber(111, {"tcp", "udp"} )
+portrule = function(host, port)
+  return nmap.version_intensity() >= 7 and
+  shortport.portnumber(111, {"tcp", "udp"})(host, port)
+end
 
 action = function(host, port)
 
@@ -112,14 +117,17 @@ action = function(host, port)
         end
       end
 
-      table.insert( result, ("%-7d %-10s %5d/%s  %s"):format(progid, stdnse.strjoin(",", v2.version), v2.port, proto, rpc.Util.ProgNumberToName(progid) or "") )
+      if v2.port then
+        -- TODO: report other transports that don't have a port; e.g. "local"
+        table.insert( result, ("%-7d %-10s %5d/%-4s  %s"):format(progid, table.concat(v2.version, ","), v2.port, proto, rpc.Util.ProgNumberToName(progid) or "") )
+      end
     end
   end
 
   table.sort(result)
 
   if (#result > 0) then
-    table.insert(result, 1, "program version   port/proto  service")
+    table.insert(result, 1, "program version    port/proto  service")
   end
 
   return xmlout, stdnse.format_output( true, result )

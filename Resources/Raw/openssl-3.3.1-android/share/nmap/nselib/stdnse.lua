@@ -10,7 +10,6 @@ local _G = require "_G"
 local coroutine = require "coroutine"
 local math = require "math"
 local nmap = require "nmap"
-local os = require "os"
 local string = require "string"
 local table = require "table"
 local assert = assert;
@@ -27,12 +26,10 @@ local tonumber = tonumber;
 local tostring = tostring;
 local print = print;
 local type = type
+local pcall = pcall
 
 local ceil = math.ceil
-local floor = math.floor
-local fmod = math.fmod
 local max = math.max
-local random = math.random
 
 local format = string.format;
 local rep = string.rep
@@ -42,16 +39,13 @@ local sub = string.sub
 local gsub = string.gsub
 local char = string.char
 local byte = string.byte
+local gmatch = string.gmatch
 
 local concat = table.concat;
 local insert = table.insert;
 local remove = table.remove;
 local pack = table.pack;
 local unpack = table.unpack;
-
-local difftime = os.difftime;
-local time = os.time;
-local date = os.date;
 
 local EMPTY = {}; -- Empty constant table
 
@@ -103,7 +97,7 @@ end
 -- If known, the output includes some context based information: the script
 -- identifier and the target ip/port (if there is one). If the debug level is
 -- at least 2, it also prints the base thread identifier and whether it is a
--- worker thread or the master thread.
+-- worker thread or the controller thread.
 --
 -- @class function
 -- @name debug
@@ -192,79 +186,6 @@ print_verbose = function(level, fmt, ...)
   end
 end
 
---- Join a list of strings with a separator string.
---
--- This is Lua's <code>table.concat</code> function with the parameters
--- swapped for coherence.
--- @usage
--- stdnse.strjoin(", ", {"Anna", "Bob", "Charlie", "Dolores"})
--- --> "Anna, Bob, Charlie, Dolores"
--- @param delimiter String to delimit each element of the list.
--- @param list Array of strings to concatenate.
--- @return Concatenated string.
-function strjoin(delimiter, list)
-  assert(type(delimiter) == "string" or type(delimiter) == nil, "delimiter is of the wrong type! (did you get the parameters backward?)")
-
-  return concat(list, delimiter);
-end
-
---- Split a string at a given delimiter, which may be a pattern.
--- @usage
--- stdnse.strsplit(",%s*", "Anna, Bob, Charlie, Dolores")
--- --> { "Anna", "Bob", "Charlie", "Dolores" }
--- @param pattern Pattern that separates the desired strings.
--- @param text String to split.
--- @return Array of substrings without the separating pattern.
-function strsplit(pattern, text)
-  local list, pos = {}, 1;
-
-  assert(pattern ~= "", "delimiter matches empty string!");
-
-  while true do
-    local first, last, match = text:find(pattern, pos);
-    if first then -- found?
-      list[#list+1] = text:sub(pos, first-1);
-      pos = last+1;
-    else
-      list[#list+1] = text:sub(pos);
-      break;
-    end
-  end
-  return list;
-end
-
---- Generate a random string.
---
--- You can either provide your own charset or the function will use
--- a default one which is [A-Z].
--- @param len Length of the string we want to generate.
--- @param charset Charset that will be used to generate the string. String or table
--- @return A random string of length <code>len</code> consisting of
--- characters from <code>charset</code> if one was provided, otherwise
--- <code>charset</code> defaults to [A-Z] letters.
-function generate_random_string(len, charset)
-  local t = {}
-  local ascii_A = 65
-  local ascii_Z = 90
-  if charset then
-    if type(charset) == "string" then
-      for i=1,len do
-        local r = random(#charset)
-        t[i] = sub(charset, r, r)
-      end
-    else
-      for i=1,len do
-        t[i]=charset[random(#charset)]
-      end
-    end
-  else
-    for i=1,len do
-      t[i]=char(random(ascii_A,ascii_Z))
-    end
-  end
-  return concat(t)
-end
-
 --- Return a wrapper closure around a socket that buffers socket reads into
 -- chunks separated by a pattern.
 --
@@ -299,13 +220,13 @@ function make_buffer(socket, sep)
         return self();
       end
     else
-      local i, j = buffer:find(sep, point);
+      local i, j = find(buffer, sep, point);
       if i then
-        local ret = buffer:sub(point, i-1);
+        local ret = sub(buffer, point, i-1);
         point = j + 1;
         return ret;
       else
-        point, left, buffer = 1, buffer:sub(point), nil;
+        point, left, buffer = 1, sub(buffer, point), nil;
         return self();
       end
     end
@@ -339,12 +260,12 @@ do
   };
 
 --- Converts the given number, n, to a string in a binary number format (12
--- becomes "1100").
+-- becomes "1100"). Leading 0s not stripped.
 -- @param n Number to convert.
 -- @return String in binary format.
   function tobinary(n)
-    assert(tonumber(n), "number expected");
-    return (("%x"):format(n):gsub("%w", t):gsub("^0*", ""));
+    -- enforced by string.format: assert(tonumber(n), "number expected");
+    return gsub(format("%x", n), "%w", t)
   end
 end
 
@@ -353,11 +274,14 @@ end
 -- @param n Number to convert.
 -- @return String in octal format.
 function tooctal(n)
-  assert(tonumber(n), "number expected");
-  return ("%o"):format(n)
+  -- enforced by string.format: assert(tonumber(n), "number expected");
+  return format("%o", n)
 end
 
---- Encode a string or number in hexadecimal (12 becomes "c", "AB" becomes
+local tohex_helper =  function(b)
+  return format("%02x", byte(b))
+end
+--- Encode a string or integer in hexadecimal (12 becomes "c", "AB" becomes
 -- "4142").
 --
 -- An optional second argument is a table with formatting options. The possible
@@ -380,9 +304,9 @@ function tohex( s, options )
   local hex
 
   if type( s ) == "number" then
-    hex = ("%x"):format(s)
+    hex = format("%x", s)
   elseif type( s ) == 'string' then
-    hex = ("%02x"):rep(#s):format(s:byte(1,#s))
+    hex = gsub(s, ".", tohex_helper)
   else
     error( "Type not supported in tohex(): " .. type(s), 2 )
   end
@@ -390,24 +314,47 @@ function tohex( s, options )
   -- format hex if we got a separator
   if separator then
     local group = options.group or 2
-    local fmt_table = {}
-    -- split hex in group-size chunks
-    for i=#hex,1,-group do
-      -- table index must be consecutive otherwise table.concat won't work
-      fmt_table[ceil(i/group)] = hex:sub(max(i-group+1,1),i)
-    end
-
-    hex = concat( fmt_table, separator )
+    local subs = 0
+    local pat = "(%x)(" .. rep("[^:]", group) .. ")%f[\0:]"
+    repeat
+      hex, subs = gsub(hex, pat, "%1:%2")
+    until subs == 0
   end
 
   return hex
 end
 
+
+local fromhex_helper = function (h)
+  return char(tonumber(h, 16))
+end
+---Decode a hexadecimal string to raw bytes
+--
+-- The string can contain any amount of whitespace and capital or lowercase
+-- hexadecimal digits. There must be an even number of hex digits, since it
+-- takes 2 hex digits to make a byte.
+--
+-- @param hex A string in hexadecimal representation
+-- @return A string of bytes or nil if string could not be decoded
+-- @return Error message if string could not be decoded
+function fromhex (hex)
+  local p = find(hex, "[^%x%s]")
+  if p then
+    return nil, "Invalid hexadecimal digits at position " .. p
+  end
+  hex = gsub(hex, "%s+", "")
+  if #hex % 2 ~= 0 then
+    return nil, "Odd number of hexadecimal digits"
+  end
+  return gsub(hex, "..", fromhex_helper)
+end
+
+local colonsep = {separator=":"}
 ---Format a MAC address as colon-separated hex bytes.
 --@param mac The MAC address in binary, such as <code>host.mac_addr</code>
 --@return The MAC address in XX:XX:XX:XX:XX:XX format
 function format_mac(mac)
-  return tohex(mac, {separator=":"})
+  return tohex(mac, colonsep)
 end
 
 ---Either return the string itself, or return "<blank>" (or the value of the second parameter) if the string
@@ -428,6 +375,7 @@ function string_or_blank(string, blank)
   end
 end
 
+local timespec_multipliers = {[""] = 1, s = 1, m = 60, h = 60 * 60, ms = 0.001}
 ---
 -- Parses a time duration specification, which is a number followed by a
 -- unit, and returns a number of seconds.
@@ -455,7 +403,6 @@ end
 function parse_timespec(timespec)
   if timespec == nil then return nil, "Can't parse nil timespec" end
   local n, unit, t, m
-  local multipliers = {[""] = 1, s = 1, m = 60, h = 60 * 60, ms = 0.001}
 
   n, unit = match(timespec, "^([%d.]+)(.*)$")
   if not n then
@@ -467,182 +414,12 @@ function parse_timespec(timespec)
     return nil, format("Can't parse time specification \"%s\" (bad number \"%s\")", timespec, n)
   end
 
-  m = multipliers[unit]
+  m = timespec_multipliers[unit]
   if not m then
     return nil, format("Can't parse time specification \"%s\" (bad unit \"%s\")", timespec, unit)
   end
 
   return t * m
-end
-
--- Find the offset in seconds between local time and UTC. That is, if we
--- interpret a UTC date table as a local date table by passing it to os.time,
--- how much must be added to the resulting integer timestamp to make it
--- correct?
-local function utc_offset(t)
-  -- What does the calendar say locally?
-  local localtime = date("*t", t)
-  -- What does the calendar say in UTC?
-  local gmtime = date("!*t", t)
-  -- Interpret both as local calendar dates and find the difference.
-  return difftime(time(localtime), time(gmtime))
-end
---- Convert a date table into an integer timestamp.
---
--- Unlike os.time, this does not assume that the date table represents a local
--- time. Rather, it takes an optional offset number of seconds representing the
--- time zone, and returns the timestamp that would result using that time zone
--- as local time. If the offset is omitted or 0, the date table is interpreted
--- as a UTC date. For example, 4:00 UTC is the same as 5:00 UTC+1:
--- <code>
--- date_to_timestamp({year=1970,month=1,day=1,hour=4,min=0,sec=0})          --> 14400
--- date_to_timestamp({year=1970,month=1,day=1,hour=4,min=0,sec=0}, 0)       --> 14400
--- date_to_timestamp({year=1970,month=1,day=1,hour=5,min=0,sec=0}, 1*60*60) --> 14400
--- </code>
--- And 4:00 UTC+1 is an earlier time:
--- <code>
--- date_to_timestamp({year=1970,month=1,day=1,hour=4,min=0,sec=0}, 1*60*60) --> 10800
--- </code>
-function date_to_timestamp(date, offset)
-  offset = offset or 0
-  return time(date) + utc_offset(time(date)) - offset
-end
-
-local function format_tz(offset)
-  local sign, hh, mm
-
-  if not offset then
-    return ""
-  end
-  if offset < 0 then
-    sign = "-"
-    offset = -offset
-  else
-    sign = "+"
-  end
-  -- Truncate to minutes.
-  offset = floor(offset / 60)
-  hh = floor(offset / 60)
-  mm = floor(fmod(offset, 60))
-
-  return format("%s%02d:%02d", sign, hh, mm)
-end
---- Format a date and time (and optional time zone) for structured output.
---
--- Formatting is done according to RFC 3339 (a profile of ISO 8601), except
--- that a time zone may be omitted to signify an unspecified local time zone.
--- Time zones are given as an integer number of seconds from UTC. Use
--- <code>0</code> to mark UTC itself. Formatted strings with a time zone look
--- like this:
--- <code>
--- format_timestamp(os.time(), 0)       --> "2012-09-07T23:37:42+00:00"
--- format_timestamp(os.time(), 2*60*60) --> "2012-09-07T23:37:42+02:00"
--- </code>
--- Without a time zone they look like this:
--- <code>
--- format_timestamp(os.time())          --> "2012-09-07T23:37:42"
--- </code>
---
--- This function should be used for all dates emitted as part of NSE structured
--- output.
-function format_timestamp(t, offset)
-  if type(t) == "table" then
-    return format(
-      "%d-%02d-%02dT%02d:%02d:%02d",
-      t.year, t.month, t.day, t.hour, t.min, t.sec
-      )
-  else
-    local tz_string = format_tz(offset)
-    offset = offset or 0
-    return date("!%Y-%m-%dT%H:%M:%S", floor(t + offset)) .. tz_string
-  end
-end
-
---- Format a time interval into a string
---
--- String is in the same format as format_difftime
--- @param interval A time interval
--- @param unit The time unit division as a number. If <code>interval</code> is
---             in milliseconds, this is 1000 for instance. Default: 1 (seconds)
--- @return The time interval in string format
-function format_time(interval, unit)
-  local sign = ""
-  if interval < 0 then
-    sign = "-"
-    interval = math.abs(interval)
-  end
-  unit = unit or 1
-  local precision = floor(math.log(unit, 10))
-
-  local sec = (interval % (60 * unit)) / unit
-  interval = interval // (60 * unit)
-  local min = interval % 60
-  interval = interval // 60
-  local hr = interval % 24
-  interval = interval // 24
-
-  local s = format("%.0fd%02.0fh%02.0fm%02.".. precision .."fs",
-    interval, hr, min, sec)
-  -- trim off leading 0 and "empty" units
-  return sign .. (match(s, "([1-9].*)") or format("%0.".. precision .."fs", 0))
-end
-
---- Format the difference between times <code>t2</code> and <code>t1</code>
--- into a string
---
--- String is in one of the forms (signs may vary):
--- * 0s
--- * -4s
--- * +2m38s
--- * -9h12m34s
--- * +5d17h05m06s
--- * -2y177d10h13m20s
--- The string shows <code>t2</code> relative to <code>t1</code>; i.e., the
--- calculation is <code>t2</code> minus <code>t1</code>.
-function format_difftime(t2, t1)
-  local d, s, sign, yeardiff
-
-  d = difftime(time(t2), time(t1))
-  if d > 0 then
-    sign = "+"
-  elseif d < 0 then
-    sign = "-"
-    t2, t1 = t1, t2
-    d = -d
-  else
-    sign = ""
-  end
-  -- t2 is always later than or equal to t1 here.
-
-  -- The year is a tricky case because it's not a fixed number of days
-  -- the way a day is a fixed number of hours or an hour is a fixed
-  -- number of minutes. For example, the difference between 2008-02-10
-  -- and 2009-02-10 is 366 days because 2008 was a leap year, but it
-  -- should be printed as 1y0d0h0m0s, not 1y1d0h0m0s. We advance t1 to be
-  -- the latest year such that it is still before t2, which means that its
-  -- year will be equal to or one less than t2's. The number of years
-  -- skipped is stored in yeardiff.
-  if t2.year > t1.year then
-    local tmpyear = t1.year
-    -- Put t1 in the same year as t2.
-    t1.year = t2.year
-    d = difftime(time(t2), time(t1))
-    if d < 0 then
-      -- Too far. Back off one year.
-      t1.year = t2.year - 1
-      d = difftime(time(t2), time(t1))
-    end
-    yeardiff = t1.year - tmpyear
-    t1.year = tmpyear
-  else
-    yeardiff = 0
-  end
-
-  local s = format_time(d)
-  if yeardiff == 0 then return sign .. s end
-  -- Years.
-  s = format("%dy", yeardiff) .. s
-  return sign .. s
 end
 
 --- Returns the current time in milliseconds since the epoch
@@ -661,28 +438,6 @@ end
 local function format_get_indent(indent)
   return rep("  ", #indent)
 end
-
-local function splitlines(s)
-  local result = {}
-  local i = 0
-
-  while i <= #s do
-    local b, e
-    b, e = find(s, "\r?\n", i)
-    if not b then
-      break
-    end
-    result[#result + 1] = sub(s, i, b - 1)
-    i = e + 1
-  end
-
-  if i <= #s then
-    result[#result + 1] = sub(s, i)
-  end
-
-  return result
-end
-
 
 -- A helper for format_output (see below).
 local function format_output_sub(status, data, indent)
@@ -746,9 +501,9 @@ local function format_output_sub(status, data, indent)
       insert(output, format_output_sub(status, value, new_indent))
 
     elseif(type(value) == 'string') then
-      local lines = splitlines(value)
-
-      for j, line in ipairs(lines) do
+      -- ensure it ends with a newline
+      if sub(value, -1) ~= "\n" then value = value .. "\n" end
+      for line in gmatch(value, "([^\r\n]-)\n") do
         insert(output, format("%s  %s%s\n",
           format_get_indent(indent),
           prefix, line))
@@ -759,7 +514,11 @@ local function format_output_sub(status, data, indent)
   return concat(output)
 end
 
----Takes a table of output on the commandline and formats it for display to the
+---This function is deprecated.
+--
+-- Please use structured NSE output instead: https://nmap.org/book/nse-api.html#nse-structured-output
+--
+-- Takes a table of output on the commandline and formats it for display to the
 -- user.
 --
 -- This is basically done by converting an array of nested tables into a
@@ -832,23 +591,33 @@ end
 -- given. This works also for arguments given as top-level array values, like
 -- --script-args=unsafe; for these it returns the value 1.
 local function arg_value(argname)
+  -- First look for the literal script-arg name
+  -- as a key/value pair
   if nmap.registry.args[argname] then
     return nmap.registry.args[argname]
-  else
-    -- if scriptname.arg is not there, check "arg"
-    local argument_frags = strsplit("%.", argname)
-    if #argument_frags > 0 then
-      if nmap.registry.args[argument_frags[2]] then
-        return nmap.registry.args[argument_frags[2]]
-      end
-    end
   end
-
+  -- and alone, as a boolean flag
   for _, v in ipairs(nmap.registry.args) do
     if v == argname then
       return 1
     end
   end
+
+  -- if scriptname.arg is not there, check "arg"
+  local shortname = match(argname, "%.([^.]*)$")
+  if shortname then
+    -- as a key/value pair
+    if nmap.registry.args[shortname] then
+      return nmap.registry.args[shortname]
+    end
+    -- and alone, as a boolean flag
+    for _, v in ipairs(nmap.registry.args) do
+      if v == shortname then
+        return 1
+      end
+    end
+  end
+  return nil
 end
 
 --- Parses the script arguments passed to the --script-args option.
@@ -856,7 +625,7 @@ end
 -- @usage
 -- --script-args 'script.arg1=value,script.arg3,script-x.arg=value'
 -- local arg1, arg2, arg3 = get_script_args('script.arg1','script.arg2','script.arg3')
---      => arg1 = value
+--      => arg1 = "value"
 --      => arg2 = nil
 --      => arg3 = 1
 --
@@ -868,8 +637,8 @@ end
 -- --script-args 'dns-cache-snoop.mode=timed,dns-cache-snoop.domains={host1,host2}'
 -- local mode, domains = get_script_args('dns-cache-snoop.mode',
 --                                       'dns-cache-snoop.domains')
---      => mode    = 'timed'
---      => domains = {host1,host2}
+--      => mode    = "timed"
+--      => domains = {"host1","host2"}
 --
 -- @param Arguments  Script arguments to check.
 -- @return Arguments values.
@@ -890,6 +659,49 @@ function get_script_args (...)
   end
 
   return unpack(args, 1, select("#", ...))
+end
+
+local function identity(...)
+  return ...
+end
+
+---Get the interfaces that are appropriate for a script to use.
+--
+-- This function returns interface information in the same format as
+-- <code>nmap.list_interfaces()</code>, but if any of the following are given,
+-- the list will have at most one interface corresponding to the first
+-- available from this list:
+-- * The <code>SCRIPT_NAME.interface</code> script-arg
+-- * The <code>interface</code> script-arg
+-- * The <code>-e</code> option
+--
+-- @param filter_func A function to filter the result
+-- @return A list of interfaces
+-- @see nmap.list_interfaces
+-- @see nmap.get_interface
+-- @see stdnse.get_script_args
+-- @usage
+-- local up_filter = function (if_table)
+--   if if_table.up == "up" then
+--     return if_table
+--   end
+-- end
+--
+-- local up_interfaces = stdnse.get_script_interfaces(up_filter)
+function get_script_interfaces(filter_func)
+  filter_func = filter_func or identity
+  local interface = arg_value(getid() .. ".interface") or nmap.get_interface()
+  if interface then
+    return {filter_func(nmap.get_interface_info(interface))}
+  end
+  local ret = {}
+  for _, if_table in ipairs(nmap.list_interfaces()) do
+    local ift = filter_func(if_table)
+    if ift then
+      insert(ret, ift)
+    end
+  end
+  return ret
 end
 
 ---Get the best possible hostname for the given host. This can be the target as given on
@@ -1115,77 +927,6 @@ do end -- no function here, see nse_main.lua
 do end -- no function here, see nse_main.lua
 
 
-
----Checks if the port is in the port range
---
--- For example, calling:
--- <code>in_port_range({number=31337,protocol="udp"},"T:15,50-75,U:31334-31339")</code>
--- would result in a true value
---@param port a port structure containing keys port number(number) and protocol(string)
---@param port_range a port range string in Nmap standard format (ex. "T:80,1-30,U:31337,21-25")
---@returns boolean indicating whether the port is in the port range
-function in_port_range(port,port_range)
-  assert(port and type(port.number)=="number" and type(port.protocol)=="string" and
-    (port.protocol=="udp" or port.protocol=="tcp"),"Port structure missing or invalid: port={ number=<port_number>, protocol=<port_protocol> }")
-  assert((type(port_range)=="string" or type(port_range)=="number") and port_range~="","Incorrect port range specification.")
-
-  -- Proto - true for TCP, false for UDP
-  local proto
-  if(port.protocol=="tcp") then proto = true else proto = false end
-
-  --TCP flag for iteration - true for TCP, false for UDP, if not specified we presume TCP
-  local tcp_flag = true
-
-  -- in case the port_range is a single number
-  if type(port_range)=="number" then
-    if proto and port_range==port.number then return true
-    else return false
-    end
-  end
-
-  --clean the string a bit
-  port_range=port_range:gsub("%s+","")
-
-  -- single_pr - single port range
-  for i, single_pr in ipairs(strsplit(",",port_range)) do
-    if single_pr:match("T:") then
-      tcp_flag = true
-      single_pr = single_pr:gsub("T:","")
-    else
-      if single_pr:match("U:") then
-        tcp_flag = false
-        single_pr = single_pr:gsub("U:","")
-      end
-    end
-
-    -- compare ports only when the port's protocol is the same as
-    -- the current single port range
-    if tcp_flag == proto then
-      local pone = single_pr:match("^(%d+)$")
-      if pone then
-        pone = tonumber(pone)
-        assert(pone>-1 and pone<65536, "Port range number out of range (0-65535).")
-
-        if pone == port.number then
-          return true
-        end
-      else
-        local pstart, pend = single_pr:match("^(%d+)%-(%d+)$")
-        pstart, pend = tonumber(pstart), tonumber(pend)
-        assert(pstart,"Incorrect port range specification.")
-        assert(pstart<=pend,"Incorrect port range specification, the starting port should have a smaller value than the ending port.")
-        assert(pstart>-1 and pstart<65536 and pend>-1 and pend<65536, "Port range number out of range (0-65535).")
-
-        if port.number >=pstart and port.number <= pend then
-          return true
-        end
-      end
-    end
-  end
-  -- if no match is found then the port doesn't belong to the port_range
-  return false
-end
-
 --- Module function that mimics some behavior of Lua 5.1 module function.
 --
 -- This convenience function returns a module environment to set the _ENV
@@ -1202,7 +943,7 @@ end
 function module (name, ...)
   local env = {};
   env._NAME = name;
-  env._PACKAGE = name:match("(.+)%.[^.]+$");
+  env._PACKAGE = match(name, "(.+)%.[^.]+$");
   env._M = env;
   local mods = pack(...);
   for i = 1, mods.n do
@@ -1261,9 +1002,7 @@ function output_table ()
       end
       rawset(t, k, v)
     end,
-    __index = function (_, k)
-      return t[k]
-    end,
+    __index = t,
     __pairs = function (_)
       return coroutine.wrap(iterator)
     end,
@@ -1312,56 +1051,6 @@ function pretty_printer (obj, printer)
   return aux(obj, "")
 end
 
--- This pattern must match the percent sign '%' since it is used in
--- escaping.
-local FILESYSTEM_UNSAFE = "[^a-zA-Z0-9._-]"
----
--- Escape a string to remove bytes and strings that may have meaning to
--- a filesystem, such as slashes.
---
--- All bytes are escaped, except for:
--- * alphabetic <code>a</code>-<code>z</code> and <code>A</code>-<code>Z</code>
--- * digits 0-9
--- * <code>.</code> <code>_</code> <code>-</code>
--- In addition, the strings <code>"."</code> and <code>".."</code> have
--- their characters escaped.
---
--- Bytes are escaped by a percent sign followed by the two-digit
--- hexadecimal representation of the byte value.
--- * <code>filename_escape("filename.ext") --> "filename.ext"</code>
--- * <code>filename_escape("input/output") --> "input%2foutput"</code>
--- * <code>filename_escape(".") --> "%2e"</code>
--- * <code>filename_escape("..") --> "%2e%2e"</code>
--- This escaping is somewhat like that of JavaScript
--- <code>encodeURIComponent</code>, except that fewer bytes are
--- whitelisted, and it works on bytes, not Unicode characters or UTF-16
--- code points.
-function filename_escape(s)
-  if s == "." then
-    return "%2e"
-  elseif s == ".." then
-    return "%2e%2e"
-  else
-    return (gsub(s, FILESYSTEM_UNSAFE, function (c)
-      return format("%%%02x", byte(c))
-    end))
-  end
-end
-
---- Check for the presence of a value in a table
---@param tab the table to search into
---@param item the searched value
---@return Boolean true if the item was found, false if not
---@return The index or key where the value was found, or nil
-function contains(tab, item)
-  for k, val in pairs(tab) do
-    if val == item then
-      return true, k
-    end
-  end
-  return false, nil
-end
-
 --- Returns a conservative timeout for a host
 --
 -- If the host parameter is a NSE host table with a <code>times.timeout</code>
@@ -1396,19 +1085,6 @@ function get_timeout(host, max_timeout, min_timeout)
     return max_timeout
   end
   return t
-end
-
---- Returns the keys of a table as an array
--- @param t The table
--- @return A table of keys
-function keys(t)
-  local ret = {}
-  local k, v = next(t)
-  while k do
-    ret[#ret+1] = k
-    k, v = next(t, k)
-  end
-  return ret
 end
 
 return _ENV;

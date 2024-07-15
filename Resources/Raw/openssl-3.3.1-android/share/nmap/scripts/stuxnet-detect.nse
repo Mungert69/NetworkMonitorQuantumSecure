@@ -2,6 +2,7 @@ local io = require "io"
 local msrpc = require "msrpc"
 local smb = require "smb"
 local stdnse = require "stdnse"
+local stringaux = require "stringaux"
 
 -- -*- mode: lua -*-
 -- vim: set filetype=lua :
@@ -27,6 +28,8 @@ for the filename is given on the command line.
 --
 -- Host script results:
 -- |_stuxnet-detect: INFECTED (version 4c:04:00:00:01:00:00:00)
+--
+-- @see smb-vuln-ms10-061.nse
 
 author = "Mak Kolybabi"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
@@ -80,7 +83,7 @@ local function check_infected(host, path, save)
 
     fmt = save:gsub("%%h", host.ip)
     fmt = fmt:gsub("%%v", version)
-    file = io.open(stdnse.filename_escape(fmt), "w")
+    file = io.open(stringaux.filename_escape(fmt), "w")
     if file then
       stdnse.debug1("Wrote %d bytes to file %s.", #result.arguments, fmt)
       file:write(result.arguments)

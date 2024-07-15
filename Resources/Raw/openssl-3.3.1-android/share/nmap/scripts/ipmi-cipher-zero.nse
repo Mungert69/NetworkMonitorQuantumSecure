@@ -35,12 +35,11 @@ description = [[
 -- |
 -- |     References:
 -- |       http://fish2.com/ipmi/cipherzero.html
--- |       http://osvdb.org/show/osvdb/93039
--- |_      http://osvdb.org/show/osvdb/93040
+-- |_      https://www.us-cert.gov/ncas/alerts/TA13-207A
 --
 
 author = "Claudiu Perta <claudiu.perta@gmail.com>"
-license = "Same as Nmap--See http://nmap.org/book/man-legal.html"
+license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
 categories = {"vuln", "safe"}
 
 portrule = shortport.port_or_service(623, "asf-rmcp", "udp", {"open", "open|filtered"})
@@ -63,8 +62,7 @@ functionality
     ]],
     references = {
       'http://fish2.com/ipmi/cipherzero.html',
-      'http://osvdb.org/show/osvdb/93040',
-      'http://osvdb.org/show/osvdb/93039',
+      'https://www.us-cert.gov/ncas/alerts/TA13-207A',
     }
   }
 
@@ -95,7 +93,7 @@ functionality
   nmap.set_port_state(host, port, "open")
 
   local info = ipmi.parse_open_session_reply(reply)
-  if info["session_payload_type"] == ipmi.PAYLOADS["RMCPPLUSOPEN_REP"] then
+  if info["session_payload_type"] == ipmi.PAYLOADS["RMCPPLUSOPEN_REP"] and info["error_code"] == 0 then
     vuln_table.state = vulns.STATE.VULN
   end
 

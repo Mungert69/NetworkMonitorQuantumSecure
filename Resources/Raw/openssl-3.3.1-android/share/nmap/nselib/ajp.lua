@@ -1,9 +1,9 @@
 local base64 = require "base64"
-local bin = require "bin"
 local http = require "http"
 local match = require "match"
 local nmap = require "nmap"
 local stdnse = require "stdnse"
+local string = require "string"
 local table = require "table"
 local url = require "url"
 _ENV = stdnse.module("ajp", stdnse.seeall)
@@ -123,13 +123,12 @@ AJP = {
     __tostring = function(self)
 
       -- encodes a string, prefixing it with a 2-byte length
-      -- and suffixing it with a zero. P-encoding can't be used
-      -- as the zero terminator should not be counted in the length
+      -- and suffixing it with a zero.
       local function encstr(str)
         if ( not(str) or #str == 0 ) then
-          return bin.pack(">S", 0xFFFF)
+          return "\xFF\xFF"
         end
-        return bin.pack(">Sz", #str, str)
+        return string.pack(">s2x", str)
       end
 
       -- count the number of headers
@@ -152,35 +151,37 @@ AJP = {
       local p_url = url.parse(self.uri)
 
       -- save the magic and data for last
-      local data = bin.pack(">CCAAAAASCS", self.code, self.method,
+      local data = {
+        string.pack(">BB", self.code, self.method),
         encstr(self.version), encstr(p_url.path), encstr(self.raddr),
         encstr(self.rhost), encstr(self.srv),
-        self.port, (self.is_ssl and 1 or 0),
-        headerCount())
+        string.pack(">I2BI2",  self.port, (self.is_ssl and 1 or 0), headerCount()),
+      }
 
       -- encode headers
       for k, v in pairs(self.headers) do
         local header = AJP.ForwardRequest.Header[k:lower()] or k
         if ( "string" == type(header) ) then
-          data = data .. bin.pack(">Sz", #header, header)
+          data[#data+1] = string.pack(">s2x", header)
         else
-          data = data .. bin.pack(">S", header)
+          data[#data+1] = string.pack(">I2", header)
         end
 
-        data = data .. encstr(v)
+        data[#data+1] = encstr(v)
       end
 
       -- encode attributes
       if ( p_url.query ) then
-        data = data .. bin.pack("C", AJP.Attribute.QUERY_STRING)
-        data = data .. encstr(p_url.query)
+        data[#data+1] = string.pack("B", AJP.Attribute.QUERY_STRING)
+        data[#data+1] = encstr(p_url.query)
       end
 
       -- terminate the attribute list
-      data = data .. bin.pack("C", AJP.Attribute.ARE_DONE)
+      data[#data+1] = string.pack("B", AJP.Attribute.ARE_DONE)
 
       -- returns the AJP request as a string
-      return bin.pack(">SSA", AJP.Magic, #data, data)
+      data = table.concat(data)
+      return string.pack(">I2s2", AJP.Magic, data)
     end,
 
   },
@@ -215,12 +216,11 @@ AJP = {
         local pos = 6
         local status_msg, hdr_count
 
-        pos, sh.status = bin.unpack(">S", data, pos)
-        pos, status_msg  = bin.unpack(">P", data, pos)
+        sh.status, status_msg, pos = string.unpack(">I2s2", data, pos)
         pos = pos + 1
         sh.status_line = ("AJP/1.3 %d %s"):format(sh.status, status_msg)
 
-        pos, hdr_count = bin.unpack(">S", data, pos)
+        hdr_count, pos = string.unpack(">I2", data, pos)
 
         local function headerById(id)
           for k, v in pairs(AJP.Response.Header) do
@@ -231,16 +231,16 @@ AJP = {
 
         for i=1, hdr_count do
           local key, val, len
-          pos, len = bin.unpack(">S", data, pos)
+          len, pos = string.unpack(">I2", data, pos)
 
           if ( len < 0xA000 ) then
-            pos, key = bin.unpack("A"..len, data, pos)
+            key, pos = string.unpack("c"..len, data, pos)
             pos = pos + 1
           else
             key = headerById(len)
           end
 
-          pos, val = bin.unpack(">P", data, pos)
+          val, pos = string.unpack(">s2", data, pos)
           pos = pos + 1
 
           sh.headers[key:lower()] = val
@@ -281,8 +281,8 @@ Comm = {
   -- @name Comm.connect
   -- @return status true on success, false on failure
   -- @return err string containing error message on failure
-  connect = function(self)
-    self.socket = nmap.new_socket()
+  connect = function(self, socket)
+    self.socket = socket or nmap.new_socket()
     self.socket:set_timeout(self.options.timeout or 5000)
     return self.socket:connect(self.host, self.port)
   end,
@@ -316,7 +316,7 @@ Comm = {
       if ( not(status) ) then
         return false, "Failed to receive response from server"
       end
-      local pos, magic, length = bin.unpack(">A2S", buf)
+      local magic, length, pos = string.unpack(">c2I2", buf)
       if ( magic ~= "AB" ) then
         return false, ("Invalid magic received from server (%s)"):format(magic)
       end
@@ -325,12 +325,12 @@ Comm = {
         return false, "Failed to receive response from server"
       end
 
-      local pos, code = bin.unpack("C", data)
+      local code, pos = string.unpack("B", data)
       if ( AJP.Code.SEND_HEADERS == code ) then
         local sh = AJP.Response.SendHeaders.parse(buf .. data)
         response = sh
       elseif( AJP.Code.SEND_BODY == code ) then
-        response.body = select(2, bin.unpack(">P", data, pos))
+        response.body = string.unpack(">s2", data, pos)
       elseif( AJP.Code.END_RESPONSE == code ) then
         break
       end
@@ -371,9 +371,9 @@ Helper = {
   -- @name Helper.connect
   -- @return status true on success, false on failure
   -- @return err string containing error message on failure
-  connect = function(self)
+  connect = function(self, socket)
     self.comm = Comm:new(self.host, self.port, self.opt)
-    return self.comm:connect()
+    return self.comm:connect(socket)
   end,
 
   getOption = function(self, options, key)
@@ -413,7 +413,7 @@ Helper = {
     if ( status and result.status == 401 and result.headers['www-authenticate'] ) then
 
       local auth = self:getOption(options, "auth")
-      if ( not(auth) or not(auth.username) and not(auth.password) ) then
+      if not(auth and auth.username and auth.password) then
         stdnse.debug2("No authentication information")
         return status, result
       end
@@ -531,7 +531,7 @@ Helper = {
 
   -- should only work against 127.0.0.1
   shutdownContainer = function(self)
-    self.comm:send(bin.pack("H", "1234000107"))
+    self.comm:send("\x12\x34\x00\x01\x07")
     self.comm:receive()
   end,
 

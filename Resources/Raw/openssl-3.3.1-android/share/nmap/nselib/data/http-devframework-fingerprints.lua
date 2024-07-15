@@ -1,5 +1,4 @@
 local http = require "http"
-local io = require "io"
 local string = require "string"
 local table = require "table"
 
@@ -301,8 +300,8 @@ tools = { Django = { rapidDetect = function(host, port)
     end,
 
     consumingDetect = function(page, path)
-      if page and string.find(page, "content=[\"']MediaWiki") or
-        string.find(page, "/mediawiki/") then
+      if page and (string.find(page, "content=[\"']MediaWiki") or
+        string.find(page, "/mediawiki/")) then
         return "MediaWiki detected. Found common traces on " .. page
       end
     end
@@ -383,4 +382,59 @@ tools = { Django = { rapidDetect = function(host, port)
     end
   },
 
+  Express = { rapidDetect = function(host, port)
+
+      local response = http.get(host, port, "/")
+
+      if response and response.status == 200 then
+        local header_x_powered_by = response.header['x-powered-by']
+        -- Check for 'X-Powered-By' Header
+        if header_x_powered_by == "Express" then
+          return string.format("Express detected. Found Express in X-Powered-By Header")
+        end
+      end
+    end,
+
+    consumingDetect = function(page, path)
+      return
+    end
+  },
+
+  Jenkins = { rapidDetect = function(host, port)
+
+      local response = http.get(host, port, "/")
+      local jenkins = {}
+
+      if response and ( response.status == 200 or response.status == 403 ) then
+        local header_x_jenkins = response.header['x-jenkins']
+        -- Check for 'X-Jenkins' Header
+        if header_x_jenkins ~= nil then
+          table.insert(jenkins, "Jenkins detected. Found Jenkins version " ..  header_x_jenkins)
+          if response.header['x-hudson'] ~= nil then
+            table.insert(jenkins, "X-Hudson : " .. response.header['x-hudson'])
+          end
+          if response.header['x-hudson-cli-port'] ~= nil then
+            table.insert(jenkins, "X-Hudson-CLI-Port : " .. response.header['x-hudson-cli-port'])
+          end
+          if response.header['x-jenkins-cli-port'] ~= nil then
+            table.insert(jenkins, "X-Jenkins-CLI-Port : " .. response.header['x-jenkins-cli-port'])
+          end
+          if response.header['x-jenkins-cli2-port'] ~= nil then
+            table.insert(jenkins, "X-Jenkins-CLI2-Port : " .. response.header['x-jenkins-cli2-port'])
+          end
+          if response.header['x-jenkins-session'] ~= nil then
+            table.insert(jenkins, "X-Jenkins-Session : " .. response.header['x-jenkins-session'])
+          end
+          return jenkins
+        end
+      end
+    end,
+
+    consumingDetect = function(page, path)
+      return
+    end
+  },
+
 }
+
+

@@ -1,11 +1,8 @@
 local brute = require "brute"
 local creds = require "creds"
 local ipmi = require "ipmi"
-local nmap = require "nmap"
 local shortport = require "shortport"
-local stdnse = require "stdnse"
-local string = require "string"
-local table = require "table"
+local rand = require "rand"
 
 description = [[
 Performs brute force password auditing against IPMI RPC server.
@@ -24,7 +21,7 @@ Performs brute force password auditing against IPMI RPC server.
 --
 
 author = "Claudiu Perta"
-license = "Same as Nmap--See http://nmap.org/book/man-legal.html"
+license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
 categories = {"intrusive", "brute"}
 
 portrule = shortport.port_or_service(623, "asf-rmcp", "udp", {"open", "open|filtered"})
@@ -41,7 +38,7 @@ Driver = {
   end,
 
   connect = function(self)
-    self.socket = nmap.new_socket()
+    self.socket = brute.new_socket()
     self.socket:set_timeout(
       ((self.host.times and self.host.times.timeout) or 8) * 1000)
     self.socket:connect(self.host, self.port, "udp")
@@ -50,8 +47,8 @@ Driver = {
   end,
 
   login = function(self, username, password)
-    local console_session_id = stdnse.generate_random_string(4)
-    local console_random_id = stdnse.generate_random_string(16)
+    local console_session_id = rand.random_string(4)
+    local console_random_id = rand.random_string(16)
 
     local request = ipmi.session_open_request(console_session_id)
     local status, reply
@@ -107,7 +104,7 @@ Driver = {
       hmac_salt, rakp2_message["hmac_sha1"], password)
 
     if found then
-      return true, brute.Account:new(username, password, creds.State.VALID)
+      return true, creds.Account:new(username, password, creds.State.VALID)
     else
       return false, brute.Error:new("Incorrect password")
     end

@@ -1,3 +1,4 @@
+local datetime = require "datetime"
 local msrpc = require "msrpc"
 local smb = require "smb"
 local stdnse = require "stdnse"
@@ -58,7 +59,8 @@ the system, besides showing a message box to the user.
 -- |  |_ DOMAIN\rbowes since 2008-10-20 09:03:23
 -- |  Active SMB Sessions:
 -- |_ |_ ADMINISTRATOR is connected from 10.100.254.138 for [just logged in, it's probably you], idle for [not idle]
------------------------------------------------------------------------
+--
+-- @see smb-enum-users.nse
 
 author = "Ron Bowes"
 copyright = "Ron Bowes"
@@ -264,9 +266,7 @@ local function winreg_enum_rids(host)
 end
 
 
---_G.TRACEBACK = TRACEBACK or {}
 action = function(host)
-  --    TRACEBACK[coroutine.running()] = true;
 
   local response = {}
 
@@ -305,14 +305,14 @@ action = function(host)
         if(time == 0) then
           time = "[just logged in, it's probably you]"
         else
-          time = stdnse.format_time(time)
+          time = datetime.format_time(time)
         end
 
         local idle_time = sessions[i]['idle_time']
         if(idle_time == 0) then
           idle_time = "[not idle]"
         else
-          idle_time = stdnse.format_time(idle_time)
+          idle_time = datetime.format_time(idle_time)
         end
 
         table.insert(sessions_output, string.format("%s is connected from %s for %s, idle for %s", sessions[i]['user'], sessions[i]['client'], time, idle_time))

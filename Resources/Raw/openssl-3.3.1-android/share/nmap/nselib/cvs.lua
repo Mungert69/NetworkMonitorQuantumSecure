@@ -25,13 +25,12 @@ Helper = {
     return o
   end,
 
-  connect = function(self)
-    self.socket = nmap.new_socket()
+  connect = function(self, socket)
+    self.socket = socket or nmap.new_socket()
     return self.socket:connect(self.host, self.port)
   end,
 
   login = function(self, repo, user, pass )
-    local auth_tab = {}
     assert(repo, "No repository was specified")
     assert(user, "No user was specified")
     assert(pass, "No pass was specified")
@@ -39,13 +38,15 @@ Helper = {
     -- Add a leading slash if it's missing
     if ( repo:sub(1,1) ~= "/" ) then repo = "/" .. repo end
 
-    table.insert(auth_tab, "BEGIN AUTH REQUEST")
-    table.insert(auth_tab, repo)
-    table.insert(auth_tab, user)
-    table.insert(auth_tab, Util.pwscramble(pass))
-    table.insert(auth_tab, "END AUTH REQUEST")
+    local auth_tab = {
+      "BEGIN AUTH REQUEST",
+      repo,
+      user,
+      Util.pwscramble(pass),
+      "END AUTH REQUEST\n",
+    }
 
-    local data = stdnse.strjoin("\n", auth_tab) .. "\n"
+    local data = table.concat(auth_tab, "\n")
     local status = self.socket:send(data)
     if ( not(status) ) then return false, "Failed to send login request" end
 

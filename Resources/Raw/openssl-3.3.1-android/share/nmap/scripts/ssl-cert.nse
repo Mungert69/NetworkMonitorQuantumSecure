@@ -1,9 +1,14 @@
+local datetime = require "datetime"
 local nmap = require "nmap"
+local outlib = require "outlib"
 local shortport = require "shortport"
 local sslcert = require "sslcert"
 local stdnse = require "stdnse"
 local string = require "string"
+local table = require "table"
+local tls = require "tls"
 local unicode = require "unicode"
+local have_openssl, openssl = pcall(require, "openssl")
 
 description = [[
 Retrieves a server's SSL certificate. The amount of information printed
@@ -65,6 +70,8 @@ certificate.
 ]]
 
 ---
+-- @see ssl-cert-intaddr.nse
+--
 -- @output
 -- 443/tcp open  https
 -- | ssl-cert: Subject: commonName=www.paypal.com/organizationName=PayPal, Inc.\
@@ -96,6 +103,8 @@ certificate.
 -- <table key="pubkey">
 --   <elem key="type">rsa</elem>
 --   <elem key="bits">2048</elem>
+--   <elem key="modulus">DF40CCF2C50A0D65....35B5927DF25D4DE5</elem>
+--   <elem key="exponent">65537</elem>
 -- </table>
 -- <elem key="sig_algo">sha1WithRSAEncryption</elem>
 -- <table key="validity">
@@ -116,7 +125,7 @@ author = "David Fifield"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
 
 categories = { "default", "safe", "discovery" }
-
+dependencies = {"https-redirect"}
 
 portrule = function(host, port)
   return shortport.ssl(host, port) or sslcert.isPortSupported(port) or sslcert.getPrepareTLSWithoutReconnect(port)
@@ -140,7 +149,7 @@ function date_to_string(date)
   if type(date) == "string" then
     return string.format("Can't parse; string is \"%s\"", date)
   else
-    return stdnse.format_timestamp(date)
+    return datetime.format_timestamp(date)
   end
 end
 
@@ -183,39 +192,68 @@ function stringify_name(name)
       -- Don't include a field twice.
       if not table_find(NON_VERBOSE_FIELDS, k) then
         if type(k) == "table" then
-          k = stdnse.strjoin(".", k)
+          k = table.concat(k, ".")
         end
         fields[#fields + 1] = string.format("%s=%s", k, maybe_decode(v) or '')
       end
     end
   end
-  return stdnse.strjoin("/", fields)
+  return table.concat(fields, "/")
 end
 
 local function name_to_table(name)
   local output = {}
   for k, v in pairs(name) do
     if type(k) == "table" then
-      k = stdnse.strjoin(".", k)
+      k = table.concat(k, ".")
     end
     output[k] = v
   end
-  return output
+  return outlib.sorted_by_key(output)
 end
 
 local function output_tab(cert)
+  if not have_openssl then
+    -- OpenSSL is required to parse the cert, so just dump the PEM
+    return {pem = cert.pem}
+  end
   local o = stdnse.output_table()
   o.subject = name_to_table(cert.subject)
   o.issuer = name_to_table(cert.issuer)
-  o.pubkey = cert.pubkey
-  o.extensions = cert.extensions
+
+  o.pubkey = stdnse.output_table()
+  o.pubkey.type = cert.pubkey.type
+  o.pubkey.bits = cert.pubkey.bits
+  -- The following fields are set in nse_ssl_cert.cc and mirror those in tls.lua
+  if cert.pubkey.type == "rsa" then
+    o.pubkey.modulus = openssl.bignum_bn2hex(cert.pubkey.modulus)
+    o.pubkey.exponent = openssl.bignum_bn2dec(cert.pubkey.exponent)
+  elseif cert.pubkey.type == "ec" then
+    local params = stdnse.output_table()
+    o.pubkey.ecdhparams = {curve_params=params}
+    params.ec_curve_type = cert.pubkey.ecdhparams.curve_params.ec_curve_type
+    params.curve = cert.pubkey.ecdhparams.curve_params.curve
+  end
+
+  if cert.extensions and #cert.extensions > 0 then
+    o.extensions = {}
+    for i, v in ipairs(cert.extensions) do
+      local ext = stdnse.output_table()
+      ext.name = v.name
+      ext.value = v.value
+      ext.critical = v.critical
+      o.extensions[i] = ext
+    end
+  end
   o.sig_algo = cert.sig_algorithm
-  o.validity = {}
-  for k, v in pairs(cert.validity) do
+
+  o.validity = stdnse.output_table()
+  for i, k in ipairs({"notBefore", "notAfter"}) do
+    local v = cert.validity[k]
     if type(v)=="string" then
       o.validity[k] = v
     else
-      o.validity[k] = stdnse.format_timestamp(v)
+      o.validity[k] = datetime.format_timestamp(v)
     end
   end
   o.md5 = stdnse.tohex(cert:digest("md5"))
@@ -225,6 +263,10 @@ local function output_tab(cert)
 end
 
 local function output_str(cert)
+  if not have_openssl then
+    -- OpenSSL is required to parse the cert, so just dump the PEM
+    return "OpenSSL required to parse certificate.\n" .. cert.pem
+  end
   local lines = {}
 
   lines[#lines + 1] = "Subject: " .. stringify_name(cert.subject)
@@ -260,10 +302,11 @@ local function output_str(cert)
   if nmap.verbosity() > 1 then
     lines[#lines + 1] = cert.pem
   end
-  return stdnse.strjoin("\n", lines)
+  return table.concat(lines, "\n")
 end
 
 action = function(host, port)
+  host.targetname = tls.servername(host)
   local status, cert = sslcert.getCertificate(host, port)
   if ( not(status) ) then
     stdnse.debug1("getCertificate error: %s", cert or "unknown")

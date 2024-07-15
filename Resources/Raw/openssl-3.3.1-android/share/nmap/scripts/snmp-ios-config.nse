@@ -3,6 +3,7 @@ local nmap = require "nmap"
 local shortport = require "shortport"
 local snmp = require "snmp"
 local stdnse = require "stdnse"
+local stringaux = require "stringaux"
 local table = require "table"
 local tftp = require "tftp"
 
@@ -12,7 +13,7 @@ Attempts to downloads Cisco router IOS configuration files using SNMP RW (v1) an
 
 ---
 -- @usage
--- nmap -sU -p 161 --script snmp-ios-config --script-args snmpcommunity=<community> <target>
+-- nmap -sU -p 161 --script snmp-ios-config --script-args creds.snmp=:<community> <target>
 --
 -- @output
 -- | snmp-ios-config:
@@ -44,7 +45,7 @@ categories = {"intrusive"}
 dependencies = {"snmp-brute"}
 
 
-portrule = shortport.portnumber(161, "udp", {"open", "open|filtered"})
+portrule = shortport.port_or_service(161, "snmp", "udp", {"open", "open|filtered"})
 
 local function fail (err) return stdnse.format_output(false, err) end
 ---
@@ -151,7 +152,7 @@ action = function(host, port)
     result = ( infile and infile:getContent() )
 
     if ( tftproot ) then
-      local fname = tftproot .. stdnse.filename_escape(host.ip .. "-config")
+      local fname = tftproot .. stringaux.filename_escape(host.ip .. "-config")
       local file, err = io.open(fname, "w")
       if ( file ) then
         file:write(result)

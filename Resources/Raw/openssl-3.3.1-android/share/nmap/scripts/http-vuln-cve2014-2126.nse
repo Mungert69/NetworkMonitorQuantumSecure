@@ -10,6 +10,10 @@ Privilege Escalation Vulnerability (CVE-2014-2126).
 ]]
 
 ---
+-- @see http-vuln-cve2014-2127.nse
+-- @see http-vuln-cve2014-2128.nse
+-- @see http-vuln-cve2014-2129.nse
+--
 -- @usage
 -- nmap -p 443 --script http-vuln-cve2014-2126 <target>
 --
@@ -34,7 +38,7 @@ license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
 categories = {"vuln", "safe"}
 
 portrule = function(host, port)
-  return shortport.ssl(host, port) or sslcert.isPortSupported(port)
+  return port.protocol == "tcp" and (shortport.ssl(host, port) or sslcert.isPortSupported(port))
 end
 
 action = function(host, port)

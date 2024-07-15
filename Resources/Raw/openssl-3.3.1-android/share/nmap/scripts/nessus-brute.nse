@@ -1,6 +1,6 @@
 local brute = require "brute"
 local creds = require "creds"
-local nmap = require "nmap"
+local match = require "match"
 local shortport = require "shortport"
 
 description=[[
@@ -47,7 +47,7 @@ Driver =
   end,
 
   connect = function( self )
-    self.socket = nmap.new_socket()
+    self.socket = brute.new_socket()
     if ( not(self.socket:connect(self.host, self.port, "ssl")) ) then
       return false
     end
@@ -65,7 +65,7 @@ Driver =
     end
 
     local line
-    status, line = self.socket:receive_buf("\r?\n", false)
+    status, line = self.socket:receive_buf(match.pattern_limit("\r?\n", 2048), false)
     if ( not(status) or line ~= "< NTP/1.2 >" ) then
       local err = brute.Error:new( "The server failed to respond to handshake" )
       err:setAbort( true )

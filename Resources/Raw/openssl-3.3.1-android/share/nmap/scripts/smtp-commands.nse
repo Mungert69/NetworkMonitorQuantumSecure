@@ -62,7 +62,7 @@ SMTP server.
 -- 2.1.0.0 - 2011-06-01
 -- + Rewrite the script to use the smtp.lua library.
 
-author = "Jason DePriest"
+author = "Jasey DePriest"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
 categories = {"default", "discovery", "safe"}
 
@@ -93,19 +93,19 @@ function go(host, port)
     return status, response
   end
 
-  response = string.gsub(response, "250[%-%s]+", "") -- 250 or 250-
-  response = string.gsub(response, "\r\n", "\n") -- normalize CR LF
-  response = string.gsub(response, "\n\r", "\n") -- normalize LF CR
-  response = string.gsub(response, "^\n+(.-)\n+$", "%1")
-  response = string.gsub(response, "\n", ", ") -- LF to comma
-  response = string.gsub(response, "%s+", " ") -- get rid of extra spaces
+  response = response:gsub("\r", "")                 -- switch to simple LF line termination
+                     :gsub("^%s*(.-)%s*$", "%1")     -- trim leading and trailing whitespace
+                     :gsub("%f[^\0\n]250[-%s]+", "") -- remove line prefix 250 or 250-
+                     :gsub("\n", ", ")               -- LF to comma
+                     :gsub("%s+", " ")               -- get rid of extra spaces
   table.insert(result,response)
 
   status, response = smtp.help(socket)
   if status then
-    response = string.gsub(response, "214[%-%s]+", "") -- 214
-    response = string.gsub(response, "^%s+(.-)%s+$", "%1")
-    response = string.gsub(response, "%s+", " ") -- get rid of extra spaces
+    response = response:gsub("\r", "")                 -- switch to simple LF line termination
+                       :gsub("^%s*(.-)%s*$", "%1")     -- trim leading and trailing whitespace
+                       :gsub("%f[^\0\n]214[-%s]+", "") -- remove line prefix 214 or 214-
+                       :gsub("%s+", " ")               -- get rid of extra spaces
     table.insert(result,response)
     smtp.quit(socket)
   end
@@ -125,7 +125,7 @@ action = function(host, port)
       for index, test in ipairs(result) do
         table.insert(final, test)
       end
-      return stdnse.strjoin("\n ", final)
+      return table.concat(final, "\n ")
     end
   end
 end

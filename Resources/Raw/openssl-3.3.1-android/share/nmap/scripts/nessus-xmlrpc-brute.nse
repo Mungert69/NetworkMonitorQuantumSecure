@@ -33,7 +33,7 @@ portrule = shortport.port_or_service(8834, "ssl/http", "tcp")
 
 local arg_timeout = stdnse.parse_timespec(stdnse.get_script_args(SCRIPT_NAME..'.timeout'))
 arg_timeout = (arg_timeout or 5) * 1000
-local arg_threads = stdnse.get_script_args("nessus-xmlrpc-brute.threads")
+local arg_threads = tonumber(stdnse.get_script_args("nessus-xmlrpc-brute.threads"))
 
 local function authenticate(host, port, username, password)
   local post_data = ("login=%s&password=%s"):format(username, password)
@@ -48,7 +48,7 @@ local function authenticate(host, port, username, password)
   }
 
   local data = table.concat(headers, "\r\n") .. "\r\n\r\n" .. post_data
-  local socket = nmap.new_socket()
+  local socket = brute.new_socket()
   socket:set_timeout(arg_timeout)
 
   local status, err = socket:connect(host, port)

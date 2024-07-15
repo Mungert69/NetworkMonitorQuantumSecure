@@ -1,4 +1,3 @@
-local bin = require "bin"
 local ipOps = require "ipOps"
 local math = require "math"
 local nmap = require "nmap"
@@ -41,13 +40,6 @@ local NUMPROBES = 6
 
 local ipidseqport
 
---- Pcap check function
--- @return Destination and source IP addresses and TCP ports
-local check = function(layer3)
-  local ip = packet.Packet:new(layer3, layer3:len())
-  return bin.pack('AA=S=S', ip.ip_bin_dst, ip.ip_bin_src, ip.tcp_dport, ip.tcp_sport)
-end
-
 --- Updates a TCP Packet object
 -- @param tcp The TCP object
 local updatepkt = function(tcp)
@@ -62,7 +54,7 @@ end
 -- @param port Port number
 -- @return TCP Packet object
 local genericpkt = function(host, port)
-  local pkt = bin.pack("H",
+  local pkt = stdnse.fromhex(
   "4500 002c 55d1 0000 8006 0000 0000 0000" ..
   "0000 0000 0000 0000 0000 0000 0000 0000" ..
   "6002 0c00 0000 0000 0204 05b4"
@@ -73,9 +65,6 @@ local genericpkt = function(host, port)
   tcp:ip_set_bin_src(host.bin_ip_src)
   tcp:ip_set_bin_dst(host.bin_ip)
   tcp:tcp_set_dport(port)
-
-  updatepkt(tcp)
-
   return tcp
 end
 
@@ -203,7 +192,6 @@ hostrule = function(host)
 end
 
 action = function(host)
-  local i = 1
   local ipids = {}
   local sock = nmap.new_dnet()
   local pcap = nmap.new_socket()
@@ -219,24 +207,21 @@ action = function(host)
 
   pcap:set_timeout(host.times.timeout * 1000)
 
-  local tcp = genericpkt(host, ipidseqport)
+  local sndpkt = genericpkt(host, ipidseqport)
 
-  while i <= NUMPROBES do
-    try(sock:ip_send(tcp.buf, host))
-
-    local status, len, _, layer3 = pcap:pcap_receive()
-    local test = bin.pack('AA=S=S', tcp.ip_bin_src, tcp.ip_bin_dst, tcp.tcp_sport, tcp.tcp_dport)
-    while status and test ~= check(layer3) do
-      status, len, _, layer3 = pcap:pcap_receive()
-    end
-
-    if status then
-      table.insert(ipids, packet.u16(layer3, 4))
-    end
-
-    updatepkt(tcp)
-
-    i = i + 1
+  for _ = 1, NUMPROBES do
+    updatepkt(sndpkt)
+    try(sock:ip_send(sndpkt.buf, host))
+    local recvpkt
+    repeat
+      recvpkt = nil
+      local status, _, _, recvdata = pcap:pcap_receive()
+      if not status then break end
+      recvpkt = packet.Packet:new(recvdata, #recvdata)
+    until recvpkt and recvpkt.tcp_dport == sndpkt.tcp_sport
+    if not recvpkt then break end
+    stdnse.debug2("Received IP ID %d (0x%x)", recvpkt.ip_id, recvpkt.ip_id)
+    table.insert(ipids, recvpkt.ip_id)
   end
 
   pcap:close()

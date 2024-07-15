@@ -3,6 +3,7 @@ local shortport = require "shortport"
 local smtp = require "smtp"
 local stdnse = require "stdnse"
 local string = require "string"
+local stringaux = require "stringaux"
 local table = require "table"
 
 description = [[
@@ -57,7 +58,6 @@ Reference:
 -- |     Before 'id': uid=121(Debian-exim) gid=128(Debian-exim) groups=128(Debian-exim),45(sasl)
 -- |_    After  'id': uid=0(root) gid=128(Debian-exim) groups=0(root)
 --
--- @args smtp.domain Define the domain to be used in the SMTP EHLO command.
 -- @args smtp-vuln-cve2010-4344.exploit The script will force the checks,
 --       and will try to exploit the Exim SMTP server.
 -- @args smtp-vuln-cve2010-4344.mailfrom Define the source email address to
@@ -367,7 +367,7 @@ local function check_exim(smtp_opts)
     return smtp_finish(nil, status, response)
   end
 
-  for _, line in pairs(stdnse.strsplit("\r?\n", response)) do
+  for _, line in pairs(stringaux.strsplit("\r?\n", response)) do
     if not smtp_opts.ehlo_host or not smtp_opts.domain_ip then
       smtp_opts.ehlo_host, smtp_opts.domain_ip =
       line:match("%d.-Hello%s(.*)%s%[([^]]*)%]")

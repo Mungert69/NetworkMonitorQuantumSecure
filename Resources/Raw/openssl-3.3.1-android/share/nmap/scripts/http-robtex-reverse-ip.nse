@@ -4,7 +4,9 @@ local stdnse = require "stdnse"
 local table = require "table"
 
 description = [[
-Obtains up to 100 forward DNS names for a target IP address by querying the Robtex service (http://www.robtex.com/ip/).
+Obtains up to 100 forward DNS names for a target IP address by querying the Robtex service (https://www.robtex.com/ip-lookup/).
+
+*TEMPORARILY DISABLED* due to changes in Robtex's API. See https://www.robtex.com/api/
 ]]
 
 ---
@@ -45,11 +47,10 @@ categories = {"discovery", "safe", "external"}
 -- @param data string containing the retrieved web page
 -- @return table containing the resolved host names
 function parse_robtex_response(data)
-  local data = data:match("<span id=\"shared_ma\">.-<ol.->(.-)</ol>")
+  local data = data:match("<h2>Shared</h2>(.-)<h2>History</h2>")
   local result = {}
   if data then
-    for domain in data:gmatch("<li[^>]*>(.-)</li>") do
-      domain = domain:gsub("<[^>]+>","")
+    for domain in data:gmatch('/dns%-lookup/(.-)"') do
       table.insert(result, domain)
     end
   end
@@ -58,6 +59,11 @@ end
 
 prerule = function() return stdnse.get_script_args("http-robtex-reverse-ip.host") ~= nil end
 
+action = function()
+  return "*TEMPORARILY DISABLED* due to changes in Robtex's API. See https://www.robtex.com/api/"
+end
+
+--[[
 action = function(host, port)
 
   local target = stdnse.get_script_args("http-robtex-reverse-ip.host")
@@ -66,10 +72,10 @@ action = function(host, port)
     return stdnse.format_output(false, "The argument \"http-robtex-reverse-ip.host\" did not contain a valid IPv4 address")
   end
 
-  local link = "/ip/"..target..".html"
-  local htmldata = http.get("www.robtex.com", 443, link, {any_af=true})
+  local htmldata = http.get_url("https://www.robtex.com/ip-lookup/"..target, {any_af=true})
   local domains = parse_robtex_response(htmldata.body)
   if ( #domains > 0 ) then
     return stdnse.format_output(true, domains)
   end
 end
+]]--

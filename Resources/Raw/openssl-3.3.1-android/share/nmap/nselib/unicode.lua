@@ -5,23 +5,22 @@
 -- @copyright Same as Nmap--See https://nmap.org/book/man-legal.html
 
 
-local bit = require "bit"
-local bin = require "bin"
 local string = require "string"
 local table = require "table"
 local stdnse = require "stdnse"
 local unittest = require "unittest"
+local tableaux = require "tableaux"
+local utf8 = require "utf8"
 _ENV = stdnse.module("unicode", stdnse.seeall)
 
 -- Localize a few functions for a tiny speed boost, since these will be looped
 -- over every char of a string
-local band = bit.band
-local lshift = bit.lshift
-local rshift = bit.rshift
 local byte = string.byte
 local char = string.char
-local pack = bin.pack
-local unpack = bin.unpack
+local pack = string.pack
+local unpack = string.unpack
+local concat = table.concat
+local pcall = pcall
 
 
 ---Decode a buffer containing Unicode data.
@@ -32,6 +31,9 @@ local unpack = bin.unpack
 --                 false (little-endian)
 --@return A list-table containing the code points as numbers
 function decode(buf, decoder, bigendian)
+  if decoder == utf8_dec then
+    return {utf8.codepoint(buf, 1, -1)}
+  end
   local cp = {}
   local pos = 1
   while pos <= #buf do
@@ -48,6 +50,9 @@ end
 --                 false (little-endian)
 --@return An encoded string
 function encode(list, encoder, bigendian)
+  if encoder == utf8_enc then
+    return utf8.char(table.unpack(list))
+  end
   local buf = {}
   for i, cp in ipairs(list) do
     buf[i] = encoder(cp, bigendian)
@@ -70,11 +75,103 @@ function transcode(buf, decoder, encoder, bigendian_dec, bigendian_enc)
   local out = {}
   local cp
   local pos = 1
-  while pos <= #buf do
-    pos, cp = decoder(buf, pos, bigendian_dec)
-    out[#out+1] = encoder(cp, bigendian_enc)
+  -- Take advantage of Lua's built-in utf8 functions
+  if decoder == utf8_dec then
+    for _, cp in utf8.codes(buf) do
+      out[#out+1] = encoder(cp, bigendian_enc)
+    end
+  elseif encoder == utf8_enc then
+    while pos <= #buf do
+      pos, cp = decoder(buf, pos, bigendian_dec)
+      out[#out+1] = utf8.char(cp)
+    end
+  else
+    while pos <= #buf do
+      pos, cp = decoder(buf, pos, bigendian_dec)
+      out[#out+1] = encoder(cp, bigendian_enc)
+    end
   end
   return table.concat(out)
+end
+
+--- Determine (poorly) the character encoding of a string
+--
+-- First, the string is checked for a Byte-order Mark (BOM). This can be
+-- examined to determine UTF-16 with endianness or UTF-8. If no BOM is found,
+-- the string is examined.
+--
+-- If null bytes are encountered, UTF-16 is assumed. Endianness is determined
+-- by byte position, assuming the null is the high-order byte. Otherwise, if
+-- byte values over 127 are found, UTF-8 decoding is attempted. If this fails,
+-- the result is 'other', otherwise it is 'utf-8'. If no high bytes are found,
+-- the result is 'ascii'.
+--
+--@param buf The string/buffer to be identified
+--@param len The number of bytes to inspect in order to identify the string.
+--           Default: 100
+--@return A string describing the encoding: 'ascii', 'utf-8', 'utf-16be',
+--        'utf-16le', or 'other' meaning some unidentified 8-bit encoding
+function chardet(buf, len)
+  local limit = len or 100
+  if limit > #buf then
+    limit = #buf
+  end
+  -- Check BOM
+  if limit >= 2 then
+    local bom1, bom2 = byte(buf, 1, 2)
+    if bom1 == 0xff and bom2 == 0xfe then
+      return 'utf-16le'
+    elseif bom1 == 0xfe and bom2 == 0xff then
+      return 'utf-16be'
+    elseif limit >= 3 then
+      local bom3 = byte(buf, 3)
+      if bom1 == 0xef and bom2 == 0xbb and bom3 == 0xbf then
+        return 'utf-8'
+      end
+    end
+  end
+  -- Try bytes
+  local pos = 1
+  local high = false
+  local is_utf8 = true
+  while pos < limit do
+    local c = byte(buf, pos)
+    if c == 0 then
+      if pos % 2 == 0 then
+        return 'utf-16le'
+      else
+        return 'utf-16be'
+      end
+      is_utf8 = false
+      pos = pos + 1
+    elseif c > 127 then
+      if not high then
+        high = true
+      end
+      if is_utf8 then
+        local p, cp = utf8_dec(buf, pos)
+        if not p then
+          is_utf8 = false
+        else
+          pos = p
+        end
+      end
+      if not is_utf8 then
+        pos = pos + 1
+      end
+    else
+      pos = pos + 1
+    end
+  end
+  if high then
+    if is_utf8 then
+      return 'utf-8'
+    else
+      return 'other'
+    end
+  else
+    return 'ascii'
+  end
 end
 
 ---Encode a Unicode code point to UTF-16. See RFC 2781.
@@ -86,9 +183,9 @@ end
 --                 false (little-endian)
 --@return A string containing the code point in UTF-16 encoding.
 function utf16_enc(cp, bigendian)
-  local fmt = "<S"
+  local fmt = "<I2"
   if bigendian then
-    fmt = ">S"
+    fmt = ">I2"
   end
 
   if cp % 1.0 ~= 0.0 or cp < 0 then
@@ -98,7 +195,7 @@ function utf16_enc(cp, bigendian)
     return pack(fmt, cp)
   elseif cp <= 0x10FFFF then
     cp = cp - 0x10000
-    return pack(fmt .. fmt, 0xD800 + rshift(cp, 10), 0xDC00 + band(cp, 0x3FF))
+    return pack(fmt .. fmt, 0xD800 + (cp >> 10), 0xDC00 + (cp & 0x3FF))
   else
     return nil
   end
@@ -116,16 +213,16 @@ end
 --@return pos The index in the string where the character ended
 --@return cp The code point of the character as a number
 function utf16_dec(buf, pos, bigendian)
-  local fmt = "<S"
+  local fmt = "<I2"
   if bigendian then
-    fmt = ">S"
+    fmt = ">I2"
   end
 
   local cp
-  pos, cp = unpack(fmt, buf, pos)
+  cp, pos = unpack(fmt, buf, pos)
   if cp >= 0xD800 and cp <= 0xDFFF then
-    local high = lshift(cp - 0xD800, 10)
-    pos, cp = unpack(fmt, buf, pos)
+    local high = (cp - 0xD800) << 10
+    cp, pos = unpack(fmt, buf, pos)
     cp = 0x10000 + high + cp - 0xDC00
   end
   return pos, cp
@@ -135,40 +232,10 @@ end
 --
 -- Does not check that cp is a real character; that is, doesn't exclude the
 -- surrogate range U+D800 - U+DFFF and a handful of others.
+-- @class function
 --@param cp The Unicode code point as a number
 --@return A string containing the code point in UTF-8 encoding.
-function utf8_enc(cp)
-  local bytes = {}
-  local n, mask
-
-  if cp % 1.0 ~= 0.0 or cp < 0 then
-    -- Only defined for nonnegative integers.
-    return nil
-  elseif cp <= 0x7F then
-    -- Special case of one-byte encoding.
-    return char(cp)
-  elseif cp <= 0x7FF then
-    n = 2
-    mask = 0xC0
-  elseif cp <= 0xFFFF then
-    n = 3
-    mask = 0xE0
-  elseif cp <= 0x10FFFF then
-    n = 4
-    mask = 0xF0
-  else
-    return nil
-  end
-
-  while n > 1 do
-    bytes[n] = char(0x80 + band(cp, 0x3F))
-    cp = rshift(cp, 6)
-    n = n - 1
-  end
-  bytes[1] = char(mask + cp)
-
-  return table.concat(bytes)
-end
+utf8_enc = utf8.char
 
 ---Decodes a UTF-8 character.
 --
@@ -179,49 +246,12 @@ end
 --@return cp The code point of the character as a number, or an error string
 function utf8_dec(buf, pos)
   pos = pos or 1
-  local n, mask
-  local bv = byte(buf, pos)
-  if bv <= 0x7F then
-    return pos+1, bv
-  elseif bv <= 0xDF then
-    --110xxxxx 10xxxxxx
-    n = 1
-    mask = 0xC0
-  elseif bv <= 0xEF then
-    --1110xxxx 10xxxxxx 10xxxxxx
-    n = 2
-    mask = 0xE0
-  elseif bv <= 0xF7 then
-    --11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
-    n = 3
-    mask = 0xF0
+  local status, cp = pcall(utf8.codepoint, buf, pos)
+  if status then
+    return utf8.offset(buf, 2, pos), cp
   else
-    return nil, string.format("Invalid UTF-8 byte at %d", pos)
+    return nil, cp
   end
-
-  local cp = bv - mask
-
-  if pos + n > #buf then
-    return nil, string.format("Incomplete UTF-8 sequence at %d", pos)
-  end
-  for i = 1, n do
-    bv = byte(buf, pos + i)
-    if bv < 0x80 or bv > 0xBF then
-      return nil, string.format("Invalid UTF-8 sequence at %d", pos + i)
-    end
-    cp = lshift(cp, 6) + band(bv, 0x3F)
-  end
-
-  return pos + 1 + n, cp
-end
-
---Invert a one-to-one mapping
-local function invert(t)
-  local out = {}
-  for k, v in pairs(t) do
-    out[v] = k
-  end
-  return out
 end
 
 -- Code Page 437, native US-English Windows OEM code page
@@ -355,7 +385,7 @@ local cp437_decode = {
   [0xfe] = 0x25a0,
   [0xff] = 0x00a0,
 }
-local cp437_encode = invert(cp437_decode)
+local cp437_encode = tableaux.invert(cp437_decode)
 
 ---Encode a Unicode code point to CP437
 --
@@ -428,5 +458,10 @@ test_suite:add_test(unittest.equal(utf16to8("\x08\xD8\x45\xDF=\0R\0a\0"), "\xF0\
 test_suite:add_test(unittest.equal(utf8to16("\xF0\x92\x8D\x85=Ra"), "\x08\xD8\x45\xDF=\0R\0a\0"),"utf8to16")
 test_suite:add_test(unittest.equal(encode({0x221e, 0x2248, 0x30}, cp437_enc), "\xec\xf70"), "encode cp437")
 test_suite:add_test(unittest.table_equal(decode("\x81ber", cp437_dec), {0xfc, 0x62, 0x65, 0x72}), "decode cp437")
+test_suite:add_test(unittest.equal(chardet("\x08\xD8\x45\xDF=\0R\0a\0"), 'utf-16le'), "detect utf-16le")
+test_suite:add_test(unittest.equal(chardet("\xD8\x08\xDF\x45\0=\0R\0a"), 'utf-16be'), "detect utf-16be")
+test_suite:add_test(unittest.equal(chardet("...\xF0\x92\x8D\x85=Ra"), 'utf-8'), "detect utf-8")
+test_suite:add_test(unittest.equal(chardet("This sentence is completely normal."), 'ascii'), "detect ascii")
+test_suite:add_test(unittest.equal(chardet('Comme ci, comme \xe7a'), 'other'), "detect other")
 
 return _ENV

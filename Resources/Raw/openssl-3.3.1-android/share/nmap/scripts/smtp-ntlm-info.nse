@@ -1,7 +1,6 @@
 local datetime = require "datetime"
 local os = require "os"
 local smtp = require "smtp"
-local bin = require "bin"
 local shortport = require "shortport"
 local stdnse = require "stdnse"
 local base64 = require "base64"
@@ -114,6 +113,9 @@ action = function(host, port)
       -- connection. Try again without SSL
       socket = do_connect(host, port, domain)
     end
+  end
+  if not socket then
+    return nil
   end
 
   socket:send("AUTH NTLM\r\n")

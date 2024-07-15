@@ -1,16 +1,18 @@
 ---
 -- Functions for proxy testing.
 --
+-- @args proxy.url Url that will be requested to the proxy
+-- @args proxy.pattern Pattern that will be searched inside the request results
+--
 -- @author Joao Correa <joao@livewire.com.br>
 -- @copyright Same as Nmap--See https://nmap.org/book/man-legal.html
 
-local bin = require "bin"
 local dns = require "dns"
 local ipOps = require "ipOps"
 local nmap = require "nmap"
 local stdnse = require "stdnse"
 local string = require "string"
-local table = require "table"
+local stringaux = require "stringaux"
 _ENV = stdnse.module("proxy", stdnse.seeall)
 
 -- Start of local functions
@@ -37,7 +39,7 @@ end
 --@param pattern The pattern to be searched
 --@return true if pattern is found, otherwise false
 local function check_pattern(result, pattern)
-  local lines = stdnse.strsplit("\n", result)
+  local lines = stringaux.strsplit("\n", result)
   for i, line in ipairs(lines) do
     if line:lower():match(pattern:lower()) then return true end
   end
@@ -100,7 +102,7 @@ function test_get(host, port, proxyType, test_url, hostname, pattern)
     return false, socket
   end
   local req = "GET " .. test_url .. " HTTP/1.0\r\nHost: " .. hostname .. "\r\n\r\n"
-  stdnse.debug1("GET Request: " .. req)
+  stdnse.debug1("GET Request: %s", req)
   return test(socket, req, pattern)
 end
 
@@ -118,7 +120,7 @@ function test_head(host, port, proxyType, test_url, hostname, pattern)
     return false, socket
   end
   local req = "HEAD " .. test_url .. " HTTP/1.0\r\nHost: " .. hostname .. "\r\n\r\n"
-  stdnse.debug1("HEAD Request: " .. req)
+  stdnse.debug1("HEAD Request: %s", req)
   return test(socket, req, pattern)
 end
 
@@ -134,27 +136,8 @@ function test_connect(host, port, proxyType, hostname)
     return false, socket
   end
   local req = "CONNECT " .. hostname .. ":80 HTTP/1.0\r\n\r\n"
-  stdnse.debug1("CONNECT Request: " .. req)
+  stdnse.debug1("CONNECT Request: %s", req)
   return test(socket, req, false)
-end
-
---- Function that resolves IP address for hostname and
---- returns it as hex values
---@param hostname Hostname to resolve
---@return Ip address of hostname in hex
-function hex_resolve(hostname)
-  local a, b, c, d;
-  local dns_status, ip = dns.query(hostname)
-  if not dns_status then
-    return false
-  end
-  local t, err = ipOps.get_parts_as_number(ip)
-  if t and not err
-    then a, b, c, d = table.unpack(t)
-    else return false
-  end
-  local sip = string.format("%.2x ", a) .. string.format("%.2x ", b) .. string.format("%.2x ", c) .. string.format("%.2x ",d)
-  return true, sip
 end
 
 --- Checks if any parameter was used in old or new syntax
@@ -208,14 +191,12 @@ end
 --  @return socket A socket with the handshake already done, or an error if
 --                 status is false
 function socksHandshake(socket, version, hostname)
-  local resolve, sip, paystring, payload
-  resolve, sip = hex_resolve(hostname)
-  if not resolve then
+  local status, ip = dns.query(hostname)
+  if not status then
     return false, "Unable to resolve hostname"
   end
   if version == 4 then
-    paystring = '04 01 00 50 ' .. sip .. ' 6e 6d 61 70 00'
-    payload = bin.pack("H",paystring)
+    local payload = '\x04\x01\x00\x50' .. ipOps.ip_to_str(ip) .. '\x6e\x6d\x61\x70\x00'
     local status, response = socket:send(payload)
     if not status then
       socket:close()
@@ -247,7 +228,7 @@ function socksHandshake(socket, version, hostname)
     return false, err
   end
   if version == 5 then
-    local payload = bin.pack("H",'05 01 00')
+    local payload = '\x05\x01\x00'
     local status, err = socket:send(payload)
     if not status then
       socket:close()
@@ -264,8 +245,7 @@ function socksHandshake(socket, version, hostname)
       -- If no Auth is required, try to establish connection
       stdnse.debug1("Socks5: No authentication required")
       -- Socks5 second payload: Version, Command, Null, Address type, Ip-Address, Port number
-      paystring = '05 01 00 01 ' .. sip .. '00 50'
-      payload = bin.pack("H",paystring)
+      payload = '\x05\x01\x00\x01' .. ipOps.ip_to_str(ip) .. '\x00\x50'
       status, err = socket:send(payload)
       if not status then
         socket:close()

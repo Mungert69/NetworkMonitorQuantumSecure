@@ -3,6 +3,7 @@ local nmap = require "nmap"
 local os = require "os"
 local packet = require "packet"
 local stdnse = require "stdnse"
+local stringaux = require "stringaux"
 local table = require "table"
 local url = require "url"
 
@@ -36,16 +37,9 @@ license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
 categories = {"safe"}
 
 
-local arg_iface = nmap.get_interface() or stdnse.get_script_args(SCRIPT_NAME .. ".interface")
-
 prerule = function()
-  local has_interface = ( arg_iface ~= nil )
   if not nmap.is_privileged() then
     stdnse.verbose1("not running for lack of privileges.")
-    return false
-  end
-  if ( not(has_interface) ) then
-    stdnse.verbose1("no network interface was supplied, aborting ...")
     return false
   end
   return true
@@ -55,11 +49,11 @@ end
 -- are all declared local.
 local function get_url(data)
 
-  local headers, body = table.unpack(stdnse.strsplit("\r\n\r\n", data))
+  local headers, body = table.unpack(stringaux.strsplit("\r\n\r\n", data))
   if ( not(headers) ) then
     return
   end
-  headers = stdnse.strsplit("\r\n", headers)
+  headers = stringaux.strsplit("\r\n", headers)
   if ( not(headers) or 1 > #headers ) then
     return
   end
@@ -101,6 +95,19 @@ local function log_entry(src_ip, url)
 end
 
 action = function()
+  local arg_iface
+  local collect_interface = function (if_table)
+    if not arg_iface and if_table.up == "up" and if_table.link ~= "loopback" then
+      arg_iface = if_table.device
+    end
+  end
+  stdnse.get_script_interfaces(collect_interface)
+
+  if not arg_iface then
+    stdnse.verbose1("no network interface was supplied, aborting ...")
+    return false
+  end
+
   local counter = 0
 
   if ( arg_outfile ) then

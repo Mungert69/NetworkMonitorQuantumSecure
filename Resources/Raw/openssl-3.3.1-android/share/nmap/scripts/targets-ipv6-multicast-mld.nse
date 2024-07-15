@@ -4,6 +4,7 @@ local nmap = require "nmap"
 local stdnse = require "stdnse"
 local tab = require "tab"
 local table = require "table"
+local tableaux = require "tableaux"
 local target = require "target"
 local multicast = require "multicast"
 
@@ -63,21 +64,11 @@ prerule = function()
 end
 
 
-local function get_interfaces()
-  local interface_name = stdnse.get_script_args(SCRIPT_NAME .. ".interface")
-    or nmap.get_interface()
-
-  -- interfaces list (decide which interfaces to broadcast on)
-  local interfaces = {}
-  for _, if_table in pairs(nmap.list_interfaces()) do
-    if (interface_name == nil or if_table.device == interface_name) -- check for correct interface
-      and ipOps.ip_in_range(if_table.address, "fe80::/10") -- link local address
-      and if_table.link == "ethernet" then                 -- not the loopback interface
-      table.insert(interfaces, if_table)
-    end
+local function filter_interfaces(if_table)
+  if ipOps.ip_in_range(if_table.address, "fe80::/10") -- link local address
+    and if_table.link == "ethernet" then                 -- not the loopback interface
+    return if_table
   end
-
-  return interfaces
 end
 
 local function single_interface_broadcast(if_nfo, results)
@@ -103,7 +94,7 @@ end
 local function format_output(results)
   local output = tab.new()
   local xmlout = {}
-  local ips = stdnse.keys(results)
+  local ips = tableaux.keys(results)
   table.sort(ips)
 
   for i, ip in ipairs(ips) do
@@ -126,7 +117,7 @@ action = function()
   local results = {}
   local condvar = nmap.condvar(results)
 
-  for _, if_nfo in ipairs(get_interfaces()) do
+  for _, if_nfo in ipairs(stdnse.get_script_interfaces(filter_interfaces)) do
     -- create a thread for each interface
     local co = stdnse.new_thread(single_interface_broadcast, if_nfo, results)
     threads[co] = true

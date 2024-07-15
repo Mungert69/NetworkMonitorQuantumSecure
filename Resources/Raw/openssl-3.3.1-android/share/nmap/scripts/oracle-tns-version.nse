@@ -25,25 +25,43 @@ end
 -- Lifted from nmap-service-probes
 -- TODO: Figure out if we can send a better probe than this. We might need to
 --       send ADDRESS, CID, etc.
-local oracle_tns_probe = "\0Z\0\0\x01\0\0\0\x016\x01,\0\0\x08\0\x7F\xFF\x7F\x08\0\0\0\x01\0 \0:\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\04\xE6\0\0\0\x01\0\0\0\0\0\0\0\0(CONNECT_DATA=(COMMAND=version))"
+local oracle_tns_probe = "\0Z\0\0\x01\0\0\0\x016\x01,\0\0\x08\0\x7F\xFF\x7F\x08\0\0\0\x01\0 \0:\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x004\xE6\0\0\0\x01\0\0\0\0\0\0\0\0(CONNECT_DATA=(COMMAND=version))"
 
 local ERR_CODES = {
   ["1189"] = "unauthorized",
   ["1194"] = "insecure transport",
+  ["12154"] = "unknown identifier",
   ["12504"] = "requires service name",
+  ["12505"] = "unknown sid",
   ["12514"] = "unknown service name",
 }
 
 local function decode_vsnnum (vsnnum)
-  local hex = stdnse.tohex(tonumber(vsnnum))
-  local maj, min, a, b, c = string.unpack("c1 c1 c2 c1 c2", hex)
+  vsnnum = tonumber(vsnnum)
   return string.format("%d.%d.%d.%d.%d",
-    tonumber(maj, 16),
-    tonumber(min, 16),
-    tonumber(a, 16),
-    tonumber(b, 16),
-    tonumber(c, 16)
+    vsnnum >> 24,
+    vsnnum >> 20 & 0xF,
+    vsnnum >> 12 & 0xFF,
+    vsnnum >>  8 & 0xF,
+    vsnnum       & 0xFF
     )
+end
+
+do
+  local test_data = {
+    ["135290880"] = "8.1.6.0.0",
+    ["153092352"] = "9.2.0.1.0",
+    ["169869568"] = "10.2.0.1.0",
+    ["185599488"] = "11.1.0.6.0",
+    ["202375680"] = "12.1.0.2.0",
+    ["301989888"] = "18.0.0.0.0",
+    ["318767104"] = "19.0.0.0.0",
+    ["352321536"] = "21.0.0.0.0",
+  }
+  for n, v in pairs(test_data) do
+    local ver = decode_vsnnum(n)
+    assert(ver == v, ("%s == %s"):format(ver, v))
+  end
 end
 
 action = function (host, port)

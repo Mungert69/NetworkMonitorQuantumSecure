@@ -4,12 +4,10 @@
 -- @author Marek Majkowski <majek04+nse@gmail.com>
 -- @copyright Same as Nmap--See https://nmap.org/book/man-legal.html
 
-local bit = require "bit"
 local ipOps = require "ipOps"
-local nmap = require "nmap"
 local stdnse = require "stdnse"
 local string = require "string"
-local table = require "table"
+local unittest = require "unittest"
 _ENV = stdnse.module("packet", stdnse.seeall)
 
 
@@ -18,29 +16,22 @@ _ENV = stdnse.module("packet", stdnse.seeall)
 -- @param b A byte string.
 -- @param i Offset.
 -- @return An 8-bit integer.
-function u8(b, i)
-  return string.byte(b, i+1)
+local function u8(b, i)
+  return b:byte(i+1)
 end
 --- Get a 16-bit integer at a 0-based byte offset in a byte string.
 -- @param b A byte string.
 -- @param i Offset.
 -- @return A 16-bit integer.
-function u16(b, i)
-  local b1,b2
-  b1, b2 = string.byte(b, i+1), string.byte(b, i+2)
-  --        2^8     2^0
-  return b1*256 + b2
+local function u16(b, i)
+  return (">I2"):unpack(b, i+1)
 end
 --- Get a 32-bit integer at a 0-based byte offset in a byte string.
 -- @param b A byte string.
 -- @param i Offset.
 -- @return A 32-bit integer.
-function u32(b,i)
-  local b1,b2,b3,b4
-  b1, b2 = string.byte(b, i+1), string.byte(b, i+2)
-  b3, b4 = string.byte(b, i+3), string.byte(b, i+4)
-  --        2^24          2^16       2^8     2^0
-  return b1*16777216 + b2*65536 + b3*256 + b4
+local function u32(b,i)
+  return (">I4"):unpack(b, i+1)
 end
 
 --- Set an 8-bit integer at a 0-based byte offset in a byte string
@@ -48,8 +39,8 @@ end
 -- @param b A byte string.
 -- @param i Offset.
 -- @param num Integer to store.
-function set_u8(b, i, num)
-  local s = string.char(bit.band(num, 0xff))
+local function set_u8(b, i, num)
+  local s = string.char(num & 0xff)
   return b:sub(0+1, i+1-1) .. s .. b:sub(i+1+1)
 end
 --- Set a 16-bit integer at a 0-based byte offset in a byte string
@@ -57,38 +48,16 @@ end
 -- @param b A byte string.
 -- @param i Offset.
 -- @param num Integer to store.
-function set_u16(b, i, num)
-  local s = string.char(bit.band(bit.rshift(num, 8), 0xff)) .. string.char(bit.band(num, 0xff))
-  return b:sub(0+1, i+1-1) .. s .. b:sub(i+1+2)
+local function set_u16(b, i, num)
+  return b:sub(0+1, i+1-1) .. (">I2"):pack(num) .. b:sub(i+1+2)
 end
 --- Set a 32-bit integer at a 0-based byte offset in a byte string
 -- (big-endian).
 -- @param b A byte string.
 -- @param i Offset.
 -- @param num Integer to store.
-function set_u32(b,i, num)
-  local s = string.char(bit.band(bit.rshift(num,24), 0xff)) ..
-  string.char(bit.band(bit.rshift(num,16), 0xff)) ..
-  string.char(bit.band(bit.rshift(num,8), 0xff)) ..
-  string.char(bit.band(num, 0xff))
-  return b:sub(0+1, i+1-1) .. s .. b:sub(i+1+4)
-end
---- Get a 1-byte string from a number.
--- @param num A number.
-function numtostr8(num)
-  return string.char(num)
-end
---- Get a 2-byte string from a number.
--- (big-endian)
--- @param num A number.
-function numtostr16(num)
-  return set_u16("..", 0, num)
-end
---- Get a 4-byte string from a number.
--- (big-endian)
--- @param num A number.
-function numtostr32(num)
-  return set_u32("....", 0, num)
+local function set_u32(b,i, num)
+  return b:sub(0+1, i+1-1) .. (">I4"):pack(num) .. b:sub(i+1+4)
 end
 
 --- Calculate a standard Internet checksum.
@@ -96,22 +65,20 @@ end
 -- @return Checksum.
 function in_cksum(b)
   local sum = 0
-  local i
 
-  -- Note we are using 0-based indexes here.
-  i = 0
-  while i < b:len() - 1 do
-    sum = sum + u16(b, i)
-    i = i + 2
-  end
-  if i < b:len() then
-    sum = sum + u8(b, i) * 256
+  -- Pad to even length, then sum up
+  string.gsub(b .. ("\0"):rep(#b % 2), "..", function(twobytes)
+      sum = sum + (">I2"):unpack(twobytes)
+    end)
+
+  local shifted = sum >> 16
+  while shifted > 0 do
+    sum = (sum & 0xffff) + shifted
+    shifted = sum >> 16
   end
 
-  sum = bit.rshift(sum, 16) + bit.band(sum, 0xffff)
-  sum = sum + bit.rshift(sum, 16)
-  sum = bit.bnot(sum)
-  sum = bit.band(sum, 0xffff) -- truncate to 16 bits
+  sum = ~sum
+  sum = (sum & 0xffff) -- truncate to 16 bits
   return sum
 end
 
@@ -240,7 +207,7 @@ function Packet:new(packet, packet_len, force_continue)
   end
   o.buf = packet
   o.packet_len = packet_len
-  o.ip_v = bit.rshift(string.byte(o.buf), 4)
+  o.ip_v = string.byte(o.buf) >> 4
   if o.ip_v == 4 and not o:ip_parse(force_continue) then
     return nil
   elseif o.ip_v == 6 and not o:ip6_parse(force_continue) then
@@ -249,7 +216,7 @@ function Packet:new(packet, packet_len, force_continue)
 
   if o.ip_v == 6 then
     while o:ipv6_is_extension_header() do
-      if not o:ipv6_ext_header_parse(force_continue) or o.ip6_data_offset >= o.packet_len then
+      if o.ip6_data_offset >= o.packet_len or not o:ipv6_ext_header_parse(force_continue) then
         stdnse.debug1("Error while parsing IPv6 extension headers.")
         return o
       end
@@ -280,11 +247,10 @@ end
 -- @param ip6_tc Number stands for Traffic Class.
 -- @param ip6_fl Number stands for Flow Label.
 -- @return The first four-byte string of an IPv6 header.
-function ipv6_hdr_pack_tc_fl(ip6_tc, ip6_fl)
-  local ver_tc_fl = bit.lshift(6, 28) +
-    bit.lshift(bit.band(ip6_tc, 0xFF), 20) +
-    bit.band(ip6_fl, 0xFFFFF)
-  return numtostr32(ver_tc_fl)
+local function ipv6_hdr_tc_fl(ip6_tc, ip6_fl)
+  return (6 << 28) +
+    ((ip6_tc & 0xFF) << 20) +
+    (ip6_fl & 0xFFFFF)
 end
 --- Build an IPv6 packet.
 -- @param src 16-byte string of the source IPv6 address.
@@ -304,13 +270,13 @@ function Packet:build_ipv6_packet(src, dst, nx_hdr, payload, h_limit, t_class, f
   self.ip6_fl = f_label or self.ip6_fl or 1
   self.ip6_hlimit = h_limit or self.ip6_hlimit or 255
   self.ip6_plen = #(self.exheader or "")+#(self.l4_packet or "")
-  self.buf =
-    ipv6_hdr_pack_tc_fl(self.ip6_tc, self.ip6_fl) ..
-    numtostr16(self.ip6_plen) .. --payload length
-    string.char(self.ip6_nhdr) .. --next header
-    string.char(self.ip6_hlimit) .. --hop limit
-    self.ip_bin_src .. --Source
-    self.ip_bin_dst ..--dest
+  self.buf = (">I4I2BBc16c16"):pack(
+    ipv6_hdr_tc_fl(self.ip6_tc, self.ip6_fl),
+    self.ip6_plen, --payload length
+    self.ip6_nhdr, --next header
+    self.ip6_hlimit, --hop limit
+    self.ip_bin_src, --Source
+    self.ip_bin_dst) .. --dest
     (self.exheader or "")..
     (self.l4_packet or "")
 end
@@ -329,7 +295,8 @@ end
 --- Count IPv6 checksum.
 -- @return the checksum.
 function Packet:count_ipv6_pseudoheader_cksum()
-  local pseudoheader = self.ip_bin_src .. self.ip_bin_dst .. numtostr16(#self.l4_packet) .. "\0\0\0" .. string.char(self.ip6_nhdr)
+  local pseudoheader = (">c16c16I2xxxB"):pack(
+    self.ip_bin_src, self.ip_bin_dst, #self.l4_packet, self.ip6_nhdr)
   local ck_content = pseudoheader .. self.l4_packet
   return in_cksum(ck_content)
 end
@@ -351,9 +318,7 @@ function Packet:build_icmpv6_header(icmpv6_type, icmpv6_code, icmpv6_payload, ip
   self.ip_bin_src = ip_bin_src or self.ip_bin_src
   self.ip_bin_dst = ip_bin_dst or self.ip_bin_dst
 
-  self.l4_packet =
-    string.char(self.icmpv6_type,self.icmpv6_code) ..
-    "\0\0" .. --checksum
+  self.l4_packet = ("BBxx"):pack(self.icmpv6_type, self.icmpv6_code) ..
     (self.icmpv6_payload or "")
   local check_sum = self:count_ipv6_pseudoheader_cksum()
   self:set_icmp6_cksum(check_sum)
@@ -386,7 +351,7 @@ function Packet:build_icmpv6_echo_request(id, sequence, data, mac_src, mac_dst, 
   self.echo_seq = sequence or self.echo_seq or 0xbeef
   self.echo_data = data or self.echo_data or ""
 
-  self.icmpv6_payload = numtostr16(self.echo_id) .. numtostr16(self.echo_seq) .. self.echo_data
+  self.icmpv6_payload = (">I2I2"):pack(self.echo_id, self.echo_seq) .. self.echo_data
 end
 --- Set an ICMPv6 option message.
 function Packet:set_icmpv6_option(opt_type,msg)
@@ -415,18 +380,19 @@ function Packet:build_ip_packet(src, dst, payload, dsf, id, flags, off, ttl, pro
   self.ip_id = id or self.ip_id or 0xbeef
   self.ip_off = off or self.ip_off or 0
   self.ip_ttl = ttl or self.ip_ttl or 255
-  self.buf =
-    numtostr8(bit.lshift(self.ip_v,4) + 20 / 4) .. -- version and header length
-    numtostr8(self.ip_dsf) ..
-    numtostr16(#self.l3_packet + 20) ..
-    numtostr16(self.ip_id) ..
-    numtostr8(self.flags) ..
-    numtostr8(self.ip_off) ..
-    numtostr8(self.ip_ttl) ..
-    numtostr8(self.ip_p) ..
-    numtostr16(0) .. -- checksum
-    self.ip_bin_src ..  --Source
+  self.buf = (">BBI2I2BBBBI2c4c4"):pack(
+    (self.ip_v << 4) + 20 / 4, -- version and header length
+    self.ip_dsf,
+    #self.l3_packet + 20,
+    self.ip_id,
+    self.flags,
+    self.ip_off,
+    self.ip_ttl,
+    self.ip_p,
+    0, -- checksum
+    self.ip_bin_src,  --Source
     self.ip_bin_dst --dest
+    )
 
   self.buf = set_u16(self.buf, 10, in_cksum(self.buf))
   self.buf = self.buf .. self.l3_packet
@@ -444,9 +410,7 @@ function Packet:build_icmp_header(icmp_type, icmp_code, icmp_payload, ip_bin_src
   self.ip_bin_src = ip_bin_src or self.ip_bin_src
   self.ip_bin_dst = ip_bin_dst or self.ip_bin_dst
 
-  self.l3_packet =
-  string.char(self.icmp_type,self.icmp_code) ..
-  "\0\0" .. --checksum
+  self.l3_packet = ("BBxx"):pack(self.icmp_type, self.icmp_code) ..
   (self.icmp_payload or "")
   self.l3_packet = set_u16(self.l3_packet, 2, in_cksum(self.l3_packet))
 end
@@ -474,13 +438,16 @@ function Packet:build_icmp_echo_request(id, seq, data, mac_src, mac_dst, ip_bin_
   self.echo_seq = seq or self.echo_seq or 0xbeef
   self.echo_data = data or self.echo_data or ""
 
-  self.icmp_payload = numtostr16(self.echo_id) .. numtostr16(self.echo_seq) .. self.echo_data
+  self.icmp_payload = (">I2I2"):pack(self.echo_id, self.echo_seq) .. self.echo_data
 end
 
 
 -- Helpers
 
 
+local function _hex_str (x)
+  return string.char(tonumber(x, 16))
+end
 --- Convert a MAC address string (like <code>"00:23:ae:5d:3b:10"</code>) to
 -- a raw six-byte long.
 -- @param str MAC address string.
@@ -489,9 +456,7 @@ function mactobin(str)
   if not str then
     return nil, "MAC was not specified."
   end
-  return (str:gsub("(%x%x)[^%x]?", function (x)
-        return string.char(tonumber(x, 16))
-    end))
+  return (str:gsub("(%x%x)[^%x]?", _hex_str))
 end
 
 --- Generate the link-local IPv6 address from the MAC address.
@@ -501,7 +466,7 @@ function mac_to_lladdr(mac)
   if not mac then
     return nil, "MAC was not specified."
   end
-  local interfier = string.char(bit.bor(string.byte(mac,1),0x02))..string.sub(mac,2,3).."\xff\xfe"..string.sub(mac,4,6)
+  local interfier = string.char((string.byte(mac,1) | 0x02))..string.sub(mac,2,3).."\xff\xfe"..string.sub(mac,4,6)
   local ll_prefix = ipOps.ip_to_str("fe80::")
   return string.sub(ll_prefix,1,8)..interfier
 end
@@ -532,7 +497,7 @@ end
 function Packet:raw(index, length)
   if not index then index = 0 end
   if not length then length = #self.buf-index end
-  return string.char(string.byte(self.buf, index+1, index+1+length-1))
+  return self.buf:sub(index+1, index+1+length-1)
 end
 
 --- Set an 8-bit integer at a 0-based byte offset in the packet.
@@ -566,13 +531,13 @@ end
 function Packet:ip_parse(force_continue)
   self.ip_offset = 0
   if    #self.buf < 20 then -- too short
-    print("too short")
+    stdnse.debug2("Packet.ip_parse: too short")
     return false
   end
-  self.ip_v = bit.rshift(bit.band(self:u8(self.ip_offset + 0), 0xF0), 4)
-  self.ip_hl = bit.band(self:u8(self.ip_offset + 0), 0x0F) -- header_length or data_offset
+  self.ip_v = (self:u8(self.ip_offset + 0) & 0xF0) >> 4
+  self.ip_hl = (self:u8(self.ip_offset + 0) & 0x0F) -- header_length or data_offset
   if    self.ip_v ~= 4 then -- not ip
-    print("not v4")
+    stdnse.debug2("Packet.ip_parse: Not IPv4")
     return false
   end
   self.ip = true
@@ -580,10 +545,10 @@ function Packet:ip_parse(force_continue)
   self.ip_len = self:u16(self.ip_offset + 2)
   self.ip_id = self:u16(self.ip_offset + 4)
   self.ip_off = self:u16(self.ip_offset + 6)
-  self.ip_rf = bit.band(self.ip_off, 0x8000)~=0 -- true/false
-  self.ip_df = bit.band(self.ip_off, 0x4000)~=0
-  self.ip_mf = bit.band(self.ip_off, 0x2000)~=0
-  self.ip_off = bit.band(self.ip_off, 0x1FFF) -- fragment offset
+  self.ip_rf = (self.ip_off & 0x8000)~=0 -- true/false
+  self.ip_df = (self.ip_off & 0x4000)~=0
+  self.ip_mf = (self.ip_off & 0x2000)~=0
+  self.ip_off = (self.ip_off & 0x1FFF) -- fragment offset
   self.ip_ttl = self:u8(self.ip_offset + 8)
   self.ip_p = self:u8(self.ip_offset + 9)
   self.ip_sum = self:u16(self.ip_offset + 10)
@@ -604,13 +569,13 @@ function Packet:ip6_parse(force_continue)
   if #self.buf < 40 then -- too short
     return false
   end
-  self.ip_v = bit.rshift(bit.band(self:u8(self.ip6_offset + 0), 0xF0), 4)
+  self.ip_v = (self:u8(self.ip6_offset + 0) & 0xF0) >> 4
   if self.ip_v ~= 6 then -- not ipv6
     return false
   end
   self.ip6 = true
-  self.ip6_tc = bit.rshift(bit.band(self:u16(self.ip6_offset + 0), 0x0FF0), 4)
-  self.ip6_fl = bit.band(self:u8(self.ip6_offset + 1), 0x0F)*65536 + self:u16(self.ip6_offset + 2)
+  self.ip6_tc = (self:u16(self.ip6_offset + 0) & 0x0FF0) >> 4
+  self.ip6_fl = (self:u8(self.ip6_offset + 1) & 0x0F)*65536 + self:u16(self.ip6_offset + 2)
   self.ip6_plen = self:u16(self.ip6_offset + 4)
   self.ip6_nhdr = self:u8(self.ip6_offset + 6)
   self.ip6_hlimt = self:u8(self.ip6_offset + 7)
@@ -629,6 +594,7 @@ function Packet:ipv6_ext_header_parse(force_continue)
   ext_hdr_len = ext_hdr_len*8 + 8
   self.ip6_data_offset = self.ip6_data_offset + ext_hdr_len
   self.ip6_nhdr = self:u8(self.ip6_data_offset)
+  return true
 end
 --- Set the payload length field.
 -- @param plen Payload length.
@@ -638,9 +604,9 @@ function Packet:ip6_set_plen(plen)
 end
 --- Set the header length field.
 function Packet:ip_set_hl(len)
-  self:set_u8(self.ip_offset + 0, bit.bor(bit.lshift(self.ip_v, 4), bit.band(len, 0x0F)))
-  self.ip_v = bit.rshift(bit.band(self:u8(self.ip_offset + 0), 0xF0), 4)
-  self.ip_hl = bit.band(self:u8(self.ip_offset + 0), 0x0F) -- header_length or data_offset
+  self:set_u8(self.ip_offset + 0, (self.ip_v << 4) | (len & 0x0F))
+  self.ip_v = (self:u8(self.ip_offset + 0) & 0xF0) >> 4
+  self.ip_hl = (self:u8(self.ip_offset + 0) & 0x0F) -- header_length or data_offset
 end
 --- Set the packet length field.
 -- @param len Packet length.
@@ -833,17 +799,17 @@ function Packet:tcp_parse(force_continue)
   end
   self.tcp_seq = self:u32(self.tcp_offset + 4)
   self.tcp_ack = self:u32(self.tcp_offset + 8)
-  self.tcp_hl = bit.rshift(bit.band(self:u8(self.tcp_offset+12), 0xF0), 4) -- header_length or data_offset
-  self.tcp_x2 = bit.band(self:u8(self.tcp_offset+12), 0x0F)
+  self.tcp_hl = (self:u8(self.tcp_offset+12) & 0xF0) >> 4 -- header_length or data_offset
+  self.tcp_x2 = (self:u8(self.tcp_offset+12) & 0x0F)
   self.tcp_flags = self:u8(self.tcp_offset + 13)
-  self.tcp_th_fin = bit.band(self.tcp_flags, 0x01)~=0 -- true/false
-  self.tcp_th_syn = bit.band(self.tcp_flags, 0x02)~=0
-  self.tcp_th_rst = bit.band(self.tcp_flags, 0x04)~=0
-  self.tcp_th_push = bit.band(self.tcp_flags, 0x08)~=0
-  self.tcp_th_ack = bit.band(self.tcp_flags, 0x10)~=0
-  self.tcp_th_urg = bit.band(self.tcp_flags, 0x20)~=0
-  self.tcp_th_ece = bit.band(self.tcp_flags, 0x40)~=0
-  self.tcp_th_cwr = bit.band(self.tcp_flags, 0x80)~=0
+  self.tcp_th_fin = (self.tcp_flags & 0x01)~=0 -- true/false
+  self.tcp_th_syn = (self.tcp_flags & 0x02)~=0
+  self.tcp_th_rst = (self.tcp_flags & 0x04)~=0
+  self.tcp_th_push = (self.tcp_flags & 0x08)~=0
+  self.tcp_th_ack = (self.tcp_flags & 0x10)~=0
+  self.tcp_th_urg = (self.tcp_flags & 0x20)~=0
+  self.tcp_th_ece = (self.tcp_flags & 0x40)~=0
+  self.tcp_th_cwr = (self.tcp_flags & 0x80)~=0
   self.tcp_win = self:u16(self.tcp_offset + 14)
   self.tcp_sum = self:u16(self.tcp_offset + 16)
   self.tcp_urp = self:u16(self.tcp_offset + 18)
@@ -936,8 +902,7 @@ function Packet:tcp_count_checksum()
   local b = self.ip_bin_src ..
     self.ip_bin_dst ..
     "\0" ..
-    string.char(proto) ..
-    set_u16("..", 0, length) ..
+    (">BI2"):pack(proto, length) ..
     self.buf:sub(self.tcp_offset+1)
 
   self:tcp_set_checksum(in_cksum(b))
@@ -1009,6 +974,7 @@ end
 -- @return Whether the parsing succeeded.
 function Packet:udp_parse(force_continue)
   self.udp = true
+  self.ip_p = self.ip_p or IPPROTO_UDP
   self.udp_offset = self.ip_data_offset or self.ip6_data_offset
   if #self.buf < self.udp_offset + 4 then
     return false
@@ -1070,17 +1036,43 @@ end
 -- Count and save the UDP checksum field.
 function Packet:udp_count_checksum()
   self:udp_set_checksum(0)
-  local proto = self.ip_p
-  local length = self.buf:len() - self.udp_offset
-  local b = self.ip_bin_src ..
-    self.ip_bin_dst ..
-    "\0" ..
-    string.char(proto) ..
-    set_u16("..", 0, length) ..
-    self.buf:sub(self.udp_offset+1)
+  local pseudo_header
+  local payload = self.buf:sub(self.udp_offset+1)
+  if self.ip_v == 4 then
+    pseudo_header = (">c4 c4 x B I2"):pack(self.ip_bin_src, self.ip_bin_dst,
+      IPPROTO_UDP, #payload)
+  elseif self.ip_v == 6 then
+    pseudo_header = (">c16 c16 I4 xxx B"):pack(self.ip_bin_src, self.ip_bin_dst,
+      #payload, IPPROTO_UDP)
+  end
 
-  self:udp_set_checksum(in_cksum(b))
+  self:udp_set_checksum(in_cksum(pseudo_header .. payload))
 end
 
+if not unittest.testing() then
+  return _ENV
+end
 
+test_suite = unittest.TestSuite:new()
+-- Byte setting functions
+test_suite:add_test(unittest.equal(set_u8("abc", 1, 0x41), "aAc"), "set_u8")
+test_suite:add_test(unittest.equal(set_u16("abcd", 2, 0x4142), "abAB"), "set_u16")
+test_suite:add_test(unittest.equal(set_u32("abcdefg", 0, 0x41424344), "ABCDefg"), "set_u32")
+
+-- Packet parsing
+local packet1 = "\x45\x00\x00\x62\xaf\xbd\x40\x00\xe3\x06\x03\xf3\x03\x5e\x1e\xa5\xc0\xa8\x01\x3a\x01\xbb\xee\x3e\x74\xd2\x61\xbe\xd5\x66\xb1\x09\x80\x18\x00\x7a\x94\x22\x00\x00\x01\x01\x08\x0a\x73\xab\x53\x92\x05\xe3\x08\xc3\x17\x03\x03\x00\x29\x99\xff\x5d\x17\xe4\x26\x14\xb8\x53\xe3\x76\xdc\xba\xf9\x55\xf7\x52\x5f\xa2\x78\xc3\x4e\x9a\x31\x44\x2d\x67\x9c\x16\xea\x71\xf1\xdb\x0a\xdd\xc1\x92\x46\xa7\xdf\xde"
+local pkt_parsed = Packet:new(packet1, #packet1, false)
+test_suite:add_test (unittest.not_nil(pkt_parsed), "parse packet")
+
+test_suite:add_test(unittest.equal(pkt_parsed:raw(), packet1), "parse to raw")
+
+-- Checksum tests
+pkt_parsed:ip_count_checksum()
+test_suite:add_test(unittest.equal(pkt_parsed:raw(), packet1), "IP checksum")
+pkt_parsed:tcp_count_checksum()
+test_suite:add_test(unittest.equal(pkt_parsed:raw(), packet1), "TCP checksum")
+
+-- TODO: UDP parsing/checksum
+-- TODO: IPv6 parsing, ICMPv6 checksum
+-- Basically, we need a lot more test coverage here.
 return _ENV;
