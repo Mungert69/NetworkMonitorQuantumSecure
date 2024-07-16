@@ -22,6 +22,9 @@ public partial class ScanPage : ContentPage
         _logger = logger;
 
         CustomPopupView.BindingContext = scanProcessorStatesViewModel;
+        BindingContext = scanProcessorStatesViewModel;
+        EndpointTypePicker.SelectedIndexChanged += OnEndpointTypePickerSelectedIndexChanged;
+
         WeakReferenceMessenger.Default.Register<ShowLoadingMessage>(this, (recipient, message) =>
         {
             ShowLoadingNoCancel(message.Show);
@@ -29,7 +32,13 @@ public partial class ScanPage : ContentPage
 
     }
 
-
+ private void OnEndpointTypePickerSelectedIndexChanged(object sender, EventArgs e)
+    {
+        if (EndpointTypePicker.SelectedItem is string selectedEndpointType)
+        {
+            _scanProcessorStatesViewModel.DefaultEndpointType = selectedEndpointType;
+        }
+    }
 
     private async void OpenLoginWebsite()
     {

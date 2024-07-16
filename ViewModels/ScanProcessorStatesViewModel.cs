@@ -5,14 +5,17 @@ using Microsoft.Extensions.DependencyInjection;
 using System.Windows.Input;
 using Microsoft.Maui.Controls;
 using Microsoft.Extensions.Logging;
+using System.Collections.ObjectModel;
 namespace QuantumSecure.ViewModels
 {
     public class ScanProcessorStatesViewModel : BasePopupViewModel
     {
         private LocalScanProcessorStates _scanProcessorStates;
-       // public ICommand ShowPopupCommand { get; private set; }
+        // public ICommand ShowPopupCommand { get; private set; }
         private ILogger _logger;
         private string _popupMessageType = "";
+        public ObservableCollection<string> EndpointTypes { get; set; }
+
 
         public ScanProcessorStatesViewModel(ILogger logger, LocalScanProcessorStates scanProcessorStates)
         {
@@ -20,12 +23,13 @@ namespace QuantumSecure.ViewModels
             {
                 _logger = logger; _scanProcessorStates = scanProcessorStates;
                 _scanProcessorStates.PropertyChanged += OnScanProcessorStatesChanged;
-                //ShowPopupCommand = new Command<string>(ShowPopupWithMessage);
+                EndpointTypes = new ObservableCollection<string>(_scanProcessorStates.EndpointTypes);
+
             }
             catch (Exception ex)
             {
                 _logger.LogError($"Error initializing ScanProcessorStatesViewModel: {ex}");
-               }
+            }
 
 
         }
@@ -35,17 +39,35 @@ namespace QuantumSecure.ViewModels
         public string CompletedMessage => _scanProcessorStates.CompletedMessage;
         public string RunningMessage => _scanProcessorStates.RunningMessage;
 
-        public async Task Scan() {
-            string endPointType = "quantum";
+        public async Task Scan()
+        {
             IsPopupVisible = true;
-            _scanProcessorStates.EndPointType = endPointType;
             await _scanProcessorStates.Scan();
         }
-        public async Task Cancel() {
+        public async Task Cancel()
+        {
             await _scanProcessorStates.Cancel();
         }
 
+        public string DefaultEndpointType
+        {
+            get => _scanProcessorStates.DefaultEndpointType;
+            set
+            {
+                _scanProcessorStates.DefaultEndpointType = value;
+                OnPropertyChanged();
+            }
+        }
 
+        public bool UseDefaultEndpointType
+        {
+            get => _scanProcessorStates.UseDefaultEndpointType;
+            set
+            {
+                _scanProcessorStates.UseDefaultEndpointType = value;
+                OnPropertyChanged();
+            }
+        }
         private void OnScanProcessorStatesChanged(object sender, PropertyChangedEventArgs e)
         {
             OnPropertyChanged(e.PropertyName);
@@ -61,16 +83,16 @@ namespace QuantumSecure.ViewModels
         {
             PopupMessage = $"{RunningMessage}\n{CompletedMessage}";
             // Logic to update PopupMessage based on propertyName
-           /* switch (propertyName)
-            {
-                case nameof(RunningMessage):
-                    if (IsRunning) PopupMessage = $"Scan Running Message: {RunningMessage}";
-                    break;
-                case nameof(CompletedMessage):
-                    if (!IsRunning) PopupMessage = $"Scan Completed Message: {RunningMessage}\n{CompletedMessage}";
+            /* switch (propertyName)
+             {
+                 case nameof(RunningMessage):
+                     if (IsRunning) PopupMessage = $"Scan Running Message: {RunningMessage}";
+                     break;
+                 case nameof(CompletedMessage):
+                     if (!IsRunning) PopupMessage = $"Scan Completed Message: {RunningMessage}\n{CompletedMessage}";
 
-                    break;
-            }*/
+                     break;
+             }*/
         }
 
     }
