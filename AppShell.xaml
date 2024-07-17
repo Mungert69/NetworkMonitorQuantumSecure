@@ -6,16 +6,16 @@
     <FlyoutItem Title="Home" Route="Home">
         <ShellContent ContentTemplate="{DataTemplate local:MainPage}" />
     </FlyoutItem>
-     <FlyoutItem Title="Check Host" Route="Check">
+     <FlyoutItem Title="Check a Host" Route="Check">
         <ShellContent ContentTemplate="{DataTemplate local:NetworkMonitorPage}" />
     </FlyoutItem>
-    <FlyoutItem Title="Host Data" Route="Data">
-        <ShellContent ContentTemplate="{DataTemplate local:DateViewPage}" />
-    </FlyoutItem>
-    <FlyoutItem Title="Scan Host" Route="Data">
+    <FlyoutItem Title="Scan For Host Services" Route="Data">
         <ShellContent ContentTemplate="{DataTemplate local:ScanPage}" />
     </FlyoutItem>
-    <FlyoutItem Title="Config" Route="Config">
+    <FlyoutItem Title="Monitored Hosts" Route="Data">
+        <ShellContent ContentTemplate="{DataTemplate local:DateViewPage}" />
+    </FlyoutItem>
+    <FlyoutItem Title="Show Config" Route="Config">
         <ShellContent ContentTemplate="{DataTemplate local:ConfigPage}" />
     </FlyoutItem>
     <FlyoutItem Title="Setup Guide" Route="SetupGuide">

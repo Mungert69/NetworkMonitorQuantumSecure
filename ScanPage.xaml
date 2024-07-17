@@ -4,72 +4,117 @@
              xmlns:controls="clr-namespace:QuantumSecure.Controls"
              xmlns:view="clr-namespace:QuantumSecure.Views"
              xmlns:vm="clr-namespace:QuantumSecure.ViewModels"
-             x:Class="QuantumSecure.ScanPage">
+             x:Class="QuantumSecure.ScanPage"
+             BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Gray900}}">
 
-   
-    <ScrollView>
-        <VerticalStackLayout Spacing="15"
-                             Padding="5"
-                             VerticalOptions="Center">
-
-            <Frame BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Gray950}}"
-                   Padding="20"
-                   CornerRadius="10"
-                   HorizontalOptions="FillAndExpand">
-                <VerticalStackLayout Spacing="10">
-                    <Image Source="logo.png"
-                           SemanticProperties.Description="Quantum Secure Logo. "
-                           HeightRequest="100"
-                           HorizontalOptions="Center"/>
-                    <Label Text="Quantum Secure"
-                           FontSize="22"
-                           HorizontalOptions="Center"
-                           TextColor="{DynamicResource Primary}"/>
-                </VerticalStackLayout>
-            </Frame>
-
-            <Frame BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Gray950}}"
-                   Padding="20"
-                   CornerRadius="10"
-                   HorizontalOptions="FillAndExpand"
-                   Margin="0,0,0,10">
-                <Label Text="Scan For Local Hosts"
-                       FontSize="16"
-                       HorizontalOptions="Center"
-                       TextColor="{DynamicResource Primary}"/>
-            </Frame>
-            <Picker x:Name="EndpointTypePicker"
-                    Title="Select Default Endpoint Type"
-                    ItemsSource="{Binding EndpointTypes}"
-                    SelectedItem="{Binding DefaultEndpointType}"/>
-            <HorizontalStackLayout>
-                <CheckBox x:Name="UseDefaultEndpointTypeCheckBox"
-                        IsChecked="{Binding UseDefaultEndpointType}"/>
-                <Label Text="Use Default Endpoint Type"
-                        VerticalOptions="Center"/>
-            </HorizontalStackLayout>
-
-
-            <ActivityIndicator x:Name="ProgressIndicator"
-                               IsVisible="False"
+        <ScrollView>
+                <VerticalStackLayout Spacing="20"
+                                     Padding="20">
+                        <!-- Logo and Title -->
+                        <Image Source="logo.png"
+                               SemanticProperties.Description="Quantum Secure Logo"
+                               HeightRequest="100"
+                               HorizontalOptions="Center"/>
+                        <Label Text="Quantum Secure"
+                               FontSize="24"
+                               FontAttributes="Bold"
                                HorizontalOptions="Center"
-                               VerticalOptions="Center"/>
-            <Button x:Name="CancelButton"
-                    Text="Cancel"
-                    IsVisible="False"
-                    Clicked="OnCancelClicked"
-                    HorizontalOptions="Center"
-                    VerticalOptions="Center"/>
-            <Button x:Name="ScanButton"
-                    Text="Scan"
-                    IsVisible="True"
-                    Clicked="OnScanClicked"
-                    HorizontalOptions="Center"
-                    VerticalOptions="Center"/>
-            <view:CustomPopupView x:Name="CustomPopupView"
-                                  AbsoluteLayout.LayoutBounds="0,0,1,1"
-                                  AbsoluteLayout.LayoutFlags="All"/>
+                               TextColor="{DynamicResource Primary}"/>
 
-        </VerticalStackLayout>
-    </ScrollView>
+                        <!-- Conditional Content -->
+                        <ContentView x:Name="ScanContent">
+                                <ContentView.Content>
+                                        <!-- Scan Section -->
+                                        <StackLayout x:Name="ScanSection"
+                                                     Spacing="10">
+                                                <Label Text="Scan For Local Hosts"
+                                                       FontSize="20"
+                                                       HorizontalOptions="Center"
+                                                       TextColor="{DynamicResource Secondary}"/>
+                                                <Picker x:Name="EndpointTypePicker"
+                                                        Title="Select Default Endpoint Type"
+                                                        ItemsSource="{Binding EndpointTypes}"
+                                                        SelectedItem="{Binding DefaultEndpointType}"/>
+                                                <StackLayout Orientation="Horizontal"
+                                                             HorizontalOptions="Center">
+                                                        <CheckBox x:Name="UseDefaultEndpointTypeCheckBox"
+                                                                  IsChecked="{Binding UseDefaultEndpointType}"/>
+                                                        <Label Text="Use Default Endpoint Type"
+                                                               VerticalOptions="Center"/>
+                                                </StackLayout>
+                                                <Button x:Name="ScanButton"
+                                                        Text="Scan"
+                                                        Clicked="OnScanClicked"
+                                                        HorizontalOptions="Center"
+                                                        WidthRequest="200"/>
+                                        </StackLayout>
+
+                                        <!-- Loading Indicator -->
+                                        <StackLayout x:Name="LoadingSection"
+                                                     IsVisible="false">
+                                                <ActivityIndicator x:Name="ProgressIndicator"
+                                                                   IsRunning="True"
+                                                                   HorizontalOptions="Center"/>
+                                                <Button x:Name="CancelButton"
+                                                        Text="Cancel"
+                                                        Clicked="OnCancelClicked"
+                                                        HorizontalOptions="Center"
+                                                        WidthRequest="200"/>
+                                        </StackLayout>
+
+                                        <!-- Results Section -->
+                                        <StackLayout x:Name="ResultsSection"
+                                                     IsVisible="false"
+                                                     Spacing="10">
+                                                <Label Text="Select the hosts you want to add:"
+                                                       FontSize="18"
+                                                       TextColor="{DynamicResource Secondary}"/>
+                                                <CollectionView x:Name="HostsCollectionView"
+                                                                SelectionMode="Multiple"
+                                                                SelectionChanged="OnHostsSelectionChanged">
+                                                        <CollectionView.ItemTemplate>
+                                                                <DataTemplate>
+                                                                        <StackLayout Orientation="Vertical">
+                                                                                <Label Text="{Binding Address}"/>
+                                                                                <Label Text="{Binding EndPointType}"
+                                                                                       FontSize="Small"
+                                                                                       TextColor="Gray"/>
+                                                                                <Label Text="{Binding MessageForUser}"
+                                                                                       FontSize="Small"
+                                                                                       TextColor="Gray"/>
+                                                                        </StackLayout>
+                                                                </DataTemplate>
+                                                        </CollectionView.ItemTemplate>
+                                                </CollectionView>
+                                                <Button x:Name="AddButton"
+                                                        Text="Add Services"
+                                                        Clicked="OnAddServicesClicked"
+                                                        HorizontalOptions="Center"
+                                                        WidthRequest="200"/>
+                                        </StackLayout>
+                                </ContentView.Content>
+                        </ContentView>
+
+                        <!-- Agent Disabled Message -->
+                        <ContentView x:Name="AgentDisabledMessage"
+                                        IsVisible="false">
+                                <StackLayout Spacing="10"
+                                                HorizontalOptions="Center"
+                                                VerticalOptions="Center">
+                                        <Label Text="The Agent must be enabled to add scanned host services"
+                                               FontSize="18"
+                                               TextColor="{DynamicResource Secondary}"
+                                               HorizontalOptions="Center"
+                                               HorizontalTextAlignment="Center"/>
+                                        <Button Text="Go to Home"
+                                                Clicked="OnGoHomeClicked"
+                                                HorizontalOptions="Center"
+                                                WidthRequest="200"/>
+                                </StackLayout>
+                        </ContentView>
+                        <view:CustomPopupView x:Name="CustomPopupView"
+                                              AbsoluteLayout.LayoutBounds="0,0,1,1"
+                                              AbsoluteLayout.LayoutFlags="All"/>
+                </VerticalStackLayout>
+        </ScrollView>
 </ContentPage>

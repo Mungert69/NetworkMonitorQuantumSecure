@@ -38,6 +38,7 @@ namespace QuantumSecure.ViewModels
         public bool IsSuccess => _scanProcessorStates.IsSuccess;
         public string CompletedMessage => _scanProcessorStates.CompletedMessage;
         public string RunningMessage => _scanProcessorStates.RunningMessage;
+        public List<MonitorIP> SelectedDevices => _scanProcessorStates.SelectedDevices.ToList();
 
         public async Task Scan()
         {
@@ -82,19 +83,34 @@ namespace QuantumSecure.ViewModels
         private void UpdatePopupMessage(string propertyName)
         {
             PopupMessage = $"{RunningMessage}\n{CompletedMessage}";
-            // Logic to update PopupMessage based on propertyName
-            /* switch (propertyName)
-             {
-                 case nameof(RunningMessage):
-                     if (IsRunning) PopupMessage = $"Scan Running Message: {RunningMessage}";
-                     break;
-                 case nameof(CompletedMessage):
-                     if (!IsRunning) PopupMessage = $"Scan Completed Message: {RunningMessage}\n{CompletedMessage}";
-
-                     break;
-             }*/
+         
         }
+           
 
+     public async Task<List<MonitorIP>> ScanForHosts()
+    {
+        // Reset any previous state
+        IsPopupVisible = true;
+        await _scanProcessorStates.Scan();
+
+        // Return the detected hosts
+        return _scanProcessorStates.ActiveDevices.ToList();
     }
+
+     public async Task AddServices()
+    {
+            await _scanProcessorStates.AddServices();
+    }
+
+    public async Task AddSelectedHosts(List<MonitorIP> selectedServices)
+    {
+            _scanProcessorStates.SelectedDevices.Clear();
+        foreach (var service in selectedServices)
+        {
+             _scanProcessorStates.SelectedDevices.Add(service);
+        }
+        IsPopupVisible = false;
+    }
+}
 
 }
