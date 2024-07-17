@@ -22,86 +22,83 @@
                                TextColor="{DynamicResource Primary}"/>
 
                         <!-- Conditional Content -->
-                        <ContentView x:Name="ScanContent">
-                                <ContentView.Content>
-                                        <!-- Scan Section -->
-                                        <StackLayout x:Name="ScanSection"
-                                                     Spacing="10">
-                                                <Label Text="Scan For Local Hosts"
-                                                       FontSize="20"
-                                                       HorizontalOptions="Center"
-                                                       TextColor="{DynamicResource Secondary}"/>
-                                                <Picker x:Name="EndpointTypePicker"
-                                                        Title="Select Default Endpoint Type"
-                                                        ItemsSource="{Binding EndpointTypes}"
-                                                        SelectedItem="{Binding DefaultEndpointType}"/>
-                                                <StackLayout Orientation="Horizontal"
-                                                             HorizontalOptions="Center">
-                                                        <CheckBox x:Name="UseDefaultEndpointTypeCheckBox"
-                                                                  IsChecked="{Binding UseDefaultEndpointType}"/>
-                                                        <Label Text="Use Default Endpoint Type"
-                                                               VerticalOptions="Center"/>
-                                                </StackLayout>
-                                                <Button x:Name="ScanButton"
-                                                        Text="Scan"
-                                                        Clicked="OnScanClicked"
-                                                        HorizontalOptions="Center"
-                                                        WidthRequest="200"/>
+                        <StackLayout x:Name="ScanView">
+                                <!-- Scan Section -->
+                                <StackLayout x:Name="ScanSection"
+                                             Spacing="10">
+                                        <Label Text="Scan For Local Hosts"
+                                               FontSize="20"
+                                               HorizontalOptions="Center"
+                                               TextColor="{DynamicResource Secondary}"/>
+                                        <Picker x:Name="EndpointTypePicker"
+                                                Title="Select Default Endpoint Type"
+                                                ItemsSource="{Binding EndpointTypes}"
+                                                SelectedItem="{Binding DefaultEndpointType}"/>
+                                        <StackLayout Orientation="Horizontal"
+                                                     HorizontalOptions="Center">
+                                                <CheckBox x:Name="UseDefaultEndpointTypeCheckBox"
+                                                          IsChecked="{Binding UseDefaultEndpointType}"/>
+                                                <Label Text="Use Default Endpoint Type"
+                                                       VerticalOptions="Center"/>
                                         </StackLayout>
+                                        <Button x:Name="ScanButton"
+                                                Text="Scan"
+                                                Clicked="OnScanClicked"
+                                                HorizontalOptions="Center"
+                                                WidthRequest="200"/>
+                                </StackLayout>
 
-                                        <!-- Loading Indicator -->
-                                        <StackLayout x:Name="LoadingSection"
-                                                     IsVisible="false">
-                                                <ActivityIndicator x:Name="ProgressIndicator"
-                                                                   IsRunning="True"
-                                                                   HorizontalOptions="Center"/>
-                                                <Button x:Name="CancelButton"
-                                                        Text="Cancel"
-                                                        Clicked="OnCancelClicked"
-                                                        HorizontalOptions="Center"
-                                                        WidthRequest="200"/>
-                                        </StackLayout>
+                                <!-- Loading Indicator -->
+                                <StackLayout x:Name="LoadingSection"
+                                             IsVisible="false">
+                                        <ActivityIndicator x:Name="ProgressIndicator"
+                                                           IsRunning="True"
+                                                           HorizontalOptions="Center"/>
+                                        <Button x:Name="CancelButton"
+                                                Text="Cancel"
+                                                Clicked="OnCancelClicked"
+                                                HorizontalOptions="Center"
+                                                WidthRequest="200"/>
+                                </StackLayout>
 
-                                        <!-- Results Section -->
-                                        <StackLayout x:Name="ResultsSection"
-                                                     IsVisible="false"
-                                                     Spacing="10">
-                                                <Label Text="Select the hosts you want to add:"
-                                                       FontSize="18"
-                                                       TextColor="{DynamicResource Secondary}"/>
-                                                <CollectionView x:Name="HostsCollectionView"
-                                                                SelectionMode="Multiple"
-                                                                SelectionChanged="OnHostsSelectionChanged">
-                                                        <CollectionView.ItemTemplate>
-                                                                <DataTemplate>
-                                                                        <StackLayout Orientation="Vertical">
-                                                                                <Label Text="{Binding Address}"/>
-                                                                                <Label Text="{Binding EndPointType}"
-                                                                                       FontSize="Small"
-                                                                                       TextColor="Gray"/>
-                                                                                <Label Text="{Binding MessageForUser}"
-                                                                                       FontSize="Small"
-                                                                                       TextColor="Gray"/>
-                                                                        </StackLayout>
-                                                                </DataTemplate>
-                                                        </CollectionView.ItemTemplate>
-                                                </CollectionView>
-                                                <Button x:Name="AddButton"
-                                                        Text="Add Services"
-                                                        Clicked="OnAddServicesClicked"
-                                                        HorizontalOptions="Center"
-                                                        WidthRequest="200"/>
-                                        </StackLayout>
-                                </ContentView.Content>
-                        </ContentView>
+                                <!-- Results Section -->
+                                <StackLayout x:Name="ResultsSection"
+                                             IsVisible="false"
+                                             Spacing="10">
+                                        <Label Text="Select the hosts you want to add:"
+                                               FontSize="18"
+                                               TextColor="{DynamicResource Secondary}"/>
+                                        <CollectionView x:Name="HostsCollectionView"
+                                                        SelectionMode="Multiple"
+                                                        SelectionChanged="OnHostsSelectionChanged">
+                                                <CollectionView.ItemTemplate>
+                                                        <DataTemplate>
+                                                                <StackLayout Orientation="Vertical">
+                                                                        <Label Text="{Binding Address}"/>
+                                                                        <Label Text="{Binding EndPointType}"
+                                                                               FontSize="Small"
+                                                                               TextColor="Gray"/>
+                                                                        <Label Text="{Binding MessageForUser}"
+                                                                               FontSize="Small"
+                                                                               TextColor="Gray"/>
+                                                                </StackLayout>
+                                                        </DataTemplate>
+                                                </CollectionView.ItemTemplate>
+                                        </CollectionView>
+                                        <Button x:Name="AddButton"
+                                                Text="Add Services"
+                                                Clicked="OnAddServicesClicked"
+                                                HorizontalOptions="Center"
+                                                WidthRequest="200"/>
+                                </StackLayout>
+                        </StackLayout>
 
                         <!-- Agent Disabled Message -->
-                        <ContentView x:Name="AgentDisabledMessage"
-                                        IsVisible="false">
+                        <StackLayout x:Name="AgentDisabledMessage">
                                 <StackLayout Spacing="10"
-                                                HorizontalOptions="Center"
-                                                VerticalOptions="Center">
-                                        <Label Text="The Agent must be enabled to add scanned host services"
+                                             HorizontalOptions="Center"
+                                             VerticalOptions="Center">
+                                        <Label Text="The Agent must be enabled and authorized to add scanned host services"
                                                FontSize="18"
                                                TextColor="{DynamicResource Secondary}"
                                                HorizontalOptions="Center"
@@ -111,7 +108,7 @@
                                                 HorizontalOptions="Center"
                                                 WidthRequest="200"/>
                                 </StackLayout>
-                        </ContentView>
+                        </StackLayout>
                         <view:CustomPopupView x:Name="CustomPopupView"
                                               AbsoluteLayout.LayoutBounds="0,0,1,1"
                                               AbsoluteLayout.LayoutFlags="All"/>
