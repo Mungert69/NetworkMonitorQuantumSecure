@@ -15,21 +15,34 @@ public partial class ScanPage : ContentPage
     private ILogger _logger;
 
     private ScanProcessorStatesViewModel _scanProcessorStatesViewModel;
-    private bool _isAgentEnabled;
+
+    private IPlatformService _platformService;
 
     public ScanPage(ILogger logger, ScanProcessorStatesViewModel scanProcessorStatesViewModel,IPlatformService platformService)
     {
         InitializeComponent();
         _scanProcessorStatesViewModel = scanProcessorStatesViewModel;
         _logger = logger;
-        _isAgentEnabled = platformService.IsServiceStarted;
+        _platformService = platformService;
         CustomPopupView.BindingContext = scanProcessorStatesViewModel;
         BindingContext = scanProcessorStatesViewModel;
         EndpointTypePicker.SelectedIndexChanged += OnEndpointTypePickerSelectedIndexChanged;
-                // Toggle visibility based on _isAgentEnabled
-        ScanContent.IsVisible = _isAgentEnabled;
-        AgentDisabledMessage.IsVisible = !_isAgentEnabled;
+        
+        UpdateVisibility();
 
+    }
+
+     protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        // Update _isAgentEnabled when the page appears
+         UpdateVisibility();
+    }
+
+    private void UpdateVisibility()
+    {
+        ScanView.IsVisible = _platformService.IsServiceStarted;
+        AgentDisabledMessage.IsVisible = !_platformService.IsServiceStarted;
     }
 
     private void OnEndpointTypePickerSelectedIndexChanged(object sender, EventArgs e)
@@ -129,6 +142,10 @@ public partial class ScanPage : ContentPage
         {
             await _scanProcessorStatesViewModel.AddSelectedHosts(selectedHosts);
         }
+    }
+      private async void OnGoHomeClicked(object sender, EventArgs e)
+    {
+        await Shell.Current.GoToAsync("//Home");
     }
 }
 
