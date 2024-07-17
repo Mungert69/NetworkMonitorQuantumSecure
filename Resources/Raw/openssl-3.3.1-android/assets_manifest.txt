@@ -1,4 +1,3 @@
-./bin/nmap-back
 ./bin/openssl
 ./bin/nmap
 ./assets_manifest.txt

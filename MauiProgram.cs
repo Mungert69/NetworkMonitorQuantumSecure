@@ -238,7 +238,9 @@ namespace QuantumSecure
             {
                 var scanProcessorStatesViewModel = provider.GetRequiredService<ScanProcessorStatesViewModel>();
                 var logger = provider.GetRequiredService<ILogger<ScanPage>>();
-                return new ScanPage(logger, scanProcessorStatesViewModel);
+                var platformService = provider.GetRequiredService<IPlatformService>();
+                
+                return new ScanPage(logger, scanProcessorStatesViewModel,platformService);
             });
             builder.Services.AddSingleton(provider =>
            {

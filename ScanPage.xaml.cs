@@ -5,6 +5,7 @@ using QuantumSecure.ViewModels;
 using NetworkMonitor.Connection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Toolkit.Mvvm.Messaging;
+using NetworkMonitor.Objects;
 
 namespace QuantumSecure;
 
@@ -14,25 +15,24 @@ public partial class ScanPage : ContentPage
     private ILogger _logger;
 
     private ScanProcessorStatesViewModel _scanProcessorStatesViewModel;
+    private bool _isAgentEnabled;
 
-    public ScanPage(ILogger logger, ScanProcessorStatesViewModel scanProcessorStatesViewModel)
+    public ScanPage(ILogger logger, ScanProcessorStatesViewModel scanProcessorStatesViewModel,IPlatformService platformService)
     {
         InitializeComponent();
-        _scanProcessorStatesViewModel=scanProcessorStatesViewModel;
+        _scanProcessorStatesViewModel = scanProcessorStatesViewModel;
         _logger = logger;
-
+        _isAgentEnabled = platformService.IsServiceStarted;
         CustomPopupView.BindingContext = scanProcessorStatesViewModel;
         BindingContext = scanProcessorStatesViewModel;
         EndpointTypePicker.SelectedIndexChanged += OnEndpointTypePickerSelectedIndexChanged;
-
-        WeakReferenceMessenger.Default.Register<ShowLoadingMessage>(this, (recipient, message) =>
-        {
-            ShowLoadingNoCancel(message.Show);
-        });
+                // Toggle visibility based on _isAgentEnabled
+        ScanContent.IsVisible = _isAgentEnabled;
+        AgentDisabledMessage.IsVisible = !_isAgentEnabled;
 
     }
 
- private void OnEndpointTypePickerSelectedIndexChanged(object sender, EventArgs e)
+    private void OnEndpointTypePickerSelectedIndexChanged(object sender, EventArgs e)
     {
         if (EndpointTypePicker.SelectedItem is string selectedEndpointType)
         {
@@ -57,56 +57,78 @@ public partial class ScanPage : ContentPage
 
     }
 
-    private async void OnScanClicked(object sender, EventArgs e)
+      private async void OnScanClicked(object sender, EventArgs e)
     {
         try
         {
-            await Task.Run(async () =>
+            ScanSection.IsVisible = false;
+            LoadingSection.IsVisible = true;
+            ResultsSection.IsVisible = false;
+
+            var detectedHosts = await _scanProcessorStatesViewModel.ScanForHosts();
+
+            LoadingSection.IsVisible = false;
+
+            if (detectedHosts != null )
             {
-                await _scanProcessorStatesViewModel.Scan();
-            });
+                HostsCollectionView.ItemsSource = detectedHosts;
+                ResultsSection.IsVisible = true;
+            }
+            else
+            {
+                await DisplayAlert("No Hosts Found", "No hosts were found during the scan.", "OK");
+                ScanSection.IsVisible = true;
+            }
         }
         catch (Exception ex)
         {
-            // Handle any exceptions
-            await DisplayAlert("Error", $"Could not scan local hosts . Error was : {ex.Message}", "OK");
-            _logger.LogError($"Could not scan local hosts. Error was : {ex.ToString()}");
-
+            LoadingSection.IsVisible = false;
+            ScanSection.IsVisible = true;
+            await DisplayAlert("Error", $"Could not scan local hosts. Error was: {ex.Message}", "OK");
+            _logger.LogError($"Could not scan local hosts. Error was: {ex}");
         }
     }
+
+    private async void OnAddServicesClicked(object sender, EventArgs e)
+    {
+        try
+        {
+            await _scanProcessorStatesViewModel.AddServices();
+            await DisplayAlert("Success", $"Added {_scanProcessorStatesViewModel.SelectedDevices.Count} Services", "OK");
+            
+            // Reset the page to initial state
+            ResultsSection.IsVisible = false;
+            ScanSection.IsVisible = true;
+            HostsCollectionView.SelectedItems.Clear();
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Error", $"Could not add services. Error was: {ex.Message}", "OK");
+            _logger.LogError($"Could not add services. Error was: {ex}");
+        }
+    }
+
     private async void OnCancelClicked(object sender, EventArgs e)
     {
         try
         {
             await _scanProcessorStatesViewModel.Cancel();
-            CancelButton.IsVisible = false; // Hide the Cancel button
-            ShowLoading(false); // Reset the content to the original state
+            LoadingSection.IsVisible = false;
+            ScanSection.IsVisible = true;
         }
         catch (Exception ex)
         {
-            // Handle any exceptions
-            await DisplayAlert("Error", $"Could not complete Cancel click . Error was : {ex.Message}", "OK");
-            _logger.LogError($"Could not complete Cancel click. Error was : {ex.ToString()}");
-
+            await DisplayAlert("Error", $"Could not complete Cancel click. Error was: {ex.Message}", "OK");
+            _logger.LogError($"Could not complete Cancel click. Error was: {ex}");
         }
-
-
     }
-
-    private void ShowLoading(bool show)
+    private async void OnHostsSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        ProgressIndicator.IsVisible = show;
-        ProgressIndicator.IsRunning = show;
-        CancelButton.IsVisible = show;
+        var selectedHosts = e.CurrentSelection.Cast<MonitorIP>().ToList();
+        if (selectedHosts != null && selectedHosts.Count > 0)
+        {
+            await _scanProcessorStatesViewModel.AddSelectedHosts(selectedHosts);
+        }
     }
-    private void ShowLoadingNoCancel(bool show)
-    {
-        ProgressIndicator.IsVisible = show;
-        ProgressIndicator.IsRunning = show;
-        CancelButton.IsVisible = false;
-    }
-
-
-
 }
 
