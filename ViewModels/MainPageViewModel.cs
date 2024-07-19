@@ -154,8 +154,8 @@ namespace QuantumSecure.ViewModels
             Tasks = new ObservableCollection<TaskItem>
             {
                 new TaskItem { TaskDescription = "Authorize Agent", IsCompleted = netConfig.AgentUserFlow.IsAuthorized, TaskAction = new Command(wrappedAuthorizeAction) },
-                new TaskItem { TaskDescription = "Login Quantum Secure", IsCompleted = netConfig.AgentUserFlow.IsLoggedInWebsite, TaskAction = new Command(loginAction) },
-                new TaskItem { TaskDescription = "Add Hosts", IsCompleted = netConfig.AgentUserFlow.IsHostsAdded, TaskAction = new Command(addHostsAction) }
+                new TaskItem { TaskDescription = "Login Free Network Monitor", IsCompleted = netConfig.AgentUserFlow.IsLoggedInWebsite, TaskAction = new Command(loginAction) },
+                new TaskItem { TaskDescription = "Scan for Hosts", IsCompleted = netConfig.AgentUserFlow.IsHostsAdded, TaskAction = new Command(addHostsAction) }
             };
         }
 

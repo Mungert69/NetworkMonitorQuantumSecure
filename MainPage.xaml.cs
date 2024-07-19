@@ -27,7 +27,7 @@ public partial class MainPage : ContentPage
         _platformService = platformService;
 
         //Application.Current.UserAppTheme = AppTheme.Dark;
-        BindingContext = new MainPageViewModel(_netConfig, Authorize, OpenLoginWebsite, AddHosts, _platformService, _logger);
+        BindingContext = new MainPageViewModel(_netConfig, Authorize, OpenLoginWebsite, ScanHosts, _platformService, _logger);
         CustomPopupView.BindingContext = processorStatesViewModel;
         ProcessorStatesView.BindingContext = processorStatesViewModel;
         WeakReferenceMessenger.Default.Register<ShowLoadingMessage>(this, (recipient, message) =>
@@ -107,18 +107,17 @@ public partial class MainPage : ContentPage
 
     }
 
-    private async void AddHosts()
+    private async void ScanHosts()
     {
         try
         {
-            //await Launcher.OpenAsync("https://freenetworkmonitor.click/dashboard");
-            await Browser.Default.OpenAsync("https://freenetworkmonitor.click/dashboard", BrowserLaunchMode.SystemPreferred);
+            await Shell.Current.GoToAsync("//Scan");
         }
         catch (Exception ex)
         {
             // Handle any exceptions
-            await DisplayAlert("Error", $"Could not open browser . Errro was : {ex.Message}", "OK");
-            _logger.LogError($"Could not open browser. Errro was : {ex.ToString()}");
+            await DisplayAlert("Error", $"Could not navigate to scan page . Error was : {ex.Message}", "OK");
+            _logger.LogError($"Could not navigate to scan page. Error was : {ex.ToString()}");
 
         }
     }

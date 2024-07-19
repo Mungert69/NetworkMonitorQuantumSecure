@@ -102,7 +102,7 @@ namespace QuantumSecure
           {
               var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
               var configuration = provider.GetRequiredService<IConfiguration>();
-              return new ApiService(loggerFactory, configuration,FileSystem.AppDataDirectory);
+              return new ApiService(loggerFactory, configuration, FileSystem.AppDataDirectory);
           });
 
 
@@ -239,8 +239,8 @@ namespace QuantumSecure
                 var scanProcessorStatesViewModel = provider.GetRequiredService<ScanProcessorStatesViewModel>();
                 var logger = provider.GetRequiredService<ILogger<ScanPage>>();
                 var platformService = provider.GetRequiredService<IPlatformService>();
-                
-                return new ScanPage(logger, scanProcessorStatesViewModel,platformService);
+
+                return new ScanPage(logger, scanProcessorStatesViewModel, platformService);
             });
             builder.Services.AddSingleton(provider =>
            {
@@ -265,7 +265,7 @@ namespace QuantumSecure
 
                 string localPath = Path.Combine(FileSystem.AppDataDirectory, "openssl");
                 Directory.CreateDirectory(localPath);
-
+                string localFilePath = "";
                 foreach (var assetFile in assetFiles)
                 {
                     string assetFilePath = Path.Combine(directoryName, assetFile);
@@ -277,7 +277,7 @@ namespace QuantumSecure
                             continue;
                         }
 
-                        string localFilePath = Path.Combine(localPath, assetFile);
+                        localFilePath = Path.Combine(localPath, assetFile);
                         string localFileDirectory = Path.GetDirectoryName(localFilePath);
 
                         if (!Directory.Exists(localFileDirectory))
@@ -287,9 +287,10 @@ namespace QuantumSecure
                         {
                             await stream.CopyToAsync(fileStream);
                         }
-                        if (IsOpenSSLBinary(assetFile)) SetExecutablePermission(localFilePath);
-                           if (IsNmapBinary(assetFile)) SetExecutablePermission(localFilePath);
                     }
+                    if (IsOpenSSLBinary(assetFile)) SetExecutablePermission(localFilePath);
+                    if (IsNmapBinary(assetFile)) SetExecutablePermission(localFilePath);
+
                 }
 
                 Console.WriteLine($"Directory copied to: {localPath}");
@@ -314,14 +315,50 @@ namespace QuantumSecure
         {
             try
             {
-                Process.Start("chmod", $"+x {filePath}").WaitForExit();
+                Console.WriteLine($"Attempting to set executable permission for: {filePath}");
+
+#if ANDROID
+        QuantumSecure.Platforms.Android.PermissionsHelper.MakeFileExecutable(filePath);
+#else
+                // Existing implementation for other platforms
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "sh",
+                        Arguments = $"-c \"chmod +x {filePath}\"",
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+
+                process.Start();
+
+                string output = process.StandardOutput.ReadToEnd();
+                string error = process.StandardError.ReadToEnd();
+
+                process.WaitForExit();
+
+                if (!string.IsNullOrEmpty(output))
+                {
+                    Console.WriteLine($"chmod output: {output}");
+                }
+                if (!string.IsNullOrEmpty(error))
+                {
+                    Console.WriteLine($"chmod error: {error}");
+                }
+
                 Console.WriteLine($"Set executable permission for: {filePath}");
+#endif
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Failed to set executable permission for {filePath}: {ex.Message}");
             }
         }
+
         private static void SetLDLibraryPath(string libraryPath)
         {
             try

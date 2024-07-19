@@ -5,21 +5,43 @@
              Title="Setup Guide">
 
     <ScrollView>
-        <StackLayout Spacing="20" Padding="15">
-                <Label Text="Setup Guide" FontSize="Large" HorizontalOptions="Center"/>
-                <Label Text="Welcome to Quantum Secure Agent. This App provides a proxy to send network monitoring analytics from its location to the Quantum Secure Service. The management and display of the network monitoring data are performed via the Quantum Secure Service dashboard at https://freenetworkmonitor.click/dashboard."/>
-                <Label Text="In order for your device to function as an agent, it first needs to be authorized."/>
-                <Label Text="Start by clicking the 'Authorize' button on the main page to begin the authentication process."/>
-                <Label Text="Follow the on-screen instructions to log in to your account. If you don't have an account, you can create one during the authentication process."/>
-                <Label Text="Once you have successfully logged in and authenticated your agent, visit the website https://freenetworkmonitor.click/dashboard and, again, log in with the same email address you used to authorize your agent. It is from here that you will view and manage network monitoring."/>
-                <Label Text="Once logged into the Quantum Secure site, go to the dashboard and add a host that you want to monitor, click the flashing edit icon. You might wish to monitor a local router at the IP address 192.168.1.1 using the endpoint type 'icmp' to ping the local router, thereby monitoring its availability."/>
-                <Label Text="You can choose either predefined remote agents or your local agent. However, in the case of the example router at 192.168.1.1, you would need to choose 'your email address - agent id' when selecting a monitor location in order to select your local agent. When done adding hosts, click save."/>
-                <Label Text="Click the edit icon to toggle between view and edit modes. In view mode, after about 2 mins, host monitoring data should start appearing. For detailed response data, click the chart icon next to the host."/>
-                <Label Text="Alerts will be sent to your email address if the host is detected as down. Weekly reports are also sent to your email address with an analysis of your hosts' performance. Note that you must verify your email address to receive email alerts and reports. If you don't receive the verification email, exclude support@mahadeva.co.uk from your spam filter."/>
-                <Label Text="You can manage your account by clicking the profile icon."/>
-                <Label Text="We hope you find this service helpful and would love to hear your feedback or answer any support queries you may have. Feel free to email us at support@mahadeva.co.uk. We're always here to help!"/>
-                   </StackLayout>
+        <StackLayout Spacing="20"
+                Padding="15">
+            <Label Text="Setup Guide"
+                    FontSize="Large"
+                    HorizontalOptions="Center"/>
+            <Label Text="Welcome to Quantum Secure Agent. This App provides a proxy to send network monitoring analytics from its location to the Free Network Monitor Service. The management and display of the network monitoring data are performed via the Free Network Monitor Service dashboard at https://freenetworkmonitor.click/dashboard."/>
+            <Label Text="In order for your device to function as an agent, it first needs to be authorized."/>
+            <Label Text="Start by clicking the 'Authorize' button on the main page to begin the authentication process."/>
+            <Label Text="Follow the on-screen instructions to log in to your account. If you don't have an account, you can create one during the authentication process."/>
+            <Label Text="Once you have successfully logged in and authenticated your agent, visit the website https://freenetworkmonitor.click/dashboard and, again, log in with the same email address you used to authorize your agent. It is from here that you will view and manage network monitoring."/>
+            <Label Text="Once logged into the Free Network Monitor site, go to the dashboard and add a host that you want to monitor, click the flashing edit icon. You might wish to monitor a local router at the IP address 192.168.1.1 using the endpoint type 'icmp' to ping the local router, thereby monitoring its availability."/>
+            <Label Text="You can choose either predefined remote agents or your local agent. However, in the case of the example router at 192.168.1.1, you would need to choose 'your email address - agent id' when selecting a monitor location in order to select your local agent. When done adding hosts, click save."/>
+            <Label Text="Click the edit icon to toggle between view and edit modes. In view mode, after about 2 mins, host monitoring data should start appearing. For detailed response data, click the chart icon next to the host."/>
+            <Label Text="Alerts will be sent to your email address if the host is detected as down. Weekly reports are also sent to your email address with an analysis of your hosts' performance. Note that you must verify your email address to receive email alerts and reports. If you don't receive the verification email, exclude support@mahadeva.co.uk from your spam filter."/>
+            <Label Text="You can manage your account by clicking the profile icon."/>
+        </StackLayout>
+        <StackLayout Spacing="20"
+                Padding="15">
+            <Label Text="Scan for Hosts"
+                    FontSize="Large"
+                    HorizontalOptions="Center"/>
+            <Label Text="You can use the Scan for Hosts tab in the menu bar to open the Scan Page."/>
+            <Label Text="There are two options on this page: Select endpoint type and use this endpoint as the default Endpoint Type. This will set the endpoint type to the one selected in the dropdown list for every host service found during the scan."/>
+            <Label Text="Click scan to start scanning your local network for hosts and services. The progress of the scan is displayed in the text box."/>
+            <Label Text="When the scan is completed, the list of hosts and services is displayed. Click on the host service to add it to be monitored, then click Add Services."/>
+            <Label Text=""/>
+            <Label Text="How to use this page to test host services for quantum-safe TLS connections:"/>
+            <Label Text="Check Use Default endpoint type. Select 'quantum' in the endpoint type dropdown. Click Scan. Add the host services that you want to be monitored."/>
+            <Label Text="If a host service is detected as not having a quantum-safe TLS connection setup, an email will be sent to your authorized email address."/>
+            <Label Text="Other service checks can be set up by selecting different endpoint types. For instance, to set up a raw connect monitor to test a connection to the host service, select 'RawConnect.'"/>
+            <Label Text="To set up monitoring of the best match to the detected endpoint type of the host service, uncheck Use Default endpoint type. The endpoint type dropdown then has no effect. During the scan, the endpoint type will be determined by the port and type of service running."/>
+            <Label Text="You can manage the host services setup using the dashboard at https://freenetworkmonitor.click/dashboard"/>
+            <Label Text=""/>
 
-          
+            <Label Text="We hope you find this service helpful and would love to hear your feedback or answer any support queries you may have. Feel free to email us at support@mahadeva.co.uk. We're always here to help!"/>
+        </StackLayout>
+
+
     </ScrollView>
 </ContentPage>
