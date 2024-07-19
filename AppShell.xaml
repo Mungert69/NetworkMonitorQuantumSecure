@@ -9,7 +9,7 @@
      <FlyoutItem Title="Check a Host" Route="Check">
         <ShellContent ContentTemplate="{DataTemplate local:NetworkMonitorPage}" />
     </FlyoutItem>
-    <FlyoutItem Title="Scan For Host Services" Route="Data">
+    <FlyoutItem Title="Scan For Host Services" Route="Scan">
         <ShellContent ContentTemplate="{DataTemplate local:ScanPage}" />
     </FlyoutItem>
     <FlyoutItem Title="Monitored Hosts" Route="Data">
