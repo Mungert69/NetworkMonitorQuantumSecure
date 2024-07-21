@@ -616,7 +616,6 @@
 ./bin/CHANGELOG
 ./bin/nmap-service-probes
 ./bin/nse_main.lua
-./bin/vcredist_x86.exe
 ./bin/nmap.exe
 ./bin/msvcr120_clr0400.dll
 ./bin/ndiff.py
