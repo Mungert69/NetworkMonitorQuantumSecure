@@ -15,7 +15,7 @@
                 <ApplicationIdGuid>d4f21b0e-2c97-4c50-b003-dca43bd9a888</ApplicationIdGuid>
                 <!-- Versions -->
                 <ApplicationDisplayVersion>0.1</ApplicationDisplayVersion>
-                <ApplicationVersion>2</ApplicationVersion>
+                <ApplicationVersion>3</ApplicationVersion>
                 <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
                 <AndroidSdkDirectory>/usr/lib/android-sdk</AndroidSdkDirectory>
 
@@ -52,14 +52,14 @@
 
         <ItemGroup>
                 <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
-                <PackageReference Include="CommunityToolkit.Maui" Version="7.0.1" />
-                <PackageReference Include="Microsoft.Toolkit.Mvvm" Version="7.1.2" />
-                <PackageReference Include="Microsoft.Maui.Controls" Version="8.0.7" />
-                <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="8.0.7" />
+                <PackageReference Include="CommunityToolkit.Maui" Version="8.0.1" />
+                <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+                <PackageReference Include="Microsoft.Maui.Controls" Version="8.0.71" />
+                <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="8.0.71" />
                 <PackageReference Include="MetroLog.Maui" Version="2.1.0" />
-                <PackageReference Include="Microsoft.Maui.Core" Version="8.0.7" />
-                <PackageReference Include="Microsoft.Maui.Essentials" Version="8.0.7" />
-                <PackageReference Include="Microsoft.Maui.Graphics" Version="8.0.7" />
+                <PackageReference Include="Microsoft.Maui.Core" Version="8.0.71" />
+                <PackageReference Include="Microsoft.Maui.Essentials" Version="8.0.71" />
+                <PackageReference Include="Microsoft.Maui.Graphics" Version="8.0.71" />
                 <PackageReference Include="Xamarin.Android.Glide" Version="4.16.0.2" />
                 <PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData" Version="2.6.2.3" />
                 <PackageReference Include="Xamarin.AndroidX.Navigation.Common" Version="2.7.6" />
