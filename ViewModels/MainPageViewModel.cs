@@ -9,7 +9,7 @@ using System;
 using QuantumSecure.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Dispatching;
-using Microsoft.Toolkit.Mvvm.Messaging;
+using CommunityToolkit.Mvvm.Messaging;
 
 
 namespace QuantumSecure.ViewModels

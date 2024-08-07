@@ -4,7 +4,7 @@ using QuantumSecure.Services;
 using QuantumSecure.ViewModels;
 using NetworkMonitor.Connection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Toolkit.Mvvm.Messaging;
+using CommunityToolkit.Mvvm.Messaging;
 using NetworkMonitor.Objects;
 
 namespace QuantumSecure;
