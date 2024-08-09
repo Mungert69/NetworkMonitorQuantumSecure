@@ -4,13 +4,8 @@ using System.Runtime.CompilerServices;
 using NetworkMonitor.Objects;
 using NetworkMonitor.Connection;
 using System.Windows.Input;
-using Microsoft.Maui.Graphics;
-using System;
 using QuantumSecure.Services;
 using Microsoft.Extensions.Logging;
-using Microsoft.Maui.Dispatching;
-using CommunityToolkit.Mvvm.Messaging;
-
 
 namespace QuantumSecure.ViewModels
 {
@@ -20,6 +15,8 @@ namespace QuantumSecure.ViewModels
         private IPlatformService _platformService;
 
         private ILogger _logger;
+        public event EventHandler<bool> ShowLoadingMessage;
+
 
         public ObservableCollection<TaskItem> Tasks { get; set; }
 
@@ -77,16 +74,12 @@ namespace QuantumSecure.ViewModels
 
         private async Task ChangeServiceAsync(bool state)
         {
-
-
-
-
             try
             {
                 ShowToggle = false;
-                WeakReferenceMessenger.Default.Send(new ShowLoadingMessage(true));
+                //WeakReferenceMessenger.Default.Send(new ShowLoadingMessage(true));
+                ShowLoadingMessage?.Invoke(this, true); // Raise event to show loading
                 // MessagingCenter.Send<MainPageViewModel, bool>(this, "ShowLoading", true);
-
                 await Task.Delay(200); // A short delay, adjust as necessary
                 await _platformService.ChangeServiceState(state);
             }
@@ -94,13 +87,12 @@ namespace QuantumSecure.ViewModels
             {
                 try
                 {
-                    WeakReferenceMessenger.Default.Send(new ShowLoadingMessage(false));
+                    ShowLoadingMessage?.Invoke(this, false); // Raise event to hide loading
+                    //WeakReferenceMessenger.Default.Send(new ShowLoadingMessage(false));
                     //MessagingCenter.Send<MainPageViewModel, bool>(this, "ShowLoading", false);
                 }
                 catch { }
-
                 ShowToggle = true;
-
             }
         }
 
@@ -109,7 +101,6 @@ namespace QuantumSecure.ViewModels
         public string ServiceMessage
         {
             get => _platformService.ServiceMessage;
-
         }
 
         public MainPageViewModel(NetConnectConfig netConfig, Action authorizeAction, Action loginAction, Action addHostsAction, IPlatformService platformService, ILogger logger)
