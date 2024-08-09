@@ -290,7 +290,7 @@ namespace QuantumSecure
                     }
                     if (IsOpenSSLBinary(assetFile)) SetExecutablePermission(localFilePath);
                     if (IsNmapBinary(assetFile)) SetExecutablePermission(localFilePath);
-
+                    Console.WriteLine($"Copying file: {localFilePath}");
                 }
 
                 Console.WriteLine($"Directory copied to: {localPath}");
