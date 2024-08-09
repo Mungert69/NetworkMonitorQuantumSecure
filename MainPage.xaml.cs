@@ -4,10 +4,9 @@ using QuantumSecure.Services;
 using QuantumSecure.ViewModels;
 using NetworkMonitor.Connection;
 using Microsoft.Extensions.Logging;
-using CommunityToolkit.Mvvm.Messaging;
+
 namespace QuantumSecure;
 
-public record ShowLoadingMessage(bool Show);
 
 public partial class MainPage : ContentPage
 {
@@ -27,13 +26,16 @@ public partial class MainPage : ContentPage
         _platformService = platformService;
 
         //Application.Current.UserAppTheme = AppTheme.Dark;
-        BindingContext = new MainPageViewModel(_netConfig, Authorize, OpenLoginWebsite, ScanHosts, _platformService, _logger);
+        var mainPageViewModel = new MainPageViewModel(_netConfig, Authorize, OpenLoginWebsite, ScanHosts, _platformService, _logger);
+        mainPageViewModel.ShowLoadingMessage += (sender, show) => ShowLoadingNoCancel(show);
+        BindingContext= mainPageViewModel;
+
         CustomPopupView.BindingContext = processorStatesViewModel;
         ProcessorStatesView.BindingContext = processorStatesViewModel;
-        WeakReferenceMessenger.Default.Register<ShowLoadingMessage>(this, (recipient, message) =>
+       /* WeakReferenceMessenger.Default.Register<ShowLoadingMessage>(this, (recipient, message) =>
         {
             ShowLoadingNoCancel(message.Show);
-        });
+        });*/
 
     }
 
