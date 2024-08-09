@@ -109,7 +109,7 @@ namespace QuantumSecure.ViewModels
         {
              _scanProcessorStates.SelectedDevices.Add(service);
         }
-        IsPopupVisible = false;
+        //IsPopupVisible = false;
     }
 }
 
