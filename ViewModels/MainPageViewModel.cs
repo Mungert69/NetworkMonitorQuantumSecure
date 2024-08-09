@@ -101,20 +101,15 @@ namespace QuantumSecure.ViewModels
             try
             {
                 ShowToggle = false;
-                //WeakReferenceMessenger.Default.Send(new ShowLoadingMessage(true));
-                ShowLoadingMessage?.Invoke(this, true); // Raise event to show loading
-                // MessagingCenter.Send<MainPageViewModel, bool>(this, "ShowLoading", true);
-                await Task.Delay(200); // A short delay, adjust as necessary
+                ShowLoadingMessage?.Invoke(this, true); 
+                 await Task.Delay(200); // A short delay, adjust as necessary
                  await _platformService.ChangeServiceState(state);
             }
             finally
             {
                 try
                 {
-                    ShowLoadingMessage?.Invoke(this, false); // Raise event to hide loading
-                    //WeakReferenceMessenger.Default.Send(new ShowLoadingMessage(false));
-                    //MessagingCenter.Send<MainPageViewModel, bool>(this, "ShowLoading", false);
-                }
+                    ShowLoadingMessage?.Invoke(this, false);             }
                 catch { }
                 ShowToggle = true;
             }
