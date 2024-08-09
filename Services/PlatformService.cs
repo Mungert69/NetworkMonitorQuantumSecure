@@ -41,8 +41,9 @@ namespace QuantumSecure.Services
             {
                 if (_isServiceStarted != value)
                 {
-                    _isServiceStarted = value;
+
                     OnServiceStateChanged();
+                    _isServiceStarted = value;
 
                 }
             }
