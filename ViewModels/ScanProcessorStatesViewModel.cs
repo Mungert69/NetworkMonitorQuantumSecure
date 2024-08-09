@@ -43,11 +43,11 @@ namespace QuantumSecure.ViewModels
         public async Task Scan()
         {
             IsPopupVisible = true;
-            await _scanProcessorStates.Scan();
+            await _scanProcessorStates.Scan().ConfigureAwait(false);
         }
         public async Task Cancel()
         {
-            await _scanProcessorStates.Cancel();
+            await _scanProcessorStates.Cancel().ConfigureAwait(false);
         }
 
         public string DefaultEndpointType
@@ -72,15 +72,11 @@ namespace QuantumSecure.ViewModels
         private void OnScanProcessorStatesChanged(object sender, PropertyChangedEventArgs e)
         {
             OnPropertyChanged(e.PropertyName);
-
-            if (IsPopupVisible)
-            {
-                // Update PopupMessage based on the changed property
-                UpdatePopupMessage(e.PropertyName);
-            }
+            UpdatePopupMessage();
+         
         }
 
-        private void UpdatePopupMessage(string propertyName)
+        private void UpdatePopupMessage()
         {
             PopupMessage = $"{RunningMessage}\n{CompletedMessage}";
          
@@ -91,7 +87,7 @@ namespace QuantumSecure.ViewModels
     {
         // Reset any previous state
         IsPopupVisible = true;
-        await _scanProcessorStates.Scan();
+        await _scanProcessorStates.Scan().ConfigureAwait(false);
 
         // Return the detected hosts
         return _scanProcessorStates.ActiveDevices.ToList();
@@ -99,7 +95,7 @@ namespace QuantumSecure.ViewModels
 
      public async Task AddServices()
     {
-            await _scanProcessorStates.AddServices();
+            await _scanProcessorStates.AddServices().ConfigureAwait(false);
     }
 
     public async Task AddSelectedHosts(List<MonitorIP> selectedServices)

@@ -11,11 +11,9 @@ public partial class App : Application
     private ILogger? _logger;
 
     public App(IServiceProvider serviceProvider)
-    {
-       
+    {   
         try
-        {
-          
+        {        
             InitializeComponent();
             _logger = serviceProvider.GetRequiredService<ILogger<App>>();
             MainPage = serviceProvider.GetRequiredService<AppShell>(); ;
