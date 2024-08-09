@@ -33,15 +33,39 @@ namespace QuantumSecure.ViewModels
             }
         }
 
+       
+
+        private async Task SetServiceStartedAsync(bool value)
+        {
+            try
+            {
+                await ChangeServiceAsync(value);
+
+                // Update the ShowToggle property based on the service state
+                if (_platformService.IsServiceStarted && !value && _platformService.DisableAgentOnServiceShutdown)
+                {
+                    ShowToggle = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error changing service state: {ex.Message}");
+            }
+        }
+
         public bool IsServiceStarted
         {
             get => _platformService.IsServiceStarted;
             set
             {
-                ChangeServiceAsync(value);
-                if (_platformService.IsServiceStarted && !value && _platformService.DisableAgentOnServiceShutdown) ShowToggle = false;
+                if (_platformService.IsServiceStarted != value)
+                {
+                    // Fire and forget the async call
+                    SetServiceStartedAsync(value).ConfigureAwait(false);
+                }
             }
         }
+
 
         private bool _showToggle = true;
         public bool ShowToggle
@@ -72,7 +96,7 @@ namespace QuantumSecure.ViewModels
         }
 
 
-        private async Task ChangeServiceAsync(bool state)
+        private  async Task ChangeServiceAsync(bool state)
         {
             try
             {
@@ -81,7 +105,7 @@ namespace QuantumSecure.ViewModels
                 ShowLoadingMessage?.Invoke(this, true); // Raise event to show loading
                 // MessagingCenter.Send<MainPageViewModel, bool>(this, "ShowLoading", true);
                 await Task.Delay(200); // A short delay, adjust as necessary
-                await _platformService.ChangeServiceState(state);
+                 await _platformService.ChangeServiceState(state);
             }
             finally
             {
@@ -121,7 +145,7 @@ namespace QuantumSecure.ViewModels
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError($" Error : handling service state change: {ex}");
+                        _logger.LogError($" Error : handling service state change: {ex.Message}");
                     }
                 };
 
