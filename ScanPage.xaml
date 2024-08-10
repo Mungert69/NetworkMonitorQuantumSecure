@@ -41,6 +41,11 @@
                                                 <Label Text="Use Default Endpoint Type"
                                                        VerticalOptions="Center"/>
                                         </StackLayout>
+                                         <Picker x:Name="NetworkInterfacePicker"
+                                                        Title="Select Network Interface"
+                                                        ItemsSource="{Binding NetworkInterfaces}"
+                                                        SelectedItem="{Binding SelectedNetworkInterface}"
+                                                        ItemDisplayBinding="{Binding .}"/>
                                         <Button x:Name="ScanButton"
                                                 Text="Scan"
                                                 Clicked="OnScanClicked"
