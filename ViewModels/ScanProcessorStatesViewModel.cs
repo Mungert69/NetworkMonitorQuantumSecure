@@ -6,6 +6,7 @@ using System.Windows.Input;
 using Microsoft.Maui.Controls;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
+using NetworkMonitor.Utils;
 namespace QuantumSecure.ViewModels
 {
     public class ScanProcessorStatesViewModel : BasePopupViewModel
@@ -15,6 +16,18 @@ namespace QuantumSecure.ViewModels
         private ILogger _logger;
         private string _popupMessageType = "";
         public ObservableCollection<string> EndpointTypes { get; set; }
+        public ObservableCollection<NetworkInterfaceInfo> NetworkInterfaces =>
+           new ObservableCollection<NetworkInterfaceInfo>(_scanProcessorStates.AvailableNetworkInterfaces);
+
+        public NetworkInterfaceInfo SelectedNetworkInterface
+        {
+            get => _scanProcessorStates.SelectedNetworkInterface;
+            set
+            {
+                _scanProcessorStates.SelectedNetworkInterface = value;
+                OnPropertyChanged();
+            }
+        }
 
 
         public ScanProcessorStatesViewModel(ILogger logger, LocalScanProcessorStates scanProcessorStates)
@@ -24,6 +37,7 @@ namespace QuantumSecure.ViewModels
                 _logger = logger; _scanProcessorStates = scanProcessorStates;
                 _scanProcessorStates.PropertyChanged += OnScanProcessorStatesChanged;
                 EndpointTypes = new ObservableCollection<string>(_scanProcessorStates.EndpointTypes);
+                LoadNetworkInterfaces();
 
             }
             catch (Exception ex)
@@ -39,7 +53,11 @@ namespace QuantumSecure.ViewModels
         public string CompletedMessage => _scanProcessorStates.CompletedMessage;
         public string RunningMessage => _scanProcessorStates.RunningMessage;
         public List<MonitorIP> SelectedDevices => _scanProcessorStates.SelectedDevices.ToList();
-
+        public void LoadNetworkInterfaces()
+        {
+            _scanProcessorStates.AvailableNetworkInterfaces = NetworkUtils.GetSuitableNetworkInterfaces(_logger,_scanProcessorStates);
+            _scanProcessorStates.SelectedNetworkInterface = _scanProcessorStates.AvailableNetworkInterfaces.FirstOrDefault();
+        }
         public async Task Scan()
         {
             IsPopupVisible = true;
@@ -73,40 +91,40 @@ namespace QuantumSecure.ViewModels
         {
             OnPropertyChanged(e.PropertyName);
             UpdatePopupMessage();
-         
+
         }
 
         private void UpdatePopupMessage()
         {
             PopupMessage = $"{RunningMessage}\n{CompletedMessage}";
-         
+
         }
-           
 
-     public async Task<List<MonitorIP>> ScanForHosts()
-    {
-        // Reset any previous state
-        IsPopupVisible = true;
-        await _scanProcessorStates.Scan().ConfigureAwait(false);
 
-        // Return the detected hosts
-        return _scanProcessorStates.ActiveDevices.ToList();
-    }
-
-     public async Task AddServices()
-    {
-            await _scanProcessorStates.AddServices().ConfigureAwait(false);
-    }
-
-    public async Task AddSelectedHosts(List<MonitorIP> selectedServices)
-    {
-            _scanProcessorStates.SelectedDevices.Clear();
-        foreach (var service in selectedServices)
+        public async Task<List<MonitorIP>> ScanForHosts()
         {
-             _scanProcessorStates.SelectedDevices.Add(service);
+            // Reset any previous state
+            IsPopupVisible = true;
+            await _scanProcessorStates.Scan().ConfigureAwait(false);
+
+            // Return the detected hosts
+            return _scanProcessorStates.ActiveDevices.ToList();
         }
-        //IsPopupVisible = false;
+
+        public async Task AddServices()
+        {
+            await _scanProcessorStates.AddServices().ConfigureAwait(false);
+        }
+
+        public async Task AddSelectedHosts(List<MonitorIP> selectedServices)
+        {
+            _scanProcessorStates.SelectedDevices.Clear();
+            foreach (var service in selectedServices)
+            {
+                _scanProcessorStates.SelectedDevices.Add(service);
+            }
+            //IsPopupVisible = false;
+        }
     }
-}
 
 }
