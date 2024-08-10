@@ -14,7 +14,6 @@ namespace QuantumSecure.ViewModels
         private LocalScanProcessorStates _scanProcessorStates;
         // public ICommand ShowPopupCommand { get; private set; }
         private ILogger _logger;
-        private string _popupMessageType = "";
         public ObservableCollection<string> EndpointTypes { get; set; }
         public ObservableCollection<NetworkInterfaceInfo> NetworkInterfaces =>
            new ObservableCollection<NetworkInterfaceInfo>(_scanProcessorStates.AvailableNetworkInterfaces);
@@ -35,7 +34,7 @@ namespace QuantumSecure.ViewModels
             try
             {
                 _logger = logger; _scanProcessorStates = scanProcessorStates;
-                _scanProcessorStates.PropertyChanged += OnScanProcessorStatesChanged;
+                _scanProcessorStates.UpdateMessage+= UpdatePopupMessage;
                 EndpointTypes = new ObservableCollection<string>(_scanProcessorStates.EndpointTypes);
                 LoadNetworkInterfaces();
 
@@ -47,11 +46,7 @@ namespace QuantumSecure.ViewModels
 
 
         }
-
-        public bool IsRunning => _scanProcessorStates.IsRunning;
-        public bool IsSuccess => _scanProcessorStates.IsSuccess;
-        public string CompletedMessage => _scanProcessorStates.CompletedMessage;
-        public string RunningMessage => _scanProcessorStates.RunningMessage;
+       
         public List<MonitorIP> SelectedDevices => _scanProcessorStates.SelectedDevices.ToList();
         public void LoadNetworkInterfaces()
         {
@@ -61,11 +56,11 @@ namespace QuantumSecure.ViewModels
         public async Task Scan()
         {
             IsPopupVisible = true;
-            await _scanProcessorStates.Scan().ConfigureAwait(false);
+            await _scanProcessorStates.Scan();
         }
         public async Task Cancel()
         {
-            await _scanProcessorStates.Cancel().ConfigureAwait(false);
+            await _scanProcessorStates.Cancel();
         }
 
         public string DefaultEndpointType
@@ -87,16 +82,10 @@ namespace QuantumSecure.ViewModels
                 OnPropertyChanged();
             }
         }
-        private void OnScanProcessorStatesChanged(object sender, PropertyChangedEventArgs e)
-        {
-            OnPropertyChanged(e.PropertyName);
-            UpdatePopupMessage();
-
-        }
 
         private void UpdatePopupMessage()
         {
-            PopupMessage = $"{RunningMessage}\n{CompletedMessage}";
+            PopupMessage = $"{_scanProcessorStates.RunningMessage}\n{_scanProcessorStates.CompletedMessage}";
 
         }
 
