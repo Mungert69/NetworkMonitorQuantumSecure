@@ -79,7 +79,7 @@ public partial class ScanPage : ContentPage
 
             LoadingSection.IsVisible = false;
 
-            if (detectedHosts != null )
+            if (detectedHosts != null && detectedHosts.Count > 0)
             {
                 HostsCollectionView.ItemsSource = detectedHosts;
                 ResultsSection.IsVisible = true;
