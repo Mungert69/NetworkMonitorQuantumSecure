@@ -7,12 +7,14 @@ using Microsoft.Maui.Controls;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 using NetworkMonitor.Utils;
+using NetworkMonitor.Api.Services;
 namespace QuantumSecure.ViewModels
 {
     public class ScanProcessorStatesViewModel : BasePopupViewModel
     {
         private LocalScanProcessorStates _scanProcessorStates;
-              private ILogger _logger;
+        private ILogger _logger;
+        private readonly IApiService _apiService;
         public ObservableCollection<string> EndpointTypes { get; set; }
         public ObservableCollection<NetworkInterfaceInfo> NetworkInterfaces =>
            new ObservableCollection<NetworkInterfaceInfo>(_scanProcessorStates.AvailableNetworkInterfaces);
@@ -29,12 +31,13 @@ namespace QuantumSecure.ViewModels
         }
 
 
-        public ScanProcessorStatesViewModel(ILogger logger, LocalScanProcessorStates scanProcessorStates)
+        public ScanProcessorStatesViewModel(ILogger logger, LocalScanProcessorStates scanProcessorStates, IApiService apiService)
         {
             try
             {
                 _logger = logger; _scanProcessorStates = scanProcessorStates;
-                  _scanProcessorStates.PropertyChanged += OnProcessorStatesChanged;
+                _apiService = apiService;
+                _scanProcessorStates.PropertyChanged += OnProcessorStatesChanged;
                 EndpointTypes = new ObservableCollection<string>(_scanProcessorStates.EndpointTypes);
                 LoadNetworkInterfaces();
 
@@ -130,6 +133,60 @@ namespace QuantumSecure.ViewModels
                 _scanProcessorStates.SelectedDevices.Add(service);
             }
             //IsPopupVisible = false;
+        }
+        public async Task CheckServices()
+        {
+            // Convert the selected devices to a list of IConnectionObject (HostObject)
+            var connectionObjects = new List<IConnectionObject>();
+
+            foreach (var device in   _scanProcessorStates.SelectedDevices)
+            {
+                IConnectionObject hostObject;
+                if (device.EndPointType == "quantum")
+                {
+                    hostObject = new QuantumHostObject
+                    {
+                        Address = device.Address, // Assuming MonitorIP has a property IPAddress
+                        Port = device.Port,         // Assuming MonitorIP has a property Port
+                        Timeout = 20000             // Default timeout, can be customized
+                    };
+                }
+                else
+                {
+                    hostObject = new HostObject
+                    {
+                        Address = device.Address, // Assuming MonitorIP has a property IPAddress
+                        Port = device.Port,         // Assuming MonitorIP has a property Port
+                        Timeout = 10000,             // Default timeout, can be customized
+                        EndPointType=device.EndPointType
+                    };
+                }
+
+
+                connectionObjects.Add(hostObject);
+            }
+
+            // Use the ApiService to check the connections
+            var results = await _apiService.CheckConnections(connectionObjects);
+
+            // Handle the results (e.g., display them or log them)
+            foreach (var result in results)
+            {
+                string message = "";
+                if (result.Success)
+                {
+                    message = $"Check succeeded for {result.Data.TestedAddress} with status {result.Data.ResultStatus}\n";
+                    _logger.LogInformation(message);
+                }
+                else
+                {
+                    message = $"Check failed for {result.Data.TestedAddress} with status {result.Data.ResultStatus}\n";
+                    _logger.LogWarning(message);
+                }
+                _scanProcessorStates.CompletedMessage += message;
+            }
+
+            // Update the UI or state based on results, if necessary
         }
     }
 

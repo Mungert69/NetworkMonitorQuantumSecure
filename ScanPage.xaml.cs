@@ -118,6 +118,22 @@ public partial class ScanPage : ContentPage
         }
     }
 
+     private async void OnCheckServicesClicked(object sender, EventArgs e)
+    {
+        try
+        {
+            await _scanProcessorStatesViewModel.CheckServices();
+            await DisplayAlert("Success", $"Checked {_scanProcessorStatesViewModel.SelectedDevices.Count} Services", "OK");
+            
+          
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Error", $"Could not add services. Error was: {ex.Message}", "OK");
+            _logger.LogError($"Could not add services. Error was: {ex}");
+        }
+    }
+
     private async void OnCancelClicked(object sender, EventArgs e)
     {
         try

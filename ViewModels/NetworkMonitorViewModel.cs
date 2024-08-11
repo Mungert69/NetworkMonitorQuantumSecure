@@ -109,7 +109,7 @@ namespace QuantumSecure.ViewModels
                         result = await _apiService.CheckIcmp(hostObject);
                         break;
                     case "quantum":
-                        var quantumResult = await _apiService.CheckQuantum(new UrlObject { Url = Address, Port = Port });
+                        var quantumResult = await _apiService.CheckQuantum(new QuantumHostObject { Address = Address, Port = Port });
                         result = new TResultObj<DataObj>
                         {
                             Success = quantumResult.Success,
