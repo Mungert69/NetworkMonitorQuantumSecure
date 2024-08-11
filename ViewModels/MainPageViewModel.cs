@@ -183,10 +183,10 @@ namespace QuantumSecure.ViewModels
                     UpdateTaskCompletion("Authorize Agent", _netConfig.AgentUserFlow.IsAuthorized);
                     break;
                 case nameof(AgentUserFlow.IsLoggedInWebsite):
-                    UpdateTaskCompletion("Login Quantum Secure", _netConfig.AgentUserFlow.IsLoggedInWebsite);
+                    UpdateTaskCompletion("Login Free Network Monitor", _netConfig.AgentUserFlow.IsLoggedInWebsite);
                     break;
                 case nameof(AgentUserFlow.IsHostsAdded):
-                    UpdateTaskCompletion("Add Hosts", _netConfig.AgentUserFlow.IsHostsAdded);
+                    UpdateTaskCompletion("Scan for Hosts", _netConfig.AgentUserFlow.IsHostsAdded);
                     break;
             }
         }
@@ -209,23 +209,24 @@ namespace QuantumSecure.ViewModels
             }
         }
 
+       public event PropertyChangedEventHandler? PropertyChanged;
+
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        protected void SetProperty<T>(ref T storage, T value, [CallerMemberName] string propertyName = null)
+        protected bool SetProperty<T>(ref T storage, T value, [CallerMemberName] string? propertyName = null)
         {
             if (Equals(storage, value))
             {
-                return;
+                return false;
             }
 
             storage = value;
             OnPropertyChanged(propertyName);
+            return true;
         }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
     }
 
     public class TaskItem : INotifyPropertyChanged

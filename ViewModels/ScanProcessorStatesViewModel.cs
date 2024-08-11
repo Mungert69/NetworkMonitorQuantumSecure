@@ -12,12 +12,12 @@ namespace QuantumSecure.ViewModels
     public class ScanProcessorStatesViewModel : BasePopupViewModel
     {
         private LocalScanProcessorStates _scanProcessorStates;
-        // public ICommand ShowPopupCommand { get; private set; }
-        private ILogger _logger;
+              private ILogger _logger;
         public ObservableCollection<string> EndpointTypes { get; set; }
         public ObservableCollection<NetworkInterfaceInfo> NetworkInterfaces =>
            new ObservableCollection<NetworkInterfaceInfo>(_scanProcessorStates.AvailableNetworkInterfaces);
-
+        public string RunningMessage => _scanProcessorStates.RunningMessage;
+        public string CompletedMessage => _scanProcessorStates.CompletedMessage;
         public NetworkInterfaceInfo SelectedNetworkInterface
         {
             get => _scanProcessorStates.SelectedNetworkInterface;
@@ -34,7 +34,7 @@ namespace QuantumSecure.ViewModels
             try
             {
                 _logger = logger; _scanProcessorStates = scanProcessorStates;
-                _scanProcessorStates.UpdateMessage+= UpdatePopupMessage;
+                  _scanProcessorStates.PropertyChanged += OnProcessorStatesChanged;
                 EndpointTypes = new ObservableCollection<string>(_scanProcessorStates.EndpointTypes);
                 LoadNetworkInterfaces();
 
@@ -46,11 +46,11 @@ namespace QuantumSecure.ViewModels
 
 
         }
-       
+
         public List<MonitorIP> SelectedDevices => _scanProcessorStates.SelectedDevices.ToList();
         public void LoadNetworkInterfaces()
         {
-            _scanProcessorStates.AvailableNetworkInterfaces = NetworkUtils.GetSuitableNetworkInterfaces(_logger,_scanProcessorStates);
+            _scanProcessorStates.AvailableNetworkInterfaces = NetworkUtils.GetSuitableNetworkInterfaces(_logger, _scanProcessorStates);
             _scanProcessorStates.SelectedNetworkInterface = _scanProcessorStates.AvailableNetworkInterfaces.FirstOrDefault();
         }
         public async Task Scan()
@@ -83,13 +83,30 @@ namespace QuantumSecure.ViewModels
             }
         }
 
-        private void UpdatePopupMessage()
+        private void OnProcessorStatesChanged(object sender, PropertyChangedEventArgs e)
         {
-            PopupMessage = $"{_scanProcessorStates.RunningMessage}\n{_scanProcessorStates.CompletedMessage}";
+            OnPropertyChanged(e.PropertyName);
 
+            if (IsPopupVisible)
+            {
+                UpdatePopupMessage(e.PropertyName);
+            }
         }
 
+        private void UpdatePopupMessage(string propertyName)
+        {
+            switch (propertyName)
+            {
+                case nameof(RunningMessage):
+                    PopupMessage = $"{RunningMessage}\n{CompletedMessage}";
 
+                    break;
+                case nameof(CompletedMessage):
+                    PopupMessage = $"{RunningMessage}\n{CompletedMessage}";
+
+                    break;
+            }
+        }
         public async Task<List<MonitorIP>> ScanForHosts()
         {
             // Reset any previous state
