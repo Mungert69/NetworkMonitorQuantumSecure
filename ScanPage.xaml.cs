@@ -104,12 +104,8 @@ public partial class ScanPage : ContentPage
         try
         {
             await _scanProcessorStatesViewModel.AddServices();
-            await DisplayAlert("Success", $"Added {_scanProcessorStatesViewModel.SelectedDevices.Count} Services", "OK");
+            await DisplayAlert("Success", $"Added {_scanProcessorStatesViewModel.SelectedDevices.Count} services to be monitored. You will received alerts if any of these servers are down. View host monitoring details under the Monitored Hosts tab. Alternatively you can manage and view more detailed host data at https://freenetworkmonitor.click/dashboard. Login using the same email you registerd this agent with.", "OK");
             
-            // Reset the page to initial state
-            ResultsSection.IsVisible = false;
-            ScanSection.IsVisible = true;
-            HostsCollectionView.SelectedItems.Clear();
         }
         catch (Exception ex)
         {
