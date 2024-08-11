@@ -139,7 +139,7 @@ namespace QuantumSecure.ViewModels
             // Convert the selected devices to a list of IConnectionObject (HostObject)
             var connectionObjects = new List<IConnectionObject>();
 
-            foreach (var device in   _scanProcessorStates.SelectedDevices)
+            foreach (var device in _scanProcessorStates.SelectedDevices)
             {
                 IConnectionObject hostObject;
                 if (device.EndPointType == "quantum")
@@ -158,7 +158,7 @@ namespace QuantumSecure.ViewModels
                         Address = device.Address, // Assuming MonitorIP has a property IPAddress
                         Port = device.Port,         // Assuming MonitorIP has a property Port
                         Timeout = 10000,             // Default timeout, can be customized
-                        EndPointType=device.EndPointType
+                        EndPointType = device.EndPointType
                     };
                 }
 
@@ -168,19 +168,19 @@ namespace QuantumSecure.ViewModels
 
             // Use the ApiService to check the connections
             var results = await _apiService.CheckConnections(connectionObjects);
-
+            _scanProcessorStates.CompletedMessage += "\n\nChecking status of selected services...\n\n";
             // Handle the results (e.g., display them or log them)
             foreach (var result in results)
             {
                 string message = "";
                 if (result.Success)
                 {
-                    message = $"Check succeeded for {result.Data.TestedAddress} with status {result.Data.ResultStatus}\n";
+                    message = $"Performed a successful {result.Data.CheckPerformed} check for {result.Data.TestedAddress} on port {result.Data.TestedPort} with status {result.Data.ResultStatus}\n";
                     _logger.LogInformation(message);
                 }
                 else
                 {
-                    message = $"Check failed for {result.Data.TestedAddress} with status {result.Data.ResultStatus}\n";
+                    message = $"{result.Data.CheckPerformed} check failed for {result.Data.TestedAddress} on port {result.Data.TestedPort} with status {result.Data.ResultStatus}\n";
                     _logger.LogWarning(message);
                 }
                 _scanProcessorStates.CompletedMessage += message;

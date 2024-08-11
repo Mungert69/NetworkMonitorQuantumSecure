@@ -118,19 +118,38 @@ public partial class ScanPage : ContentPage
         }
     }
 
+     private async void OnClearServicesClicked(object sender, EventArgs e)
+    {
+        try
+        {
+            ResultsSection.IsVisible = false;
+            ScanSection.IsVisible = true;
+            HostsCollectionView.SelectedItems.Clear();
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Error", $"Could not clear services. Error was: {ex.Message}", "OK");
+            _logger.LogError($"Could not clear services. Error was: {ex}");
+        }
+    }
+
+
      private async void OnCheckServicesClicked(object sender, EventArgs e)
     {
         try
         {
+              LoadingSection.IsVisible = true;
+                ResultsSection.IsVisible = false;
             await _scanProcessorStatesViewModel.CheckServices();
-            await DisplayAlert("Success", $"Checked {_scanProcessorStatesViewModel.SelectedDevices.Count} Services", "OK");
-            
+            await DisplayAlert("Success", $"Checked {_scanProcessorStatesViewModel.SelectedDevices.Count} Services. Check the Result Output for the status of each service checked.", "OK");
+            LoadingSection.IsVisible = false;
+              ResultsSection.IsVisible = true;
           
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Error", $"Could not add services. Error was: {ex.Message}", "OK");
-            _logger.LogError($"Could not add services. Error was: {ex}");
+            await DisplayAlert("Error", $"Could not check services. Error was: {ex.Message}", "OK");
+            _logger.LogError($"Could not check services. Error was: {ex}");
         }
     }
 

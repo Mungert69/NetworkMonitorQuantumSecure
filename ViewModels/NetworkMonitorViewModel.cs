@@ -19,7 +19,7 @@ namespace QuantumSecure.ViewModels
         private string _responseTime;
         private string _resultStatus;
 
-        public ObservableCollection<string> EndpointTypes { get; } = new ObservableCollection<string> { "Http", "Smtp", "Dns", "Icmp", "Quantum" };
+        public ObservableCollection<string> EndpointTypes { get; } = new ObservableCollection<string> { "Http", "SSL Cert", "Smtp", "Dns", "Icmp", "Quantum", "Raw Connect" };
 
         public string SelectedEndpointType
         {
@@ -99,6 +99,9 @@ namespace QuantumSecure.ViewModels
                     case "http":
                         result = await _apiService.CheckHttp(hostObject);
                         break;
+                    case "ssl cert":
+                        result = await _apiService.CheckHttps(hostObject);
+                        break;
                     case "smtp":
                         result = await _apiService.CheckSmtp(hostObject);
                         break;
@@ -107,6 +110,9 @@ namespace QuantumSecure.ViewModels
                         break;
                     case "icmp":
                         result = await _apiService.CheckIcmp(hostObject);
+                        break;
+                     case "raw connect":
+                        result = await _apiService.CheckRawconnect(hostObject);
                         break;
                     case "quantum":
                         var quantumResult = await _apiService.CheckQuantum(new QuantumHostObject { Address = Address, Port = Port });

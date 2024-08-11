@@ -56,7 +56,7 @@
 
                             <!-- Loading Indicator -->
                             <StackLayout x:Name="LoadingSection"
-                                         IsVisible="false">
+                                         IsVisible="false"  Spacing="10">
                                    <ActivityIndicator x:Name="ProgressIndicator"
                                                       IsRunning="True"
                                                       HorizontalOptions="Center"/>
@@ -91,21 +91,36 @@
                                                  </DataTemplate>
                                           </CollectionView.ItemTemplate>
                                    </CollectionView>
-                                   <Button x:Name="AddButton"
-                                           Text="Add Services"
-                                           Clicked="OnAddServicesClicked"
-                                           HorizontalOptions="Center"
-                                           WidthRequest="200"/>
                                    <Button x:Name="CheckButton"
                                            Text="Check Services"
                                            Clicked="OnCheckServicesClicked"
                                            HorizontalOptions="Center"
                                            WidthRequest="200"/>
+                                   <Button x:Name="AddButton"
+                                           Text="Monitor Services"
+                                           Clicked="OnAddServicesClicked"
+                                           HorizontalOptions="Center"
+                                           WidthRequest="200"/>
+                                    <Button x:Name="ClearButton"
+                                           Text="Clear Services"
+                                           Clicked="OnClearServicesClicked"
+                                           HorizontalOptions="Center"
+                                           WidthRequest="200"/>
+
+                            </StackLayout>
+                            <StackLayout Spacing="10"
+                                         HorizontalOptions="Center"
+                                         VerticalOptions="Center">
+                                   <Label Text="Result Output"
+                                          FontSize="18"
+                                          TextColor="{DynamicResource Secondary}"
+                                          HorizontalOptions="Center"
+                                          HorizontalTextAlignment="Center"/>
+                                   <view:CustomPopupView x:Name="CustomPopupView"
+                                                         AbsoluteLayout.LayoutBounds="0,0,1,1"
+                                                         AbsoluteLayout.LayoutFlags="All"/>
                             </StackLayout>
 
-                            <view:CustomPopupView x:Name="CustomPopupView"
-                                                  AbsoluteLayout.LayoutBounds="0,0,1,1"
-                                                  AbsoluteLayout.LayoutFlags="All"/>
                      </StackLayout>
 
                      <!-- Agent Disabled Message -->
