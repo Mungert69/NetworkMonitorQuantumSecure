@@ -208,7 +208,8 @@ namespace QuantumSecure
                var logger = provider.GetRequiredService<ILogger<ScanProcessorStatesViewModel>>();
                var scanProcessorStates = provider.GetRequiredService<LocalScanProcessorStates>();
                // Choose the appropriate constructor
-               return new ScanProcessorStatesViewModel(logger, scanProcessorStates);
+               var apiService = provider.GetRequiredService<IApiService>();
+               return new ScanProcessorStatesViewModel(logger, scanProcessorStates, apiService);
            });
 
             builder.Services.AddSingleton(provider =>
