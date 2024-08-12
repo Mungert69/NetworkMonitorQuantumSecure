@@ -108,11 +108,12 @@ public class StatusIndicator : ContentView
             if (IsAnimated != value)
             {
                 SetValue(IsAnimatedProperty, value);
-                if (value == true) {
+                if (value == true)
+                {
                     _animationCts?.Dispose(); // Dispose the old CTS if it exists
                     _animationCts = new CancellationTokenSource();
-                    StartPulsingAnimation(_animationCts.Token);
-                    StartRippleAnimation(_animationCts.Token);
+                    var pulsingTask = StartPulsingAnimation(_animationCts.Token);
+                    var rippleTask = StartRippleAnimation(_animationCts.Token);
 
                     // Start the timer
                     _animationTimer.Start();
@@ -210,8 +211,8 @@ public class StatusIndicator : ContentView
         {
             _animationCts?.Dispose(); // Dispose the old CTS if it exists
             _animationCts = new CancellationTokenSource();
-            StartPulsingAnimation(_animationCts.Token);
-            StartRippleAnimation(_animationCts.Token);
+            var pulsingTask = StartPulsingAnimation(_animationCts.Token);
+            var rippleTask = StartRippleAnimation(_animationCts.Token);
 
             // Start the timer
             _animationTimer.Start();
@@ -224,10 +225,10 @@ public class StatusIndicator : ContentView
     }
     private void OnAnimationTimerElapsed(object sender, ElapsedEventArgs e)
     {
-        Device.BeginInvokeOnMainThread(() =>
-        {
-            _animationCts.Cancel();
-        });
+        this.Dispatcher.Dispatch(() =>
+   {
+       _animationCts.Cancel();
+   });
     }
 
     private async Task StartPulsingAnimation(CancellationToken cancellationToken)
@@ -252,7 +253,7 @@ public class StatusIndicator : ContentView
         _ripple.Opacity = 0.07;
         _ripple.Scale = 1;
         double scale = CalculateRippleScale(PacketsLostPercentage);
-     
+
         while (!cancellationToken.IsCancellationRequested && IsUp && IsAnimated)
         {
             uint animationDuration = CalculateRippleAnimationDuration(PacketsLostPercentage);
