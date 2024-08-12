@@ -12,11 +12,6 @@ namespace QuantumSecure.ViewModels
         private LocalProcessorStates _processorStates;
         public ICommand ShowPopupCommand { get; private set; }
         private ILogger _logger;
-        //public ICommand ClosePopupCommand { get; private set; }
-
-        //private bool _isPopupVisible;
-        //private string _popupMessage;
-
         private string _popupMessageType="";
 
         public ProcessorStatesViewModel(ILogger logger, LocalProcessorStates processorStates)
@@ -48,26 +43,6 @@ namespace QuantumSecure.ViewModels
 
         public string RunningMessage => _processorStates.RunningMessage;
         public string ConnectRunningMessage => _processorStates.ConnectRunningMessage;
-
-       /* public bool IsPopupVisible
-        {
-            get => _isPopupVisible;
-            set
-            {
-                _isPopupVisible = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public string PopupMessage
-        {
-            get => _popupMessage;
-            set
-            {
-                _popupMessage = value;
-                OnPropertyChanged();
-            }
-        }*/
 
         private void OnProcessorStatesChanged(object sender, PropertyChangedEventArgs e)
         {
@@ -127,11 +102,6 @@ namespace QuantumSecure.ViewModels
             IsPopupVisible = true;
         }
 
-        /*public event PropertyChangedEventHandler PropertyChanged;
-        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = "")
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }*/
     }
 
 }

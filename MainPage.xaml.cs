@@ -14,28 +14,33 @@ public partial class MainPage : ContentPage
     private NetConnectConfig _netConfig;
     private ILogger _logger;
     private CancellationTokenSource _cancellationTokenSource;
-    private IPlatformService _platformService;
+    private MainPageViewModel _mainPageViewModel;
 
 
-    public MainPage(IAuthService authService, NetConnectConfig netConfig, ILogger logger, IPlatformService platformService, ProcessorStatesViewModel processorStatesViewModel)
+    public MainPage(IAuthService authService, NetConnectConfig netConfig, ILogger logger, MainPageViewModel mainPageViewModel, ProcessorStatesViewModel processorStatesViewModel)
     {
-        InitializeComponent();
-        _authService = authService;
-        _netConfig = netConfig;
-        _logger = logger;
-        _platformService = platformService;
-
-        //Application.Current.UserAppTheme = AppTheme.Dark;
-        var mainPageViewModel = new MainPageViewModel(_netConfig, Authorize, OpenLoginWebsite, ScanHosts, _platformService, _logger);
-        mainPageViewModel.ShowLoadingMessage += (sender, show) => ShowLoadingNoCancel(show);
-        BindingContext= mainPageViewModel;
-
-        CustomPopupView.BindingContext = processorStatesViewModel;
-        ProcessorStatesView.BindingContext = processorStatesViewModel;
-       /* WeakReferenceMessenger.Default.Register<ShowLoadingMessage>(this, (recipient, message) =>
+        try
         {
-            ShowLoadingNoCancel(message.Show);
-        });*/
+            InitializeComponent();
+            _authService = authService;
+            _netConfig = netConfig;
+            _logger = logger;
+            //Application.Current.UserAppTheme = AppTheme.Dark;
+            _mainPageViewModel = mainPageViewModel;
+            _mainPageViewModel.ShowLoadingMessage += (sender, show) => ShowLoadingNoCancel(show);
+            _mainPageViewModel.AuthorizeAction += Authorize;
+            _mainPageViewModel.LoginAction += OpenLoginWebsite;
+            _mainPageViewModel.AddHostsAction += ScanHosts;
+            _mainPageViewModel.SetupTasks();
+            BindingContext = _mainPageViewModel;
+
+            CustomPopupView.BindingContext = processorStatesViewModel;
+            ProcessorStatesView.BindingContext = processorStatesViewModel;
+        }
+        catch (Exception ex)
+        {
+            if (_logger != null) _logger.LogError($" Error : Unable to load MainPage. Error was: {ex.Message}");
+        }
 
     }
 
@@ -46,19 +51,20 @@ public partial class MainPage : ContentPage
         try
         {
 
-            var resultInit = await _authService.InitializeAsync();
+            var resultInit = await Task.Run(async () => await  _authService.InitializeAsync());
+
             if (!resultInit.Success)
             {
                 await DisplayAlert("Error", resultInit.Message, "OK");
-                ((MainPageViewModel)BindingContext).IsPolling = false; // Reset the flag
+                _mainPageViewModel.IsPolling = false; // Reset the flag
                 return;
             }
-            var resultSend = await _authService.SendAuthRequestAsync();
+            var resultSend = await Task.Run(async () => await _authService.SendAuthRequestAsync());
 
             if (!resultSend.Success)
             {
                 await DisplayAlert("Error", resultSend.Message, "OK");
-                ((MainPageViewModel)BindingContext).IsPolling = false; // Reset the flag
+                _mainPageViewModel.IsPolling = false; // Reset the flag
                 return;
             }
 
@@ -80,7 +86,7 @@ public partial class MainPage : ContentPage
                 // Handle the case where the URL is not available
                 await DisplayAlert("Error", "Authorization URL is not available.", "OK");
                 _logger.LogError(" Error : Authorization URL is not available.");
-                ((MainPageViewModel)BindingContext).IsPolling = false; // Reset the flag
+                _mainPageViewModel.IsPolling = false; // Reset the flag
             }
         }
         catch (Exception ex)
@@ -88,7 +94,7 @@ public partial class MainPage : ContentPage
             // Handle any exceptions
             await DisplayAlert("Error", $"Could not authorize with requested authUrl {authUrl} . Errro was : {ex.Message}", "OK");
             _logger.LogError($" Error : Could not authorize with requested authUrl {authUrl} . Errro was : {ex.ToString()}");
-            ((MainPageViewModel)BindingContext).IsPolling = false; // Reset the flag
+            _mainPageViewModel.IsPolling = false; // Reset the flag
         }
     }
 
@@ -127,7 +133,7 @@ public partial class MainPage : ContentPage
     {
         try
         {
-            ((MainPageViewModel)BindingContext).IsPolling = false; // Reset the flag
+            _mainPageViewModel.IsPolling = false; // Reset the flag
             _cancellationTokenSource?.Cancel(); // Cancel the polling operation
             CancelButton.IsVisible = false; // Hide the Cancel button
             ShowLoading(false); // Reset the content to the original state
@@ -162,37 +168,30 @@ public partial class MainPage : ContentPage
         {
             _cancellationTokenSource = new CancellationTokenSource();
             ShowLoading(true); // Show progress indicator and cancel button
-            var result = await Task.Run(async () =>
-                await _authService.PollForTokenAsync(_cancellationTokenSource.Token)); // Pass the token
+            var result= await Task.Run(async () => await _authService.PollForTokenAsync(_cancellationTokenSource.Token)); 
+            ShowLoading(false);
+            _mainPageViewModel.IsPolling = false; // Reset the flag
 
-            // Using Dispatcher.Dispatch instead of Device.BeginInvokeOnMainThread
-            Dispatcher.Dispatch(async () =>
+            if (result.Success)
             {
-                ShowLoading(false);
-                ((MainPageViewModel)BindingContext).IsPolling = false; // Reset the flag
+                 await DisplayAlert("Success", $"Authorization successful! Now login to Quantum Secure and add hosts to monitor from your device. choose '{_netConfig.MonitorLocation}' as the monitor location . ", "OK");
 
-                if (result.Success)
-                {
-                    //(BindingContext as MainPageViewModel)?.UpdateTaskCompletion("Authorize Agent", true);
+            }
+            else
+            {
+                await DisplayAlert("Fail", result.Message, "OK");
+            }
 
-                    await DisplayAlert("Success", $"Authorization successful! Now login to Quantum Secure and add hosts to monitor from your device. choose '{_netConfig.MonitorLocation}' as the monitor location . ", "OK");
-
-                }
-                else
-                {
-                    await DisplayAlert("Fail", result.Message, "OK");
-                }
-            });
         }
         catch (Exception ex)
         {
             _logger.LogError($" Error : Unable to complete Polling in background. Error was : {ex.Message}");
-            ((MainPageViewModel)BindingContext).IsPolling = false; // Reset the flag
+            _mainPageViewModel.IsPolling = false; // Reset the flag
         }
         finally
         {
             _cancellationTokenSource?.Dispose();
-            
+
         }
 
     }

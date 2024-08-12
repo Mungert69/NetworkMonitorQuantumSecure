@@ -15,7 +15,7 @@ public partial class ScanPage : ContentPage
 
     private IPlatformService _platformService;
 
-    public ScanPage(ILogger logger, ScanProcessorStatesViewModel scanProcessorStatesViewModel,IPlatformService platformService)
+    public ScanPage(ILogger logger, ScanProcessorStatesViewModel scanProcessorStatesViewModel, IPlatformService platformService)
     {
         InitializeComponent();
         _scanProcessorStatesViewModel = scanProcessorStatesViewModel;
@@ -24,16 +24,16 @@ public partial class ScanPage : ContentPage
         CustomPopupView.BindingContext = scanProcessorStatesViewModel;
         BindingContext = scanProcessorStatesViewModel;
         EndpointTypePicker.SelectedIndexChanged += OnEndpointTypePickerSelectedIndexChanged;
-        
+
         UpdateVisibility();
 
     }
 
-     protected override void OnAppearing()
+    protected override void OnAppearing()
     {
         base.OnAppearing();
         // Update _isAgentEnabled when the page appears
-         UpdateVisibility();
+        UpdateVisibility();
     }
 
     private void UpdateVisibility()
@@ -67,7 +67,7 @@ public partial class ScanPage : ContentPage
 
     }
 
-      private async void OnScanClicked(object sender, EventArgs e)
+    private async void OnScanClicked(object sender, EventArgs e)
     {
         try
         {
@@ -105,7 +105,7 @@ public partial class ScanPage : ContentPage
         {
             await _scanProcessorStatesViewModel.AddServices();
             await DisplayAlert("Success", $"Added {_scanProcessorStatesViewModel.SelectedDevices.Count} services to be monitored. You will receive alerts if any of these servers are down. View host monitoring details under the Monitored Hosts tab. Alternatively you can manage and view more detailed host data at https://freenetworkmonitor.click/dashboard. Login using the same email you registerd this agent with.", "OK");
-            
+
         }
         catch (Exception ex)
         {
@@ -114,7 +114,7 @@ public partial class ScanPage : ContentPage
         }
     }
 
-     private async void OnClearServicesClicked(object sender, EventArgs e)
+    private async void OnClearServicesClicked(object sender, EventArgs e)
     {
         try
         {
@@ -130,22 +130,22 @@ public partial class ScanPage : ContentPage
     }
 
 
-     private async void OnCheckServicesClicked(object sender, EventArgs e)
+    private async void OnCheckServicesClicked(object sender, EventArgs e)
     {
         try
         {
-              LoadingSection.IsVisible = true;
-                ResultsSection.IsVisible = false;
+            LoadingSection.IsVisible = true;
+            ResultsSection.IsVisible = false;
             await _scanProcessorStatesViewModel.CheckServices();
             await DisplayAlert("Success", $"Checked {_scanProcessorStatesViewModel.SelectedDevices.Count} Services. Check the Result Output for the status of each service checked.", "OK");
             LoadingSection.IsVisible = false;
-              ResultsSection.IsVisible = true;
-          
+            ResultsSection.IsVisible = true;
+
         }
         catch (Exception ex)
         {
             await DisplayAlert("Error", $"Could not check services. Error was: {ex.Message}", "OK");
-            _logger.LogError($"Could not check services. Error was: {ex}");
+            _logger.LogError($"Could not check services. Error was: {ex.Message}");
         }
     }
 
@@ -171,7 +171,7 @@ public partial class ScanPage : ContentPage
             await _scanProcessorStatesViewModel.AddSelectedHosts(selectedHosts);
         }
     }
-      private async void OnGoHomeClicked(object sender, EventArgs e)
+    private async void OnGoHomeClicked(object sender, EventArgs e)
     {
         await Shell.Current.GoToAsync("//Home");
     }

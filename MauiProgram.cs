@@ -224,9 +224,17 @@ namespace QuantumSecure
                 var authService = provider.GetRequiredService<IAuthService>();
                 var netConfig = provider.GetRequiredService<NetConnectConfig>();
                 var logger = provider.GetRequiredService<ILogger<MainPage>>();
-                var platformService = provider.GetRequiredService<IPlatformService>();
                 var processorStatesViewModel = provider.GetRequiredService<ProcessorStatesViewModel>();
-                return new MainPage(authService, netConfig, logger, platformService, processorStatesViewModel);
+                var mainPageViewModel=provider.GetRequiredService<MainPageViewModel>();
+                return new MainPage(authService, netConfig, logger, mainPageViewModel, processorStatesViewModel);
+            });
+
+             builder.Services.AddSingleton(provider =>
+            {
+               var netConfig = provider.GetRequiredService<NetConnectConfig>();
+                var logger = provider.GetRequiredService<ILogger<MainPageViewModel>>();
+                var platformService = provider.GetRequiredService<IPlatformService>();
+                return new MainPageViewModel( netConfig,  platformService, logger);
             });
 
             builder.Services.AddSingleton(provider =>
