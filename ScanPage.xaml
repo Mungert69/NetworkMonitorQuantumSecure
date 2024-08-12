@@ -46,6 +46,24 @@
                                           <Label Text="Use Default Endpoint Type"
                                                  VerticalOptions="Center"/>
                                    </StackLayout>
+                                   <StackLayout Orientation="Horizontal"
+                                                HorizontalOptions="Center">
+
+                                          <StackLayout Orientation="Horizontal"
+                                                       HorizontalOptions="Center">
+                                                 <CheckBox x:Name="UseFastScanCheckBox"
+                                                           IsChecked="{Binding UseFastScan}"/>
+                                                 <Label Text="Use Fast Scan"
+                                                        VerticalOptions="Center"/>
+                                          </StackLayout>
+                                          <StackLayout Orientation="Horizontal"
+                                                       HorizontalOptions="Center">
+                                                 <CheckBox x:Name="LimitPortsCheckBox"
+                                                           IsChecked="{Binding LimitPorts}"/>
+                                                 <Label Text="Limit Ports"
+                                                        VerticalOptions="Center"/>
+                                          </StackLayout>
+                                   </StackLayout>
 
                                    <Button x:Name="ScanButton"
                                            Text="Scan"
@@ -56,7 +74,8 @@
 
                             <!-- Loading Indicator -->
                             <StackLayout x:Name="LoadingSection"
-                                         IsVisible="false"  Spacing="10">
+                                         IsVisible="false"
+                                         Spacing="10">
                                    <ActivityIndicator x:Name="ProgressIndicator"
                                                       IsRunning="True"
                                                       HorizontalOptions="Center"/>
@@ -101,7 +120,7 @@
                                            Clicked="OnAddServicesClicked"
                                            HorizontalOptions="Center"
                                            WidthRequest="200"/>
-                                    <Button x:Name="ClearButton"
+                                   <Button x:Name="ClearButton"
                                            Text="Clear Services"
                                            Clicked="OnClearServicesClicked"
                                            HorizontalOptions="Center"

@@ -85,6 +85,24 @@ namespace QuantumSecure.ViewModels
                 OnPropertyChanged();
             }
         }
+          public bool UseFastScan
+        {
+            get => _scanProcessorStates.UseFastScan;
+            set
+            {
+                _scanProcessorStates.UseFastScan = value;
+                OnPropertyChanged();
+            }
+        }
+         public bool LimitPorts
+        {
+            get => _scanProcessorStates.LimitPorts;
+            set
+            {
+                _scanProcessorStates.LimitPorts = value;
+                OnPropertyChanged();
+            }
+        }
 
         private void OnProcessorStatesChanged(object sender, PropertyChangedEventArgs e)
         {
@@ -148,7 +166,7 @@ namespace QuantumSecure.ViewModels
                     {
                         Address = device.Address, // Assuming MonitorIP has a property IPAddress
                         Port = device.Port,         // Assuming MonitorIP has a property Port
-                        Timeout = 20000             // Default timeout, can be customized
+                        Timeout = 10000             // Default timeout, can be customized
                     };
                 }
                 else
@@ -167,7 +185,7 @@ namespace QuantumSecure.ViewModels
             }
 
             // Use the ApiService to check the connections
-            var results = await _apiService.CheckConnections(connectionObjects);
+            var results = await _apiService.CheckConnections(connectionObjects).ConfigureAwait(false);
             _scanProcessorStates.CompletedMessage += "\n\nChecking status of selected services...\n\n";
             // Handle the results (e.g., display them or log them)
             foreach (var result in results)
