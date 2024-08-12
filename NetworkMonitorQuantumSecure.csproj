@@ -65,17 +65,15 @@
 
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
         <PackageReference Include="CommunityToolkit.Maui" Version="8.0.1" />
-        <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.22621.3233" />
-        <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.5.240627000" />
-
         <PackageReference Include="Microsoft.Maui.Controls" Version="8.0.71" />
         <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="8.0.71" />
-
         <PackageReference Include="MetroLog.Maui" Version="2.1.0" />
         <PackageReference Include="Microsoft.Maui.Core" Version="8.0.71" />
         <PackageReference Include="Microsoft.Maui.Essentials" Version="8.0.71" />
         <PackageReference Include="Microsoft.Maui.Graphics" Version="8.0.71" />
         <PackageReference Include="Microsoft.Maui.Graphics.Win2D.WinUI.Desktop" Version="8.0.71" />
+        <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.1" />
+        <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.5.240627000" />
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="..\NetworkMonitorProcessor\NetworkMonitorProcessor-Maui.csproj" />
