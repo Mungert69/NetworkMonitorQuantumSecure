@@ -15,6 +15,9 @@ namespace QuantumSecure.ViewModels
         private IPlatformService _platformService;
 
         private ILogger _logger;
+        public Action? AuthorizeAction;
+        public Action? LoginAction;
+        public Action? AddHostsAction;
         public event EventHandler<bool> ShowLoadingMessage;
 
 
@@ -26,14 +29,10 @@ namespace QuantumSecure.ViewModels
         public bool IsPolling
         {
             get => _isPolling;
-            set
-            {
-                _isPolling = value;
-                OnPropertyChanged();
-            }
+            set => SetProperty(ref _isPolling, value);
         }
 
-       
+
 
         private async Task SetServiceStartedAsync(bool value)
         {
@@ -73,10 +72,9 @@ namespace QuantumSecure.ViewModels
             get => _showToggle;
             set
             {
-                _showToggle = value;
-                _showTasks = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(ShowTasks));
+                SetProperty(ref _showToggle, value);
+                SetProperty(ref _showTasks, value);
+
             }
         }
         private bool _showTasks = true;
@@ -88,28 +86,25 @@ namespace QuantumSecure.ViewModels
                 if (_platformService.DisableAgentOnServiceShutdown) return _showTasks && _platformService.IsServiceStarted;
                 return _platformService.IsServiceStarted;
             }
-            set
-            {
-                _showTasks = value;
-                OnPropertyChanged();
-            }
+            set => SetProperty(ref _showTasks, value);
         }
 
 
-        private  async Task ChangeServiceAsync(bool state)
+        private async Task ChangeServiceAsync(bool state)
         {
             try
             {
                 ShowToggle = false;
-                ShowLoadingMessage?.Invoke(this, true); 
-                 await Task.Delay(200); // A short delay, adjust as necessary
-                 await _platformService.ChangeServiceState(state);
+                ShowLoadingMessage?.Invoke(this, true);
+                await Task.Delay(200); // A short delay, adjust as necessary
+                await await Task.Run(async () => _platformService.ChangeServiceState(state));
             }
             finally
             {
                 try
                 {
-                    ShowLoadingMessage?.Invoke(this, false);             }
+                    ShowLoadingMessage?.Invoke(this, false);
+                }
                 catch { }
                 ShowToggle = true;
             }
@@ -122,50 +117,41 @@ namespace QuantumSecure.ViewModels
             get => _platformService.ServiceMessage;
         }
 
-        public MainPageViewModel(NetConnectConfig netConfig, Action authorizeAction, Action loginAction, Action addHostsAction, IPlatformService platformService, ILogger logger)
+        public MainPageViewModel(NetConnectConfig netConfig, IPlatformService platformService, ILogger logger)
         {
             _netConfig = netConfig;
             _platformService = platformService;
             _logger = logger;
             CloseAppCommand = new Command(CloseApp);
             //ToggleServiceCommand = new Command(async () => await ToggleServiceAsync());
-            _platformService.ServiceStateChanged += (sender, args) =>
-                {
-                    try
-                    {
-                        OnPropertyChanged(nameof(IsServiceStarted));
-                        OnPropertyChanged(nameof(ServiceMessage));
-                        OnPropertyChanged(nameof(ShowTasks));
-                        OnPropertyChanged(nameof(ShowToggle));
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError($" Error : handling service state change: {ex.Message}");
-                    }
-                };
-
+            _platformService.ServiceStateChanged += PlatformServiceStateChanged;
             _netConfig.AgentUserFlow.PropertyChanged += OnAgentUserFlowPropertyChanged;
+
+        }
+
+        public void SetupTasks()
+        {
             Action wrappedAuthorizeAction = () =>
-                {
-                    try
-                    {
-                        if (!IsPolling)
-                        {
-                            IsPolling = true;
-                            authorizeAction();
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError($"Error executing authorize action: {ex}");
-                        // Handle failure (e.g., reset polling status, notify user)
-                    }
-                };
+                           {
+                               try
+                               {
+                                   if (!IsPolling)
+                                   {
+                                       IsPolling = true;
+                                       AuthorizeAction?.Invoke();
+                                   }
+                               }
+                               catch (Exception ex)
+                               {
+                                   _logger.LogError($"Error executing authorize action: {ex}");
+                                   // Handle failure (e.g., reset polling status, notify user)
+                               }
+                           };
             Tasks = new ObservableCollection<TaskItem>
             {
-                new TaskItem { TaskDescription = "Authorize Agent", IsCompleted = netConfig.AgentUserFlow.IsAuthorized, TaskAction = new Command(wrappedAuthorizeAction) },
-                new TaskItem { TaskDescription = "Login Free Network Monitor", IsCompleted = netConfig.AgentUserFlow.IsLoggedInWebsite, TaskAction = new Command(loginAction) },
-                new TaskItem { TaskDescription = "Scan for Hosts", IsCompleted = netConfig.AgentUserFlow.IsHostsAdded, TaskAction = new Command(addHostsAction) }
+                new TaskItem { TaskDescription = "Authorize Agent", IsCompleted = _netConfig.AgentUserFlow.IsAuthorized, TaskAction = new Command(wrappedAuthorizeAction) },
+                new TaskItem { TaskDescription = "Login Free Network Monitor", IsCompleted = _netConfig.AgentUserFlow.IsLoggedInWebsite, TaskAction = new Command(LoginAction) },
+                new TaskItem { TaskDescription = "Scan for Hosts", IsCompleted = _netConfig.AgentUserFlow.IsHostsAdded, TaskAction = new Command(AddHostsAction) }
             };
         }
 
@@ -175,6 +161,20 @@ namespace QuantumSecure.ViewModels
             //activity.FinishAffinity();
         }
 
+        private void PlatformServiceStateChanged(object sender, EventArgs e)
+        {
+            try
+            {
+                OnPropertyChanged(nameof(IsServiceStarted));
+                OnPropertyChanged(nameof(ServiceMessage));
+                OnPropertyChanged(nameof(ShowTasks));
+                OnPropertyChanged(nameof(ShowToggle));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($" Error : handling service state change: {ex.Message}");
+            }
+        }
         private void OnAgentUserFlowPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             switch (e.PropertyName)
@@ -209,7 +209,7 @@ namespace QuantumSecure.ViewModels
             }
         }
 
-       public event PropertyChangedEventHandler? PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
@@ -263,7 +263,7 @@ namespace QuantumSecure.ViewModels
                 if (_isCompleted)
                 {
                     return ColorResource.GetResourceColor("Primary");
-                 }
+                }
                 else { return Colors.White; }
             }
         }
