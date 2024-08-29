@@ -12,7 +12,7 @@ namespace QuantumSecure.ViewModels
 {
     public class ScanProcessorStatesViewModel : BasePopupViewModel
     {
-        private LocalScanProcessorStates _scanProcessorStates;
+        private LocalCmdProcessorStates _scanProcessorStates;
         private ILogger _logger;
         private readonly IApiService _apiService;
         public ObservableCollection<string> EndpointTypes { get; set; }
@@ -31,11 +31,11 @@ namespace QuantumSecure.ViewModels
         }
 
 
-        public ScanProcessorStatesViewModel(ILogger logger, LocalScanProcessorStates scanProcessorStates, IApiService apiService)
+        public ScanProcessorStatesViewModel(ILogger logger, LocalCmdProcessorStates cmdProcessorStates, IApiService apiService)
         {
             try
             {
-                _logger = logger; _scanProcessorStates = scanProcessorStates;
+                _logger = logger; _scanProcessorStates = cmdProcessorStates;
                 _apiService = apiService;
                 _scanProcessorStates.PropertyChanged += OnProcessorStatesChanged;
                 EndpointTypes = new ObservableCollection<string>(_scanProcessorStates.EndpointTypes);
