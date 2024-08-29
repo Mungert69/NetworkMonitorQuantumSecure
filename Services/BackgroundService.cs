@@ -30,9 +30,9 @@ namespace QuantumSecure.Services
         private IFileRepo _fileRepo;
         private IMonitorPingInfoView _monitorPingInfoView;
         private LocalProcessorStates _processorStates;
-        private LocalCmdProcessorStates _nmapCmdProcessorStates;
-        private LocalCmdProcessorStates _metaCmdProcessorStates;
-        public BackgroundService(ILogger logger, NetConnectConfig netConfig, ILoggerFactory loggerFactory, IRabbitRepo rabbitRepo, IFileRepo fileRepo, LocalProcessorStates processorStates, IMonitorPingInfoView monitorPingInfoView, LocalCmdProcessorStates cmdProcessorStates)
+        private ILocalCmdProcessorStates _nmapCmdProcessorStates;
+        private ILocalCmdProcessorStates _metaCmdProcessorStates;
+        public BackgroundService(ILogger logger, NetConnectConfig netConfig, ILoggerFactory loggerFactory, IRabbitRepo rabbitRepo, IFileRepo fileRepo, LocalProcessorStates processorStates, IMonitorPingInfoView monitorPingInfoView, ILocalCmdProcessorStates nmapCmdProcessorStates,ILocalCmdProcessorStates metaCmdProcessorStates )
         {
             _logger = logger;
             _netConfig = netConfig;
@@ -41,7 +41,8 @@ namespace QuantumSecure.Services
             _fileRepo = fileRepo;
             _monitorPingInfoView = monitorPingInfoView;
             _processorStates = processorStates;
-            _nmapCmdProcessorStates = cmdProcessorStates;
+            _nmapCmdProcessorStates = nmapCmdProcessorStates;
+            _metaCmdProcessorStates=metaCmdProcessorStates;
         }
         public async Task<ResultObj> Start()
         {
