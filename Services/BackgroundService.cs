@@ -65,10 +65,12 @@ namespace QuantumSecure.Services
                     System.Diagnostics.Debug.WriteLine($"Setting OqsProviderPath : {_netConfig.OqsProviderPath}");
                 }
                 var _connectFactory = new NetworkMonitor.Connection.ConnectFactory(_loggerFactory.CreateLogger<ConnectFactory>(), isLoadAlogTable: true, oqsProviderPath: _netConfig.OqsProviderPath);
+                _nmapCmdProcessorStates.IsCmdAvailable = !_netConfig.DisabledCommands.Any(a => a == _nmapCmdProcessorStates.CmdName);
                 _nmapCmdProcessorStates.UseDefaultEndpointType = _netConfig.UseDefaultEndpointType;
                 _nmapCmdProcessorStates.DefaultEndpointType = _netConfig.DefaultEndpointType;
                 _nmapCmdProcessorStates.EndpointTypes = _netConfig.EndpointTypes;
                 _nmapCmdProcessor = new NmapCmdProcessor(_loggerFactory.CreateLogger<NmapCmdProcessor>(), _nmapCmdProcessorStates, _rabbitRepo, _netConfig);
+                _metaCmdProcessorStates.IsCmdAvailable = !_netConfig.DisabledCommands.Any(a => a == _metaCmdProcessorStates.CmdName);
                 _metaCmdProcessorStates.UseDefaultEndpointType = _netConfig.UseDefaultEndpointType;
                 _metaCmdProcessorStates.DefaultEndpointType = _netConfig.DefaultEndpointType;
                 _metaCmdProcessorStates.EndpointTypes = _netConfig.EndpointTypes;
