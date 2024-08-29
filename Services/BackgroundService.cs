@@ -23,14 +23,16 @@ namespace QuantumSecure.Services
         private NetConnectConfig _netConfig;
         private ILoggerFactory _loggerFactory;
         private MonitorPingProcessor _monitorPingProcessor;
-        private IScanProcessor _scanProcessor;
+        private ICmdProcessor _nmapCmdProcessor;
+         private ICmdProcessor _metaCmdProcessor;
         private IRabbitRepo _rabbitRepo;
         private IRabbitListener _rabbitListener;
         private IFileRepo _fileRepo;
         private IMonitorPingInfoView _monitorPingInfoView;
         private LocalProcessorStates _processorStates;
-        private LocalScanProcessorStates _scanProcessorStates;
-        public BackgroundService(ILogger logger, NetConnectConfig netConfig, ILoggerFactory loggerFactory, IRabbitRepo rabbitRepo, IFileRepo fileRepo, LocalProcessorStates processorStates, IMonitorPingInfoView monitorPingInfoView, LocalScanProcessorStates scanProcessorStates)
+        private LocalCmdProcessorStates _nmapCmdProcessorStates;
+        private LocalCmdProcessorStates _metaCmdProcessorStates;
+        public BackgroundService(ILogger logger, NetConnectConfig netConfig, ILoggerFactory loggerFactory, IRabbitRepo rabbitRepo, IFileRepo fileRepo, LocalProcessorStates processorStates, IMonitorPingInfoView monitorPingInfoView, LocalCmdProcessorStates cmdProcessorStates)
         {
             _logger = logger;
             _netConfig = netConfig;
@@ -39,7 +41,7 @@ namespace QuantumSecure.Services
             _fileRepo = fileRepo;
             _monitorPingInfoView = monitorPingInfoView;
             _processorStates = processorStates;
-            _scanProcessorStates = scanProcessorStates;
+            _nmapCmdProcessorStates = cmdProcessorStates;
         }
         public async Task<ResultObj> Start()
         {
@@ -62,12 +64,17 @@ namespace QuantumSecure.Services
                     System.Diagnostics.Debug.WriteLine($"Setting OqsProviderPath : {_netConfig.OqsProviderPath}");
                 }
                 var _connectFactory = new NetworkMonitor.Connection.ConnectFactory(_loggerFactory.CreateLogger<ConnectFactory>(), isLoadAlogTable: true, oqsProviderPath: _netConfig.OqsProviderPath);
-                _scanProcessorStates.UseDefaultEndpointType = _netConfig.UseDefaultEndpointType;
-                _scanProcessorStates.DefaultEndpointType = _netConfig.DefaultEndpointType;
-                _scanProcessorStates.EndpointTypes = _netConfig.EndpointTypes;
-                _scanProcessor = new NmapScanProcessor(_loggerFactory.CreateLogger<NmapScanProcessor>(), _scanProcessorStates, _rabbitRepo, _netConfig);
+                _nmapCmdProcessorStates.UseDefaultEndpointType = _netConfig.UseDefaultEndpointType;
+                _nmapCmdProcessorStates.DefaultEndpointType = _netConfig.DefaultEndpointType;
+                _nmapCmdProcessorStates.EndpointTypes = _netConfig.EndpointTypes;
+                _nmapCmdProcessor = new NmapCmdProcessor(_loggerFactory.CreateLogger<NmapCmdProcessor>(), _nmapCmdProcessorStates, _rabbitRepo, _netConfig);
+                _metaCmdProcessorStates.UseDefaultEndpointType = _netConfig.UseDefaultEndpointType;
+                _metaCmdProcessorStates.DefaultEndpointType = _netConfig.DefaultEndpointType;
+                _metaCmdProcessorStates.EndpointTypes = _netConfig.EndpointTypes;
+                _metaCmdProcessor = new MetaCmdProcessor(_loggerFactory.CreateLogger<NmapCmdProcessor>(), _metaCmdProcessorStates, _rabbitRepo, _netConfig);
+              
                 _monitorPingProcessor = new MonitorPingProcessor(_loggerFactory.CreateLogger<MonitorPingProcessor>(), _netConfig, _connectFactory, _fileRepo, _rabbitRepo, _processorStates, _monitorPingInfoView);
-                _rabbitListener = new RabbitListener(_monitorPingProcessor, _loggerFactory.CreateLogger<RabbitListener>(), _netConfig, _processorStates, _scanProcessor);
+                _rabbitListener = new RabbitListener(_monitorPingProcessor, _loggerFactory.CreateLogger<RabbitListener>(), _netConfig, _processorStates, _nmapCmdProcessor, _metaCmdProcessor);
                 var resultListener = await _rabbitListener.SetupListener();
                 var resultProcessor = await _monitorPingProcessor.Init(new ProcessorInitObj());
                 result.Message += resultListener.Message + resultProcessor.Message;

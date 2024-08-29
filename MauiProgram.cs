@@ -96,7 +96,7 @@ namespace QuantumSecure
            });
             builder.Services.AddSingleton(provider =>
            {
-               return new LocalScanProcessorStates();
+               return new LocalCmdProcessorStates();
            });
             builder.Services.AddSingleton<IApiService>(provider =>
           {
@@ -181,10 +181,10 @@ namespace QuantumSecure
                     var rabbitRepo = provider.GetRequiredService<IRabbitRepo>();
                     var fileRepo = provider.GetRequiredService<IFileRepo>();
                     var processorStates = provider.GetRequiredService<LocalProcessorStates>();
-                    var scanProcessorStates=provider.GetRequiredService<LocalScanProcessorStates>();
+                    var cmdProcessorStates=provider.GetRequiredService<LocalCmdProcessorStates>();
                     var monitorPingInfoView = provider.GetRequiredService<IMonitorPingInfoView>();
 
-                    return new BackgroundService(logger, netConfig, loggerFactory, rabbitRepo, fileRepo, processorStates, monitorPingInfoView, scanProcessorStates);
+                    return new BackgroundService(logger, netConfig, loggerFactory, rabbitRepo, fileRepo, processorStates, monitorPingInfoView, cmdProcessorStates);
 
 
                 });
@@ -206,10 +206,10 @@ namespace QuantumSecure
             builder.Services.AddSingleton(provider =>
            {
                var logger = provider.GetRequiredService<ILogger<ScanProcessorStatesViewModel>>();
-               var scanProcessorStates = provider.GetRequiredService<LocalScanProcessorStates>();
+               var cmdProcessorStates = provider.GetRequiredService<LocalCmdProcessorStates>();
                // Choose the appropriate constructor
                var apiService = provider.GetRequiredService<IApiService>();
-               return new ScanProcessorStatesViewModel(logger, scanProcessorStates, apiService);
+               return new ScanProcessorStatesViewModel(logger, cmdProcessorStates, apiService);
            });
 
             builder.Services.AddSingleton(provider =>

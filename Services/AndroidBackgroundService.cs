@@ -30,7 +30,7 @@ namespace QuantumSecure.Services
        private IBackgroundService _backgroundService;
         private IMonitorPingInfoView _monitorPingInfoView;
         private LocalProcessorStates _processorStates;
-        private LocalScanProcessorStates _scanProcessorStates;
+        private LocalCmdProcessorStates _scanProcessorStates;
         private IPlatformService _platformService;
 
         private IFileRepo _fileRepo;
@@ -59,7 +59,7 @@ public const string ServiceMessageExtra = "ServiceMessage";
             _rabbitRepo = MauiProgram.ServiceProvider.GetRequiredService<IRabbitRepo>();
             _monitorPingInfoView = MauiProgram.ServiceProvider.GetRequiredService<IMonitorPingInfoView>();
             _processorStates=MauiProgram.ServiceProvider.GetRequiredService<LocalProcessorStates>();
-            _scanProcessorStates=MauiProgram.ServiceProvider.GetRequiredService<LocalScanProcessorStates>();
+            _scanProcessorStates=MauiProgram.ServiceProvider.GetRequiredService<LocalCmdProcessorStates>();
             _platformService= MauiProgram.ServiceProvider.GetRequiredService<IPlatformService>();
             _backgroundService = new BackgroundService(_logger, _netConfig, _loggerFactory, _rabbitRepo, _fileRepo,_processorStates, _monitorPingInfoView, _scanProcessorStates);
 

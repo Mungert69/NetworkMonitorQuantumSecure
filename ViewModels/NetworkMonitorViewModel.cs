@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using NetworkMonitor.Api.Services;
 using NetworkMonitor.Objects;
+using NetworkMonitor.Objects.Factory;
 
 namespace QuantumSecure.ViewModels
 {
@@ -19,7 +20,7 @@ namespace QuantumSecure.ViewModels
         private string _responseTime;
         private string _resultStatus;
 
-        public ObservableCollection<string> EndpointTypes { get; } = new ObservableCollection<string> { "Http", "SSL Cert", "Smtp", "Dns", "Icmp", "Quantum", "Raw Connect" };
+        public ObservableCollection<string> EndpointTypes { get; } 
 
         public string SelectedEndpointType
         {
@@ -74,6 +75,9 @@ namespace QuantumSecure.ViewModels
         public NetworkMonitorViewModel(IApiService apiService)
         {
             _apiService = apiService;
+             // Initialize the EndpointTypes collection with friendly names
+            EndpointTypes = new ObservableCollection<string>(EndPointTypeFactory.GetTypesFriendlyName());
+
             TestConnectionCommand = new Command(async () => await TestConnection());
         }
 
@@ -93,45 +97,9 @@ namespace QuantumSecure.ViewModels
             {
                 TResultObj<DataObj> result;
                 var hostObject = new HostObject { Address = Address, Port = Port };
+                string internalType = EndPointTypeFactory.GetInternalType(SelectedEndpointType);
 
-                switch (SelectedEndpointType.ToLower())
-                {
-                    case "http":
-                        result = await _apiService.CheckHttp(hostObject);
-                        break;
-                    case "ssl cert":
-                        result = await _apiService.CheckHttps(hostObject);
-                        break;
-                    case "smtp":
-                        result = await _apiService.CheckSmtp(hostObject);
-                        break;
-                    case "dns":
-                        result = await _apiService.CheckDns(hostObject);
-                        break;
-                    case "icmp":
-                        result = await _apiService.CheckIcmp(hostObject);
-                        break;
-                     case "raw connect":
-                        result = await _apiService.CheckRawconnect(hostObject);
-                        break;
-                    case "quantum":
-                        var quantumResult = await _apiService.CheckQuantum(new QuantumHostObject { Address = Address, Port = Port });
-                        result = new TResultObj<DataObj>
-                        {
-                            Success = quantumResult.Success,
-                            Message = quantumResult.Message,
-                            Data = new DataObj
-                            {
-                                ResponseTime = quantumResult.Data.ResponseTime,
-                                ResultStatus = quantumResult.Data.ResultStatus
-                            }
-                        };
-                        break;
-                    default:
-                        ResultMessage = "Invalid endpoint type selected.";
-                        HasResult = true;
-                        return;
-                }
+                result = await EndPointTypeFactory.TestConnection(internalType, _apiService, hostObject, Address, Port);
 
                 ResultMessage = result.Success ? "Connection successful" : "Connection failed";
                 ResponseTime = result.Data.ResponseTime.ToString();
