@@ -96,7 +96,11 @@ namespace QuantumSecure
            });
             builder.Services.AddSingleton(provider =>
            {
-               return new LocalCmdProcessorStates();
+               return new LocalNmapCmdProcessorStates();
+           });
+               builder.Services.AddSingleton(provider =>
+           {
+               return new LocalMetaCmdProcessorStates();
            });
             builder.Services.AddSingleton<IApiService>(provider =>
           {
@@ -181,10 +185,11 @@ namespace QuantumSecure
                     var rabbitRepo = provider.GetRequiredService<IRabbitRepo>();
                     var fileRepo = provider.GetRequiredService<IFileRepo>();
                     var processorStates = provider.GetRequiredService<LocalProcessorStates>();
-                    var cmdProcessorStates=provider.GetRequiredService<LocalCmdProcessorStates>();
+                    var nmapCmdProcessorStates=provider.GetRequiredService<LocalNmapeCmdProcessorStates>();
+                    var metaCmdProcessorStates=provider.GetRequiredService<LocalMetaCmdProcessorStates>();
                     var monitorPingInfoView = provider.GetRequiredService<IMonitorPingInfoView>();
 
-                    return new BackgroundService(logger, netConfig, loggerFactory, rabbitRepo, fileRepo, processorStates, monitorPingInfoView, cmdProcessorStates);
+                    return new BackgroundService(logger, netConfig, loggerFactory, rabbitRepo, fileRepo, processorStates, monitorPingInfoView, nmapCmdProcessorStates, metaCmdProcessorStates);
 
 
                 });
@@ -206,10 +211,10 @@ namespace QuantumSecure
             builder.Services.AddSingleton(provider =>
            {
                var logger = provider.GetRequiredService<ILogger<ScanProcessorStatesViewModel>>();
-               var cmdProcessorStates = provider.GetRequiredService<LocalCmdProcessorStates>();
+               var nmapCmdProcessorStates = provider.GetRequiredService<LocalNmapCmdProcessorStates>();
                // Choose the appropriate constructor
                var apiService = provider.GetRequiredService<IApiService>();
-               return new ScanProcessorStatesViewModel(logger, cmdProcessorStates, apiService);
+               return new ScanProcessorStatesViewModel(logger, nmapCmdProcessorStates, apiService);
            });
 
             builder.Services.AddSingleton(provider =>
