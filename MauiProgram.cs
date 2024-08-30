@@ -185,7 +185,7 @@ namespace QuantumSecure
                     var rabbitRepo = provider.GetRequiredService<IRabbitRepo>();
                     var fileRepo = provider.GetRequiredService<IFileRepo>();
                     var processorStates = provider.GetRequiredService<LocalProcessorStates>();
-                    var nmapCmdProcessorStates=provider.GetRequiredService<LocalNmapeCmdProcessorStates>();
+                    var nmapCmdProcessorStates=provider.GetRequiredService<LocalNmapCmdProcessorStates>();
                     var metaCmdProcessorStates=provider.GetRequiredService<LocalMetaCmdProcessorStates>();
                     var monitorPingInfoView = provider.GetRequiredService<IMonitorPingInfoView>();
 
