@@ -65,17 +65,22 @@ namespace QuantumSecure.Services
                     System.Diagnostics.Debug.WriteLine($"Setting OqsProviderPath : {_netConfig.OqsProviderPath}");
                 }
                 var _connectFactory = new NetworkMonitor.Connection.ConnectFactory(_loggerFactory.CreateLogger<ConnectFactory>(), isLoadAlogTable: true, oqsProviderPath: _netConfig.OqsProviderPath);
-                _nmapCmdProcessorStates.IsCmdAvailable = !_netConfig.DisabledCommands.Any(a => a == _nmapCmdProcessorStates.CmdName);
+               
                 _nmapCmdProcessorStates.UseDefaultEndpointType = _netConfig.UseDefaultEndpointType;
                 _nmapCmdProcessorStates.DefaultEndpointType = _netConfig.DefaultEndpointType;
                 _nmapCmdProcessorStates.EndpointTypes = _netConfig.EndpointTypes;
                 _nmapCmdProcessor = new NmapCmdProcessor(_loggerFactory.CreateLogger<NmapCmdProcessor>(), _nmapCmdProcessorStates, _rabbitRepo, _netConfig);
-                _metaCmdProcessorStates.IsCmdAvailable = !_netConfig.DisabledCommands.Any(a => a == _metaCmdProcessorStates.CmdName);
+                _nmapCmdProcessorStates.IsCmdAvailable = !_netConfig.DisabledCommands.Any(a => a == _nmapCmdProcessorStates.CmdName);
+                
+                if (_nmapCmdProcessorStates.IsCmdAvailable) _logger.LogInformation(" Success : Nmap command is available.");
                 _metaCmdProcessorStates.UseDefaultEndpointType = _netConfig.UseDefaultEndpointType;
                 _metaCmdProcessorStates.DefaultEndpointType = _netConfig.DefaultEndpointType;
                 _metaCmdProcessorStates.EndpointTypes = _netConfig.EndpointTypes;
                 _metaCmdProcessor = new MetaCmdProcessor(_loggerFactory.CreateLogger<NmapCmdProcessor>(), _metaCmdProcessorStates, _rabbitRepo, _netConfig);
-              
+               _metaCmdProcessorStates.IsCmdAvailable = !_netConfig.DisabledCommands.Any(a => a == _metaCmdProcessorStates.CmdName);
+                
+               if (_metaCmdProcessorStates.IsCmdAvailable) _logger.LogInformation(" Success : Metasploit command is available.");
+               
                 _monitorPingProcessor = new MonitorPingProcessor(_loggerFactory.CreateLogger<MonitorPingProcessor>(), _netConfig, _connectFactory, _fileRepo, _rabbitRepo, _processorStates, _monitorPingInfoView);
                 _rabbitListener = new RabbitListener(_monitorPingProcessor, _loggerFactory.CreateLogger<RabbitListener>(), _netConfig, _processorStates, _nmapCmdProcessor, _metaCmdProcessor);
                 var resultListener = await _rabbitListener.SetupListener();
@@ -86,7 +91,7 @@ namespace QuantumSecure.Services
             catch (Exception e)
             {
                 result.Success = false;
-                result.Message += $" Error : Enabled to start background service . Error was : {e.Message}";
+                result.Message += $" Error : failed to start background service . Error was : {e.Message}";
                 _logger.LogError(result.Message);
             }
 
