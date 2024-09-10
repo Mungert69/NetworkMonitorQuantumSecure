@@ -98,9 +98,13 @@ namespace QuantumSecure
            {
                return new LocalNmapCmdProcessorStates();
            });
-               builder.Services.AddSingleton(provider =>
+            builder.Services.AddSingleton(provider =>
+        {
+            return new LocalMetaCmdProcessorStates();
+        });
+            builder.Services.AddSingleton(provider =>
            {
-               return new LocalMetaCmdProcessorStates();
+               return new LocalOpensslCmdProcessorStates();
            });
             builder.Services.AddSingleton<IApiService>(provider =>
           {
@@ -157,6 +161,22 @@ namespace QuantumSecure
                 var processorStates = provider.GetRequiredService<LocalProcessorStates>();
                 return new AuthService(logger, netConfig, rabbitRepo, processorStates);
             });
+            builder.Services.AddSingleton<ICmdProcessorProvider>
+                (provider =>
+                {
+
+                    var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
+                    var rabbitRepo = provider.GetRequiredService<IRabbitRepo>();
+                    var netConfig = provider.GetRequiredService<NetConnectConfig>();
+                    var nmapCmdProcessorStates = provider.GetRequiredService<LocalNmapCmdProcessorStates>();
+                    var metaCmdProcessorStates = provider.GetRequiredService<LocalMetaCmdProcessorStates>();
+                    var opensslCmdProcessorStates = provider.GetRequiredService<LocalOpensslCmdProcessorStates>();
+
+                    return new CmdProcessorFactory(loggerFactory, rabbitRepo, netConfig, nmapCmdProcessorStates, metaCmdProcessorStates, opensslCmdProcessorStates);
+
+
+                });
+
             builder.Services.AddSingleton<IDialogService>(provider => { return new DialogService(); });
             builder.Services.AddSingleton<IPlatformService>(provider =>
             {
@@ -185,11 +205,10 @@ namespace QuantumSecure
                     var rabbitRepo = provider.GetRequiredService<IRabbitRepo>();
                     var fileRepo = provider.GetRequiredService<IFileRepo>();
                     var processorStates = provider.GetRequiredService<LocalProcessorStates>();
-                    var nmapCmdProcessorStates=provider.GetRequiredService<LocalNmapCmdProcessorStates>();
-                    var metaCmdProcessorStates=provider.GetRequiredService<LocalMetaCmdProcessorStates>();
+                    var cmdProcessorProvider=provider.GetRequiredService<ICmdProcessorProvider>();
                     var monitorPingInfoView = provider.GetRequiredService<IMonitorPingInfoView>();
 
-                    return new BackgroundService(logger, netConfig, loggerFactory, rabbitRepo, fileRepo, processorStates, monitorPingInfoView, nmapCmdProcessorStates, metaCmdProcessorStates);
+                    return new BackgroundService(logger, netConfig, loggerFactory, rabbitRepo, fileRepo, processorStates, monitorPingInfoView, cmdProcessorProvider);
 
 
                 });
@@ -230,17 +249,17 @@ namespace QuantumSecure
                 var netConfig = provider.GetRequiredService<NetConnectConfig>();
                 var logger = provider.GetRequiredService<ILogger<MainPage>>();
                 var processorStatesViewModel = provider.GetRequiredService<ProcessorStatesViewModel>();
-                var mainPageViewModel=provider.GetRequiredService<MainPageViewModel>();
+                var mainPageViewModel = provider.GetRequiredService<MainPageViewModel>();
                 return new MainPage(authService, netConfig, logger, mainPageViewModel, processorStatesViewModel);
             });
 
-             builder.Services.AddSingleton(provider =>
-            {
+            builder.Services.AddSingleton(provider =>
+           {
                var netConfig = provider.GetRequiredService<NetConnectConfig>();
-                var logger = provider.GetRequiredService<ILogger<MainPageViewModel>>();
-                var platformService = provider.GetRequiredService<IPlatformService>();
-                return new MainPageViewModel( netConfig,  platformService, logger);
-            });
+               var logger = provider.GetRequiredService<ILogger<MainPageViewModel>>();
+               var platformService = provider.GetRequiredService<IPlatformService>();
+               return new MainPageViewModel(netConfig, platformService, logger);
+           });
 
             builder.Services.AddSingleton(provider =>
             {
