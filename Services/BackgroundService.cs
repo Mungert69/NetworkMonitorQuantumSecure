@@ -23,16 +23,13 @@ namespace QuantumSecure.Services
         private NetConnectConfig _netConfig;
         private ILoggerFactory _loggerFactory;
         private MonitorPingProcessor _monitorPingProcessor;
-        private ICmdProcessor _nmapCmdProcessor;
-         private ICmdProcessor _metaCmdProcessor;
         private IRabbitRepo _rabbitRepo;
         private IRabbitListener _rabbitListener;
         private IFileRepo _fileRepo;
         private IMonitorPingInfoView _monitorPingInfoView;
         private LocalProcessorStates _processorStates;
-        private ILocalCmdProcessorStates _nmapCmdProcessorStates;
-        private ILocalCmdProcessorStates _metaCmdProcessorStates;
-        public BackgroundService(ILogger logger, NetConnectConfig netConfig, ILoggerFactory loggerFactory, IRabbitRepo rabbitRepo, IFileRepo fileRepo, LocalProcessorStates processorStates, IMonitorPingInfoView monitorPingInfoView, ILocalCmdProcessorStates nmapCmdProcessorStates,ILocalCmdProcessorStates metaCmdProcessorStates )
+        private ICmdProcessorProvider _cmdProcessorProvider;
+        public BackgroundService(ILogger logger, NetConnectConfig netConfig, ILoggerFactory loggerFactory, IRabbitRepo rabbitRepo, IFileRepo fileRepo, LocalProcessorStates processorStates, IMonitorPingInfoView monitorPingInfoView, ICmdProcessorProvider cmdProcessorProvider)
         {
             _logger = logger;
             _netConfig = netConfig;
@@ -41,8 +38,8 @@ namespace QuantumSecure.Services
             _fileRepo = fileRepo;
             _monitorPingInfoView = monitorPingInfoView;
             _processorStates = processorStates;
-            _nmapCmdProcessorStates = nmapCmdProcessorStates;
-            _metaCmdProcessorStates=metaCmdProcessorStates;
+            _cmdProcessorProvider = cmdProcessorProvider;
+
         }
         public async Task<ResultObj> Start()
         {
@@ -65,24 +62,24 @@ namespace QuantumSecure.Services
                     System.Diagnostics.Debug.WriteLine($"Setting OqsProviderPath : {_netConfig.OqsProviderPath}");
                 }
                 var _connectFactory = new NetworkMonitor.Connection.ConnectFactory(_loggerFactory.CreateLogger<ConnectFactory>(), isLoadAlogTable: true, oqsProviderPath: _netConfig.OqsProviderPath);
-               
-                _nmapCmdProcessorStates.UseDefaultEndpointType = _netConfig.UseDefaultEndpointType;
-                _nmapCmdProcessorStates.DefaultEndpointType = _netConfig.DefaultEndpointType;
-                _nmapCmdProcessorStates.EndpointTypes = _netConfig.EndpointTypes;
-                _nmapCmdProcessor = new NmapCmdProcessor(_loggerFactory.CreateLogger<NmapCmdProcessor>(), _nmapCmdProcessorStates, _rabbitRepo, _netConfig);
-                _nmapCmdProcessorStates.IsCmdAvailable = !_netConfig.DisabledCommands.Any(a => a == _nmapCmdProcessorStates.CmdName);
-                
-                if (_nmapCmdProcessorStates.IsCmdAvailable) _logger.LogInformation(" Success : Nmap command is available.");
-                _metaCmdProcessorStates.UseDefaultEndpointType = _netConfig.UseDefaultEndpointType;
-                _metaCmdProcessorStates.DefaultEndpointType = _netConfig.DefaultEndpointType;
-                _metaCmdProcessorStates.EndpointTypes = _netConfig.EndpointTypes;
-                _metaCmdProcessor = new MetaCmdProcessor(_loggerFactory.CreateLogger<NmapCmdProcessor>(), _metaCmdProcessorStates, _rabbitRepo, _netConfig);
-               _metaCmdProcessorStates.IsCmdAvailable = !_netConfig.DisabledCommands.Any(a => a == _metaCmdProcessorStates.CmdName);
-                
-               if (_metaCmdProcessorStates.IsCmdAvailable) _logger.LogInformation(" Success : Metasploit command is available.");
-               
+
+                _cmdProcessorProvider.NmapStates.UseDefaultEndpointType = _netConfig.UseDefaultEndpointType;
+                _cmdProcessorProvider.NmapStates.DefaultEndpointType = _netConfig.DefaultEndpointType;
+                _cmdProcessorProvider.NmapStates.EndpointTypes = _netConfig.EndpointTypes;
+                _cmdProcessorProvider.NmapStates.IsCmdAvailable = !_netConfig.DisabledCommands.Any(a => a == _cmdProcessorProvider.NmapStates.CmdName);
+                if (_cmdProcessorProvider.NmapStates.IsCmdAvailable) _logger.LogInformation(" Success : Nmap command is available.");
+
+                _cmdProcessorProvider.MetasploitStates.UseDefaultEndpointType = _netConfig.UseDefaultEndpointType;
+                _cmdProcessorProvider.MetasploitStates.DefaultEndpointType = _netConfig.DefaultEndpointType;
+                _cmdProcessorProvider.MetasploitStates.EndpointTypes = _netConfig.EndpointTypes;
+                _cmdProcessorProvider.MetasploitStates.IsCmdAvailable = !_netConfig.DisabledCommands.Any(a => a == _cmdProcessorProvider.MetasploitStates.CmdName);
+                if (_cmdProcessorProvider.MetasploitStates.IsCmdAvailable) _logger.LogInformation(" Success : Metasploit command is available.");
+
+                _cmdProcessorProvider.OpensslStates.IsCmdAvailable = !_netConfig.DisabledCommands.Any(a => a == _cmdProcessorProvider.OpensslStates.CmdName);
+                if (_cmdProcessorProvider.OpensslStates.IsCmdAvailable) _logger.LogInformation(" Success : Openssl command is available.");
+
                 _monitorPingProcessor = new MonitorPingProcessor(_loggerFactory.CreateLogger<MonitorPingProcessor>(), _netConfig, _connectFactory, _fileRepo, _rabbitRepo, _processorStates, _monitorPingInfoView);
-                _rabbitListener = new RabbitListener(_monitorPingProcessor, _loggerFactory.CreateLogger<RabbitListener>(), _netConfig, _processorStates, _nmapCmdProcessor, _metaCmdProcessor);
+                _rabbitListener = new RabbitListener(_monitorPingProcessor, _loggerFactory.CreateLogger<RabbitListener>(), _netConfig, _processorStates, _cmdProcessorProvider);
                 var resultListener = await _rabbitListener.SetupListener();
                 var resultProcessor = await _monitorPingProcessor.Init(new ProcessorInitObj());
                 result.Message += resultListener.Message + resultProcessor.Message;

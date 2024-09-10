@@ -12,6 +12,7 @@ using NetworkMonitor.DTOs;
 using NetworkMonitor.Objects;
 using Microsoft.Extensions.Configuration;
 using AndroidX.Core.App;
+using NetworkMonitor.Processor.Services;
 
 
 namespace QuantumSecure.Services
@@ -30,8 +31,7 @@ namespace QuantumSecure.Services
        private IBackgroundService _backgroundService;
         private IMonitorPingInfoView _monitorPingInfoView;
         private LocalProcessorStates _processorStates;
-        private ILocalCmdProcessorStates _nmapCmdProcessorStates;
-        private ILocalCmdProcessorStates _metaCmdProcessorStates;
+        private ICmdProcessorProvider _cmdProcessorProvider ;
         private IPlatformService _platformService;
 
         private IFileRepo _fileRepo;
@@ -60,10 +60,9 @@ public const string ServiceMessageExtra = "ServiceMessage";
             _rabbitRepo = MauiProgram.ServiceProvider.GetRequiredService<IRabbitRepo>();
             _monitorPingInfoView = MauiProgram.ServiceProvider.GetRequiredService<IMonitorPingInfoView>();
             _processorStates=MauiProgram.ServiceProvider.GetRequiredService<LocalProcessorStates>();
-            _nmapCmdProcessorStates=MauiProgram.ServiceProvider.GetRequiredService<LocalNmapCmdProcessorStates>();
-            _metaCmdProcessorStates=MauiProgram.ServiceProvider.GetRequiredService<LocalMetaCmdProcessorStates>();
+            _cmdProcessorProvider=MauiProgram.ServiceProvider.GetRequiredService<ICmdProcessorProvider>();
             _platformService= MauiProgram.ServiceProvider.GetRequiredService<IPlatformService>();
-            _backgroundService = new BackgroundService(_logger, _netConfig, _loggerFactory, _rabbitRepo, _fileRepo,_processorStates, _monitorPingInfoView, _nmapCmdProcessorStates,_metaCmdProcessorStates);
+            _backgroundService = new BackgroundService(_logger, _netConfig, _loggerFactory, _rabbitRepo, _fileRepo,_processorStates, _monitorPingInfoView, _cmdProcessorProvider );
 
         }
         private async Task StartAsync()
