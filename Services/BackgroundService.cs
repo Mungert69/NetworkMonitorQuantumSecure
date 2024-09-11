@@ -50,8 +50,8 @@ namespace QuantumSecure.Services
                 result = await _rabbitRepo.ConnectAndSetUp();
                 if (!result.Success) return result;
                 
-                var _connectFactory = new NetworkMonitor.Connection.ConnectFactory(_loggerFactory.CreateLogger<ConnectFactory>(), isLoadAlogTable: true, oqsProviderPath: _netConfig.OqsProviderPath);
-
+                var _connectFactory = new NetworkMonitor.Connection.ConnectFactory(_loggerFactory.CreateLogger<ConnectFactory>(), isLoadAlogTable: true, netConfig: _netConfig);
+                _connectFactory.SetupChromium(netConfig);
                 _cmdProcessorProvider.NmapStates.UseDefaultEndpointType = _netConfig.UseDefaultEndpointType;
                 _cmdProcessorProvider.NmapStates.DefaultEndpointType = _netConfig.DefaultEndpointType;
                 _cmdProcessorProvider.NmapStates.EndpointTypes = _netConfig.EndpointTypes;
