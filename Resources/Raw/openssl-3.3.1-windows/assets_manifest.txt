@@ -5,6 +5,7 @@
 ./ssl/ct_log_list.cnf.dist
 ./ssl/ct_log_list.cnf
 ./ssl/openssl.cnf.dist
+./bin/busybox
 ./bin/msvcp120.dll
 ./bin/libcrypto-1_1.dll
 ./bin/scripts/x11-access.nse
