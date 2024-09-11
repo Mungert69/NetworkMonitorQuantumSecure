@@ -13,6 +13,7 @@
 ./lib64/libssl.so.3
 ./lib64/oqsprovider.so
 ./ssl/openssl.cnf
+./bin/busybox
 ./bin/nmap-header-template.cc
 ./bin/nmap-protocols
 ./bin/nmap-payloads
