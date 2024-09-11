@@ -106,6 +106,10 @@ namespace QuantumSecure
            {
                return new LocalOpensslCmdProcessorStates();
            });
+            builder.Services.AddSingleton(provider =>
+           {
+               return new LocalBusyboxCmdProcessorStates();
+           });
             builder.Services.AddSingleton<IApiService>(provider =>
           {
               var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
@@ -171,8 +175,9 @@ namespace QuantumSecure
                     var nmapCmdProcessorStates = provider.GetRequiredService<LocalNmapCmdProcessorStates>();
                     var metaCmdProcessorStates = provider.GetRequiredService<LocalMetaCmdProcessorStates>();
                     var opensslCmdProcessorStates = provider.GetRequiredService<LocalOpensslCmdProcessorStates>();
+                    var busyboxCmdProcessorStates = provider.GetRequiredService<LocalBusyboxCmdProcessorStates>();
 
-                    return new CmdProcessorFactory(loggerFactory, rabbitRepo, netConfig, nmapCmdProcessorStates, metaCmdProcessorStates, opensslCmdProcessorStates);
+                    return new CmdProcessorFactory(loggerFactory, rabbitRepo, netConfig, nmapCmdProcessorStates, metaCmdProcessorStates, opensslCmdProcessorStates,busyboxCmdProcessorStates);
 
 
                 });
