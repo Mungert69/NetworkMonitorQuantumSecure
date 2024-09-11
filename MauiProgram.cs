@@ -12,6 +12,7 @@ using NetworkMonitor.Objects;
 using QuantumSecure.ViewModels;
 using CommunityToolkit.Maui;
 using Microsoft.Maui.Hosting;
+using Microsoft.Maui.Storage;
 using System.Diagnostics;
 
 
@@ -156,7 +157,8 @@ namespace QuantumSecure
             {
                 // Assuming Configuration is properly set up
                 var configuration = provider.GetRequiredService<IConfiguration>();
-                return new NetConnectConfig(configuration);
+                var appDataDirectory = FileSystem.AppDataDirectory;
+                return new NetConnectConfig(configuration,appDataDirectory);
             });
             builder.Services.AddSingleton<IRabbitRepo>(provider =>
             {
