@@ -326,6 +326,7 @@ namespace QuantumSecure
                             await stream.CopyToAsync(fileStream);
                         }
                     }
+                    if (IsBusyboxBinary(assetFile)) SetExecutablePermission(localFilePath);
                     if (IsOpenSSLBinary(assetFile)) SetExecutablePermission(localFilePath);
                     if (IsNmapBinary(assetFile)) SetExecutablePermission(localFilePath);
                     Console.WriteLine($"Copying file: {localFilePath}");
@@ -343,6 +344,11 @@ namespace QuantumSecure
         {
             string trimmedPath = assetFile.Trim('/', '\\'); // Trim leading and trailing slashes
             return trimmedPath.EndsWith("/openssl", StringComparison.OrdinalIgnoreCase);
+        }
+        private static bool IsBusyboxBinary(string assetFile)
+        {
+            string trimmedPath = assetFile.Trim('/', '\\'); // Trim leading and trailing slashes
+            return trimmedPath.EndsWith("/busybox", StringComparison.OrdinalIgnoreCase);
         }
         private static bool IsNmapBinary(string assetFile)
         {
