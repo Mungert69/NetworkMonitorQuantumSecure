@@ -49,18 +49,7 @@ namespace QuantumSecure.Services
             {
                 result = await _rabbitRepo.ConnectAndSetUp();
                 if (!result.Success) return result;
-                if (!_netConfig.OqsProviderPath.Contains(FileSystem.AppDataDirectory))
-                {
-                    string[] pathComponents = _netConfig.OqsProviderPath.Trim('/').Split('/');
-
-                    string fullPath = FileSystem.AppDataDirectory;
-                    foreach (var component in pathComponents)
-                    {
-                        fullPath = Path.Combine(fullPath, component);
-                    }
-                    _netConfig.OqsProviderPath = fullPath;
-                    System.Diagnostics.Debug.WriteLine($"Setting OqsProviderPath : {_netConfig.OqsProviderPath}");
-                }
+                
                 var _connectFactory = new NetworkMonitor.Connection.ConnectFactory(_loggerFactory.CreateLogger<ConnectFactory>(), isLoadAlogTable: true, oqsProviderPath: _netConfig.OqsProviderPath);
 
                 _cmdProcessorProvider.NmapStates.UseDefaultEndpointType = _netConfig.UseDefaultEndpointType;
@@ -77,6 +66,16 @@ namespace QuantumSecure.Services
 
                 _cmdProcessorProvider.OpensslStates.IsCmdAvailable = !_netConfig.DisabledCommands.Any(a => a == _cmdProcessorProvider.OpensslStates.CmdName);
                 if (_cmdProcessorProvider.OpensslStates.IsCmdAvailable) _logger.LogInformation(" Success : Openssl command is available.");
+                
+                _cmdProcessorProvider.BusyboxStates.IsCmdAvailable = !_netConfig.DisabledCommands.Any(a => a == _cmdProcessorProvider.BusyboxStates.CmdName);
+                if (_cmdProcessorProvider.BusyboxStates.IsCmdAvailable) _logger.LogInformation(" Success : Busybox command is available.");
+                
+                _cmdProcessorProvider.SearchWebStates.IsCmdAvailable = !_netConfig.DisabledCommands.Any(a => a == _cmdProcessorProvider.SearchWebStates.CmdName);
+                if (_cmdProcessorProvider.SearchWebStates.IsCmdAvailable) _logger.LogInformation(" Success : SearchWeb command is available.");
+                
+                _cmdProcessorProvider.CrawlPageStates.IsCmdAvailable = !_netConfig.DisabledCommands.Any(a => a == _cmdProcessorProvider.CrawlPageStates.CmdName);
+                if (_cmdProcessorProvider.CrawlPageStates.IsCmdAvailable) _logger.LogInformation(" Success : CrawlPage command is available.");
+                
 
                 _monitorPingProcessor = new MonitorPingProcessor(_loggerFactory.CreateLogger<MonitorPingProcessor>(), _netConfig, _connectFactory, _fileRepo, _rabbitRepo, _processorStates, _monitorPingInfoView);
                 _rabbitListener = new RabbitListener(_monitorPingProcessor, _loggerFactory.CreateLogger<RabbitListener>(), _netConfig, _processorStates, _cmdProcessorProvider);
