@@ -127,7 +127,7 @@ namespace QuantumSecure.Services
             try
             {
                 _logger.LogInformation("Shutting down RabbitRepo.");
-                await _rabbitRepo.ShutdownRepo();
+                _rabbitRepo.ShutdownRepo();
                 result.Message += " Success : Shutdown RabbitRepo.";
             }
             catch (Exception e)
