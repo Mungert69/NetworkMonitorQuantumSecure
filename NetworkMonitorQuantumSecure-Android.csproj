@@ -16,7 +16,7 @@
                 <ApplicationIdGuid>d4f21b0e-2c97-4c50-b003-dca43bd9a888</ApplicationIdGuid>
                 <!-- Versions -->
                 <ApplicationDisplayVersion>0.1</ApplicationDisplayVersion>
-                <ApplicationVersion>26</ApplicationVersion>
+                <ApplicationVersion>27</ApplicationVersion>
                 <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
                 <AndroidSdkDirectory>/usr/lib/android-sdk</AndroidSdkDirectory>
 
