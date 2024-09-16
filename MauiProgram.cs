@@ -14,6 +14,8 @@ using CommunityToolkit.Maui;
 using Microsoft.Maui.Hosting;
 using Microsoft.Maui.Storage;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.IO;
 
 
 namespace QuantumSecure
@@ -305,6 +307,42 @@ namespace QuantumSecure
         }
 
 
+#if WINDOWS
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern bool CreateSymbolicLink(
+            string lpSymlinkFileName,
+            string lpTargetFileName,
+            int dwFlags);
+
+        const int SYMBOLIC_LINK_FLAG_DIRECTORY = 0x1;
+
+        private static void CreateSymbolicLinkWindows(string symlinkPath, string targetPath, bool isDirectory)
+        {
+            bool result = CreateSymbolicLink(symlinkPath, targetPath, isDirectory ? SYMBOLIC_LINK_FLAG_DIRECTORY : 0);
+            if (!result)
+            {
+                throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            }
+        }
+        private static void ProcessFileForSymbolicLink(string filePath)
+        {
+            // Check if the file path ends with .exe
+            if (filePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            {
+                // Remove the .exe extension
+                string targetPath = Path.ChangeExtension(filePath, null);
+
+                // Create a symbolic link
+                CreateSymbolicLinkWindows(filePath, targetPath, false);
+            }
+            else
+            {
+                // Handle cases where the file does not end with .exe if needed
+                Console.WriteLine($"File does not end with .exe: {filePath}");
+            }
+        }
+#endif
+
         private static async Task CopyAssetsToLocalStorage(string directoryName)
         {
             try
@@ -338,9 +376,17 @@ namespace QuantumSecure
                             await stream.CopyToAsync(fileStream);
                         }
                     }
+#if WINDOWS
+                    if (IsWindowsBusyboxBinary(assetFile)) SetExecutablePermission(localFilePath);
+                    if (IsWindowsOpenSSLBinary(assetFile)) SetExecutablePermission(localFilePath);
+                    if (IsWindowsNmapBinary(assetFile)) SetExecutablePermission(localFilePath);
+#else
                     if (IsBusyboxBinary(assetFile)) SetExecutablePermission(localFilePath);
                     if (IsOpenSSLBinary(assetFile)) SetExecutablePermission(localFilePath);
                     if (IsNmapBinary(assetFile)) SetExecutablePermission(localFilePath);
+#endif
+
+
                     Console.WriteLine($"Copying file: {localFilePath}");
                 }
 
@@ -367,6 +413,21 @@ namespace QuantumSecure
             string trimmedPath = assetFile.Trim('/', '\\'); // Trim leading and trailing slashes
             return trimmedPath.EndsWith("/nmap", StringComparison.OrdinalIgnoreCase);
         }
+        private static bool IsWindowsOpenSSLBinary(string assetFile)
+        {
+            string trimmedPath = assetFile.Trim('/', '\\'); // Trim leading and trailing slashes
+            return trimmedPath.EndsWith("/openssl.exe", StringComparison.OrdinalIgnoreCase);
+        }
+        private static bool IsWindowsBusyboxBinary(string assetFile)
+        {
+            string trimmedPath = assetFile.Trim('/', '\\'); // Trim leading and trailing slashes
+            return trimmedPath.EndsWith("/busybox.exe", StringComparison.OrdinalIgnoreCase);
+        }
+        private static bool IsWindowsNmapBinary(string assetFile)
+        {
+            string trimmedPath = assetFile.Trim('/', '\\'); // Trim leading and trailing slashes
+            return trimmedPath.EndsWith("/nmap.exe", StringComparison.OrdinalIgnoreCase);
+        }
         private static void SetExecutablePermission(string filePath)
         {
             try
@@ -375,6 +436,9 @@ namespace QuantumSecure
 
 #if ANDROID
         QuantumSecure.Platforms.Android.PermissionsHelper.MakeFileExecutable(filePath);
+#elif WINDOWS
+
+                ProcessFileForSymbolicLink(filePath);
 #else
                 // Existing implementation for other platforms
                 var process = new Process
