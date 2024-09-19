@@ -143,7 +143,7 @@ namespace QuantumSecure.ViewModels
             await _scanProcessorStates.AddServices().ConfigureAwait(false);
         }
 
-        public async Task AddSelectedHosts(List<MonitorIP> selectedServices)
+        public void AddSelectedHosts(List<MonitorIP> selectedServices)
         {
             _scanProcessorStates.SelectedDevices.Clear();
             foreach (var service in selectedServices)

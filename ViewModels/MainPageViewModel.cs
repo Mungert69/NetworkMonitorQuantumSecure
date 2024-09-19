@@ -97,7 +97,7 @@ namespace QuantumSecure.ViewModels
                 ShowToggle = false;
                 ShowLoadingMessage?.Invoke(this, true);
                 await Task.Delay(200); // A short delay, adjust as necessary
-                await await Task.Run(async () => _platformService.ChangeServiceState(state));
+                await Task.Run(async () => await _platformService.ChangeServiceState(state));
             }
             finally
             {

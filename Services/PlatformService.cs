@@ -13,7 +13,7 @@ namespace QuantumSecure.Services
 {
     public interface IPlatformService
     {
-        Task<bool> RequestPermissionsAsync();
+        bool RequestPermissionsAsync();
         Task StartBackgroundService();
         Task StopBackgroundService();
         bool IsServiceStarted { get; set; }
@@ -33,7 +33,7 @@ namespace QuantumSecure.Services
         protected string _serviceMessage;
         protected bool _disableAgentOnServiceShutdown = false;
         public event EventHandler ServiceStateChanged;
-        public event EventHandler CloseAgentChanged;
+        //public event EventHandler CloseAgentChanged;
         public bool IsServiceStarted
         {
             get => _isServiceStarted;
@@ -131,7 +131,7 @@ namespace QuantumSecure.Services
             Android.App.Application.Context.RegisterReceiver(_serviceStatusReceiver, filter);
         }
 
-        public async Task<bool> RequestPermissionsAsync()
+        public bool RequestPermissionsAsync()
         {
             try
             {
@@ -334,17 +334,17 @@ namespace QuantumSecure.Services
             _backgroundService = backgroundService;
         }
 
-        public Task<bool> RequestPermissionsAsync()
+        public bool RequestPermissionsAsync()
         {
             try
             {
                 // Windows-specific permission logic here
-                return Task.FromResult(true);
+                return true;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error requesting permissions in WindowsPlatformService");
-                return Task.FromResult(false);
+                return false;
             }
         }
 
