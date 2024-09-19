@@ -157,11 +157,14 @@ namespace QuantumSecure.Services
 var powerService=Context.PowerService;
                     if (powerService!=null) {
                         var powerManager = (PowerManager?)Platform.CurrentActivity?.GetSystemService(powerService);
-                    if (powerManager!=null && !powerManager.IsIgnoringBatteryOptimizations(Platform.CurrentActivity.PackageName))
+                    if (powerManager!=null && !powerManager.IsIgnoringBatteryOptimizations(Platform.CurrentActivity?.PackageName))
                     {
                         var intentBattery = new Intent(Settings.ActionRequestIgnoreBatteryOptimizations);
-                        intentBattery.SetData(Android.Net.Uri.Parse("package:" + Platform.CurrentActivity.PackageName));
+                        if (Platform.CurrentActivity!=null){
+                             intentBattery.SetData(Android.Net.Uri.Parse("package:" + Platform.CurrentActivity.PackageName));
                         Platform.CurrentActivity.StartActivity(intentBattery);
+                        }
+                       
                         }
                     }
 #pragma warning restore CA1416
@@ -185,14 +188,14 @@ var powerService=Context.PowerService;
             try
             {
                  Android.Content.Intent? intent = new Android.Content.Intent(Android.App.Application.Context,typeof(AndroidBackgroundService));
-                if (intent!=null){
+                if (intent!=null && Android.App.Application.Context!=null){
                      if (Build.VERSION.SdkInt >= BuildVersionCodes.O)
                 {
-                Android.App.Application.Context.StartForegroundService(intent);
+                        Android.App.Application.Context.StartForegroundService(intent);
                 }
                 else{
   
-                Android.App.Application.Context.StartService(intent);
+                          Android.App.Application.Context.StartService(intent);
                 }
                 }
                 
@@ -215,10 +218,13 @@ var powerService=Context.PowerService;
 
             try
             {
-                var intent = new Intent(Platform.CurrentActivity, typeof(AndroidBackgroundService));
+                if (Platform.CurrentActivity!=null){
+                       var intent = new Intent(Platform.CurrentActivity, typeof(AndroidBackgroundService));
                 Platform.CurrentActivity.StopService(intent);
                 //_serviceMessage = " Android Service stopped successfully.";
                 //_isServiceStarted=false;
+                }
+             
 
                 return _serviceOperationCompletionSource.Task;
             }

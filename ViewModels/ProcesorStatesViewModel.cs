@@ -55,7 +55,7 @@ namespace QuantumSecure.ViewModels
             }
         }
 
-        private void UpdatePopupMessage(string propertyName)
+        private void UpdatePopupMessage(string? propertyName)
         {
             // Logic to update PopupMessage based on propertyName
             switch (propertyName)

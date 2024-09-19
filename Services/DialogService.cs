@@ -32,20 +32,25 @@ public class DialogService : IDialogService
 
     public async Task<bool> DisplayAlert(string title, string message, string accept, string cancel)
     {
-        bool? result = false;
-        if (MainThread.IsMainThread)
+        bool result = false;
+        if (MainPage != null)
         {
-            result = await MainPage?.DisplayAlert(title, message, accept, cancel);
-        }
-        else
-        {
-            MainThread.BeginInvokeOnMainThread(async () =>
+            if (MainThread.IsMainThread)
             {
-                result = await MainPage?.DisplayAlert(title, message, accept, cancel);
-            });
+                result = await MainPage.DisplayAlert(title, message, accept, cancel);
+            }
+            else
+            {
+                MainThread.BeginInvokeOnMainThread(async () =>
+                {
+                    result = await MainPage.DisplayAlert(title, message, accept, cancel);
+                });
+            }
         }
-        if (result == null) return false;
+        else return false;
+        
+       
 
-        return (bool)result;
+        return result;
     }
 }

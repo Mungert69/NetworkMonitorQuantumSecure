@@ -92,7 +92,7 @@ public const string ServiceMessageExtra = "ServiceMessage";
             }
         }
 
-        private PendingIntent GetViewAppPendingIntent()
+        private PendingIntent? GetViewAppPendingIntent()
         {
             var viewAppIntent = new Intent(this, typeof(MainActivity)); // Replace 'MainActivity' with your main activity class
             viewAppIntent.SetAction(Intent.ActionMain);

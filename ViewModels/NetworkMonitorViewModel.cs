@@ -102,8 +102,11 @@ namespace QuantumSecure.ViewModels
                 result = await EndPointTypeFactory.TestConnection(internalType, _apiService, hostObject, Address, Port);
 
                 ResultMessage = result.Success ? "Connection successful" : "Connection failed";
-                ResponseTime = result.Data.ResponseTime.ToString();
+                if (result.Data != null) { 
+                      ResponseTime = result.Data.ResponseTime?.ToString();
                 ResultStatus = result.Data.ResultStatus;
+                }
+              
                 HasResult = true;
             }
             catch (Exception ex)
