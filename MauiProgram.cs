@@ -366,9 +366,9 @@ namespace QuantumSecure
                         }
 
                         localFilePath = Path.Combine(localPath, assetFile);
-                        string localFileDirectory = Path.GetDirectoryName(localFilePath);
+                        string? localFileDirectory = Path.GetDirectoryName(localFilePath);
 
-                        if (!Directory.Exists(localFileDirectory))
+                        if (localFileDirectory!=null && !Directory.Exists(localFileDirectory))
                             Directory.CreateDirectory(localFileDirectory);
 
                         using (var fileStream = new FileStream(localFilePath, FileMode.Create, FileAccess.Write))

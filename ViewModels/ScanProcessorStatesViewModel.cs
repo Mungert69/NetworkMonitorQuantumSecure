@@ -55,7 +55,7 @@ namespace QuantumSecure.ViewModels
         {
             if (_scanProcessorStates != null) { 
                  _scanProcessorStates.AvailableNetworkInterfaces = NetworkUtils.GetSuitableNetworkInterfaces(_logger, _scanProcessorStates);
-            if (_scanProcessorStates.AvailableNetworkInterfaces!=null && _scanProcessorStates.AvailableNetworkInterfaces.Count>0) _scanProcessorStates.SelectedNetworkInterface = _scanProcessorStates.AvailableNetworkInterfaces.FirstOrDefault();
+            if (_scanProcessorStates.AvailableNetworkInterfaces!=null && _scanProcessorStates.AvailableNetworkInterfaces.Count>0) _scanProcessorStates.SelectedNetworkInterface = _scanProcessorStates.AvailableNetworkInterfaces.First();
       
             }
                  
