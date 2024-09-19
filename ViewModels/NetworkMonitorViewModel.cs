@@ -103,8 +103,8 @@ namespace QuantumSecure.ViewModels
 
                 ResultMessage = result.Success ? "Connection successful" : "Connection failed";
                 if (result.Data != null) { 
-                      ResponseTime = result.Data.ResponseTime.ToString() ?? "";
-                ResultStatus = result.Data.ResultStatus ?? false;
+                      ResponseTime = result.Data.ResponseTime.ToString()  ;
+                ResultStatus = result.Data.ResultStatus ;
                 }
               
                 HasResult = true;
