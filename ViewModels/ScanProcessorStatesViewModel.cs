@@ -53,9 +53,12 @@ namespace QuantumSecure.ViewModels
         public List<MonitorIP> SelectedDevices => _scanProcessorStates.SelectedDevices.ToList();
         public void LoadNetworkInterfaces()
         {
-            _scanProcessorStates.AvailableNetworkInterfaces = NetworkUtils.GetSuitableNetworkInterfaces(_logger, _scanProcessorStates);
+            if (_scanProcessorStates != null) { 
+                 _scanProcessorStates.AvailableNetworkInterfaces = NetworkUtils.GetSuitableNetworkInterfaces(_logger, _scanProcessorStates);
             if (_scanProcessorStates.AvailableNetworkInterfaces!=null && _scanProcessorStates.AvailableNetworkInterfaces.Count>0) _scanProcessorStates.SelectedNetworkInterface = _scanProcessorStates.AvailableNetworkInterfaces.FirstOrDefault();
-            
+      
+            }
+                 
         }
         public async Task Scan()
         {
