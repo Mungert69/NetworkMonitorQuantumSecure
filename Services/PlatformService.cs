@@ -184,9 +184,9 @@ var powerService=Context.PowerService;
 
             try
             {
-                 Android.Content.Intent intent = new Android.Content.Intent(Android.App.Application.Context,typeof(AndroidBackgroundService));
-   
-                 if (Build.VERSION.SdkInt >= BuildVersionCodes.O)
+                 Android.Content.Intent? intent = new Android.Content.Intent(Android.App.Application.Context,typeof(AndroidBackgroundService));
+                if (intent!=null){
+                     if (Build.VERSION.SdkInt >= BuildVersionCodes.O)
                 {
                 Android.App.Application.Context.StartForegroundService(intent);
                 }
@@ -194,6 +194,8 @@ var powerService=Context.PowerService;
   
                 Android.App.Application.Context.StartService(intent);
                 }
+                }
+                
                
                 //_serviceMessage = " Android Service started successfully.";
                 //_isServiceStarted=true;

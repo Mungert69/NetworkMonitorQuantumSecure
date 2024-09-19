@@ -13,7 +13,7 @@ public class DialogService : IDialogService
 
     public async Task DisplayAlert(string title, string message, string cancel)
     {
-        if (MainPage != null && MainThread != null)
+        if (MainPage != null)
         {
             if (MainThread.IsMainThread)
             {
