@@ -104,7 +104,7 @@ namespace QuantumSecure.ViewModels
             }
         }
 
-        private void OnProcessorStatesChanged(object sender, PropertyChangedEventArgs e)
+        private void OnProcessorStatesChanged(object? sender, PropertyChangedEventArgs e)
         {
             OnPropertyChanged(e.PropertyName);
 

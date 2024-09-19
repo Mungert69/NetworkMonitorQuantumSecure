@@ -285,7 +285,7 @@ namespace QuantumSecure.ViewModels
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        protected void SetProperty<T>(ref T storage, T value, [CallerMemberName] string propertyName = null)
+        protected void SetProperty<T>(ref T storage, T value, [CallerMemberName] string? propertyName = null)
         {
             if (Equals(storage, value))
             {

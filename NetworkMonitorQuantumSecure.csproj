@@ -11,7 +11,7 @@
         <SelfContained>true</SelfContained>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-
+    <NoWarn>CS8618</NoWarn>
         <!-- Display name -->
         <ApplicationTitle>Quantum Secure</ApplicationTitle>
 

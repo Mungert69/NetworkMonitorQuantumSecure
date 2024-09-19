@@ -223,7 +223,7 @@ public class StatusIndicator : ContentView
             _ripple.CancelAnimations();
         }
     }
-    private void OnAnimationTimerElapsed(object sender, ElapsedEventArgs e)
+    private void OnAnimationTimerElapsed(object? sender, ElapsedEventArgs e)
     {
         this.Dispatcher.Dispatch(() =>
    {

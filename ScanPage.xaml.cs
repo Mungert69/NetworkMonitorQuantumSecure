@@ -42,7 +42,7 @@ public partial class ScanPage : ContentPage
         AgentDisabledMessage.IsVisible = !_platformService.IsServiceStarted;
     }
 
-    private void OnEndpointTypePickerSelectedIndexChanged(object sender, EventArgs e)
+    private void OnEndpointTypePickerSelectedIndexChanged(object? sender, EventArgs e)
     {
         if (EndpointTypePicker.SelectedItem is string selectedEndpointType)
         {

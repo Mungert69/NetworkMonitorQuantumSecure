@@ -44,7 +44,7 @@ public const string ServiceMessageExtra = "ServiceMessage";
 
         }
 
-        public override IBinder OnBind(Intent intent)
+        public override IBinder OnBind(Intent? intent)
         {
             return null;
         }
@@ -100,7 +100,7 @@ public const string ServiceMessageExtra = "ServiceMessage";
             return PendingIntent.GetActivity(this, 0, viewAppIntent, 0);
         }
 
-        public override StartCommandResult OnStartCommand(Intent intent, StartCommandFlags flags, int startId)
+        public override StartCommandResult OnStartCommand(Intent? intent, StartCommandFlags flags, int startId)
         {
              if (_cts.IsCancellationRequested)
             {

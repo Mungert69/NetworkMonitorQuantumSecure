@@ -154,12 +154,15 @@ namespace QuantumSecure.Services
                 if (Build.VERSION.SdkInt >= BuildVersionCodes.M)
                 {
 #pragma warning disable CA1416
-                    var powerManager = (PowerManager)Platform.CurrentActivity.GetSystemService(Context.PowerService);
-                    if (!powerManager.IsIgnoringBatteryOptimizations(Platform.CurrentActivity.PackageName))
+var powerService=Context.PowerService;
+                    if (powerService!=null) {
+                        var powerManager = (PowerManager)Platform.CurrentActivity.GetSystemService(powerService);
+                    if (powerManager!=null && !powerManager.IsIgnoringBatteryOptimizations(Platform.CurrentActivity.PackageName))
                     {
                         var intentBattery = new Intent(Settings.ActionRequestIgnoreBatteryOptimizations);
                         intentBattery.SetData(Android.Net.Uri.Parse("package:" + Platform.CurrentActivity.PackageName));
                         Platform.CurrentActivity.StartActivity(intentBattery);
+                        }
                     }
 #pragma warning restore CA1416
 
@@ -279,7 +282,7 @@ namespace QuantumSecure.Services
                 _logger = logger;
             }
 
-            public override void OnReceive(Context context, Intent intent)
+            public override void OnReceive(Context? context, Intent? intent)
             {
                 try
                 {
