@@ -86,7 +86,7 @@ namespace QuantumSecure.ViewModels
         }
         public string BaseFusionAuthURL => _netConfig.BaseFusionAuthURL;
         public string ClientId => _netConfig.ClientId;
-        public string LocalSystemUrlDisplay => _netConfig.LocalSystemUrl?.ExternalUrl;
+        public string? LocalSystemUrlDisplay => _netConfig.LocalSystemUrl?.ExternalUrl;
         public string AppID => _netConfig.AppID;
         public int QuantumFilterSkip => _netConfig.QuantumFilterSkip;
         public int QuantumFilterStart => _netConfig.QuantumFilterStart;

@@ -297,7 +297,7 @@ var powerService=Context.PowerService;
                     if (intent?.Action == AndroidBackgroundService.ServiceBroadcastAction)
                     {
                         bool serviceChangeSuccess = intent?.GetBooleanExtra(AndroidBackgroundService.ServiceStatusExtra, false) ?? false;
-                        string message = intent?.GetStringExtra(AndroidBackgroundService.ServiceMessageExtra);
+                        string? message = intent?.GetStringExtra(AndroidBackgroundService.ServiceMessageExtra);
 
                         // Update PlatformService properties
                         if (serviceChangeSuccess)
