@@ -161,7 +161,7 @@ namespace QuantumSecure.ViewModels
             //activity.FinishAffinity();
         }
 
-        private void PlatformServiceStateChanged(object sender, EventArgs e)
+        private void PlatformServiceStateChanged(object? sender, EventArgs e)
         {
             try
             {
@@ -175,7 +175,7 @@ namespace QuantumSecure.ViewModels
                 _logger.LogError($" Error : handling service state change: {ex.Message}");
             }
         }
-        private void OnAgentUserFlowPropertyChanged(object sender, PropertyChangedEventArgs e)
+        private void OnAgentUserFlowPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             switch (e.PropertyName)
             {
@@ -240,7 +240,7 @@ namespace QuantumSecure.ViewModels
             {
                 if (_isCompleted)
                 {
-                    if (App.Current.RequestedTheme == AppTheme.Dark)
+                    if (App.Current?.RequestedTheme == AppTheme.Dark)
                     {
                         return ColorResource.GetResourceColor("Grey(950");
                     }

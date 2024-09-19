@@ -44,7 +44,7 @@ public const string ServiceMessageExtra = "ServiceMessage";
 
         }
 
-        public override IBinder OnBind(Intent? intent)
+        public override IBinder? OnBind(Intent? intent)
         {
             return null;
         }
@@ -107,7 +107,7 @@ public const string ServiceMessageExtra = "ServiceMessage";
                 _cts = new CancellationTokenSource();
             }
             try { 
-                if (intent.Action == "STOP_SERVICE") {
+                if (intent?.Action == "STOP_SERVICE") {
 
                 Task.Run(async () =>
                     {
@@ -135,8 +135,9 @@ public const string ServiceMessageExtra = "ServiceMessage";
 #pragma warning disable CA1416, CA1422
                     Notification notification;
                     NotificationChannel channel = new NotificationChannel("channel_id", "Quantum Secure Agent", NotificationImportance.Low);
-                    NotificationManager notificationManager = (NotificationManager)GetSystemService(Context.NotificationService);
-                    notificationManager.CreateNotificationChannel(channel);
+                    var notificationService=Context.NotificationService;
+                    NotificationManager? notificationManager = (NotificationManager?)GetSystemService(notificationService);
+                    notificationManager?.CreateNotificationChannel(channel);
                     /*var stopAction = new Notification.Action.Builder(
                             QuantumSecure.Resource.Drawable.stop,
                             "Stop",

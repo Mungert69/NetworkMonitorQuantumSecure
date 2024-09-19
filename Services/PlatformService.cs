@@ -156,7 +156,7 @@ namespace QuantumSecure.Services
 #pragma warning disable CA1416
 var powerService=Context.PowerService;
                     if (powerService!=null) {
-                        var powerManager = (PowerManager)Platform.CurrentActivity.GetSystemService(powerService);
+                        var powerManager = (PowerManager?)Platform.CurrentActivity?.GetSystemService(powerService);
                     if (powerManager!=null && !powerManager.IsIgnoringBatteryOptimizations(Platform.CurrentActivity.PackageName))
                     {
                         var intentBattery = new Intent(Settings.ActionRequestIgnoreBatteryOptimizations);
@@ -286,10 +286,10 @@ var powerService=Context.PowerService;
             {
                 try
                 {
-                    if (intent.Action == AndroidBackgroundService.ServiceBroadcastAction)
+                    if (intent?.Action == AndroidBackgroundService.ServiceBroadcastAction)
                     {
-                        bool serviceChangeSuccess = intent.GetBooleanExtra(AndroidBackgroundService.ServiceStatusExtra, false);
-                        string message = intent.GetStringExtra(AndroidBackgroundService.ServiceMessageExtra);
+                        bool serviceChangeSuccess = intent?.GetBooleanExtra(AndroidBackgroundService.ServiceStatusExtra, false) ?? false;
+                        string message = intent?.GetStringExtra(AndroidBackgroundService.ServiceMessageExtra);
 
                         // Update PlatformService properties
                         if (serviceChangeSuccess)

@@ -44,7 +44,7 @@ namespace QuantumSecure.ViewModels
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error initializing ScanProcessorStatesViewModel: {ex}");
+                _logger?.LogError($"Error initializing ScanProcessorStatesViewModel: {ex}");
             }
 
 
@@ -54,7 +54,8 @@ namespace QuantumSecure.ViewModels
         public void LoadNetworkInterfaces()
         {
             _scanProcessorStates.AvailableNetworkInterfaces = NetworkUtils.GetSuitableNetworkInterfaces(_logger, _scanProcessorStates);
-            _scanProcessorStates.SelectedNetworkInterface = _scanProcessorStates.AvailableNetworkInterfaces.FirstOrDefault();
+            if (_scanProcessorStates.AvailableNetworkInterfaces!=null && _scanProcessorStates.AvailableNetworkInterfaces.Count>0) _scanProcessorStates.SelectedNetworkInterface = _scanProcessorStates.AvailableNetworkInterfaces.FirstOrDefault();
+            
         }
         public async Task Scan()
         {
@@ -114,7 +115,7 @@ namespace QuantumSecure.ViewModels
             }
         }
 
-        private void UpdatePopupMessage(string propertyName)
+        private void UpdatePopupMessage(string? propertyName)
         {
             switch (propertyName)
             {
@@ -164,7 +165,7 @@ namespace QuantumSecure.ViewModels
                 {
                     hostObject = new QuantumHostObject
                     {
-                        Address = device.Address, // Assuming MonitorIP has a property IPAddress
+                        Address = device.Address ?? "NoHostFound", // Assuming MonitorIP has a property IPAddress
                         Port = device.Port,         // Assuming MonitorIP has a property Port
                         Timeout = 10000             // Default timeout, can be customized
                     };
@@ -173,10 +174,10 @@ namespace QuantumSecure.ViewModels
                 {
                     hostObject = new HostObject
                     {
-                        Address = device.Address, // Assuming MonitorIP has a property IPAddress
+                        Address = device.Address ?? "NoHostFound", // Assuming MonitorIP has a property IPAddress
                         Port = device.Port,         // Assuming MonitorIP has a property Port
                         Timeout = 10000,             // Default timeout, can be customized
-                        EndPointType = device.EndPointType
+                        EndPointType = device.EndPointType ?? "icmp"
                     };
                 }
 
@@ -190,16 +191,19 @@ namespace QuantumSecure.ViewModels
             // Handle the results (e.g., display them or log them)
             foreach (var result in results)
             {
-                string message = "";
-                if (result.Success)
+                string message = "No Data in results";
+                if (result.Data != null)
                 {
-                    message = $"Performed a successful {result.Data.CheckPerformed} check for {result.Data.TestedAddress} on port {result.Data.TestedPort} with status {result.Data.ResultStatus}\n";
-                    _logger.LogInformation(message);
-                }
-                else
-                {
-                    message = $"{result.Data.CheckPerformed} check failed for {result.Data.TestedAddress} on port {result.Data.TestedPort} with status {result.Data.ResultStatus}\n";
-                    _logger.LogWarning(message);
+                    if (result.Success)
+                    {
+                        message = $"Performed a successful {result.Data.CheckPerformed} check for {result.Data.TestedAddress} on port {result.Data.TestedPort} with status {result.Data.ResultStatus}\n";
+                        _logger.LogInformation(message);
+                    }
+                    else
+                    {
+                        message = $"{result.Data.CheckPerformed} check failed for {result.Data.TestedAddress} on port {result.Data.TestedPort} with status {result.Data.ResultStatus}\n";
+                        _logger.LogWarning(message);
+                    }
                 }
                 _scanProcessorStates.CompletedMessage += message;
             }
