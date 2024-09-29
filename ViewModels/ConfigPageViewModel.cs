@@ -24,7 +24,7 @@ namespace QuantumSecure.ViewModels
             }
 
         }
-        private void NetConfig_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        private void NetConfig_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             try
             {
@@ -86,7 +86,7 @@ namespace QuantumSecure.ViewModels
         }
         public string BaseFusionAuthURL => _netConfig.BaseFusionAuthURL;
         public string ClientId => _netConfig.ClientId;
-        public string LocalSystemUrlDisplay => _netConfig.LocalSystemUrl.ToString();
+        public string? LocalSystemUrlDisplay => _netConfig.LocalSystemUrl?.ExternalUrl;
         public string AppID => _netConfig.AppID;
         public int QuantumFilterSkip => _netConfig.QuantumFilterSkip;
         public int QuantumFilterStart => _netConfig.QuantumFilterStart;
@@ -99,9 +99,9 @@ namespace QuantumSecure.ViewModels
         public string Owner => _netConfig.Owner;
         public string MonitorLocation => _netConfig.MonitorLocation;
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

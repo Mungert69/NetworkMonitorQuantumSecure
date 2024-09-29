@@ -26,12 +26,12 @@ public partial class AppShell : Shell
            _logger?.LogError($" Error initializing AppShell {ex.Message} ");
         }
     }
-    protected override async void OnAppearing()
+    protected override void OnAppearing()
     {
         try
         {
             base.OnAppearing();
-           if (_platformService!=null) await _platformService.RequestPermissionsAsync();
+           if (_platformService!=null)  _platformService.RequestPermissionsAsync();
         }
         catch (Exception ex)
         {

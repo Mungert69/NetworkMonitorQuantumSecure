@@ -42,7 +42,7 @@ public partial class ScanPage : ContentPage
         AgentDisabledMessage.IsVisible = !_platformService.IsServiceStarted;
     }
 
-    private void OnEndpointTypePickerSelectedIndexChanged(object sender, EventArgs e)
+    private void OnEndpointTypePickerSelectedIndexChanged(object? sender, EventArgs e)
     {
         if (EndpointTypePicker.SelectedItem is string selectedEndpointType)
         {
@@ -163,12 +163,12 @@ public partial class ScanPage : ContentPage
             _logger.LogError($"Could not complete Cancel click. Error was: {ex}");
         }
     }
-    private async void OnHostsSelectionChanged(object sender, SelectionChangedEventArgs e)
+    private  void OnHostsSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         var selectedHosts = e.CurrentSelection.Cast<MonitorIP>().ToList();
         if (selectedHosts != null && selectedHosts.Count > 0)
         {
-            await _scanProcessorStatesViewModel.AddSelectedHosts(selectedHosts);
+             _scanProcessorStatesViewModel.AddSelectedHosts(selectedHosts);
         }
     }
     private async void OnGoHomeClicked(object sender, EventArgs e)

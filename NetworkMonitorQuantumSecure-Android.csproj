@@ -15,19 +15,20 @@
                 <ApplicationId>click.freenetworkmonitor.quantumsecure</ApplicationId>
                 <ApplicationIdGuid>d4f21b0e-2c97-4c50-b003-dca43bd9a888</ApplicationIdGuid>
                 <!-- Versions -->
-                <ApplicationDisplayVersion>0.1</ApplicationDisplayVersion>
-                <ApplicationVersion>28</ApplicationVersion>
+                <ApplicationDisplayVersion>0.2.1</ApplicationDisplayVersion>
+                <ApplicationVersion>201</ApplicationVersion>
                 <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
                 <AndroidSdkDirectory>/usr/lib/android-sdk</AndroidSdkDirectory>
-
+                <Nullable>enable</Nullable>
+    <NoWarn>CS8618</NoWarn>
 
         </PropertyGroup>
         <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
                 <AndroidPackageFormat>aab</AndroidPackageFormat>
                 <AndroidSigningKeyAlias>networkmonitormaui</AndroidSigningKeyAlias>
                 <AndroidSigningKeyStore>/home/mahadeva/code/securefiles/networkmonitormaui.keystore</AndroidSigningKeyStore>
-                <AndroidSigningKeyPass>0hsoL33l4</AndroidSigningKeyPass>
-                <AndroidSigningStorePass>0hsoL33l4</AndroidSigningStorePass>
+                <AndroidSigningKeyPass>$(ANDROID_SIGNING_KEY_PASS)</AndroidSigningKeyPass>
+                <AndroidSigningStorePass>$(ANDROID_SIGNING_KEY_PASS)</AndroidSigningStorePass>
                 <AndroidKeyStore>true</AndroidKeyStore>
                 <Optimize>false</Optimize>
                 <PublishTrimmed>false</PublishTrimmed>
@@ -53,22 +54,14 @@
 
         <ItemGroup>
                 <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
-                <PackageReference Include="CommunityToolkit.Maui" Version="8.0.1" />
-               <PackageReference Include="Microsoft.Maui.Controls" Version="8.0.71" />
-                <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="8.0.71" />
+                <PackageReference Include="CommunityToolkit.Maui" Version="9.0.1" />
+               <PackageReference Include="Microsoft.Maui.Controls" Version="8.0.91" />
+                <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="8.0.91" />
                 <PackageReference Include="MetroLog.Maui" Version="2.1.0" />
-                <PackageReference Include="Microsoft.Maui.Core" Version="8.0.71" />
-                <PackageReference Include="Microsoft.Maui.Essentials" Version="8.0.71" />
-                <PackageReference Include="Microsoft.Maui.Graphics" Version="8.0.71" />
-                <PackageReference Include="Xamarin.Android.Glide" Version="4.16.0.6" />
-                <PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData" Version="2.8.3.1" />
-                <PackageReference Include="Xamarin.AndroidX.Navigation.Common" Version="2.7.7.5" />
-                <PackageReference Include="Xamarin.AndroidX.Navigation.Fragment" Version="2.7.7.5" />
-                <PackageReference Include="Xamarin.AndroidX.Navigation.Runtime" Version="2.7.7.5" />
-                <PackageReference Include="Xamarin.AndroidX.Navigation.UI" Version="2.7.7.5" />
-                <PackageReference Include="Xamarin.AndroidX.SwipeRefreshLayout" Version="1.1.0.22" />
-                <PackageReference Include="Xamarin.Google.Android.Material" Version="1.11.0.1" />
-                  
+                <PackageReference Include="Microsoft.Maui.Core" Version="8.0.91" />
+                <PackageReference Include="Microsoft.Maui.Essentials" Version="8.0.91" />
+                <PackageReference Include="Microsoft.Maui.Graphics" Version="8.0.91" />
+                     
               </ItemGroup>
         <ItemGroup>
                 <ProjectReference Include="..\NetworkMonitorProcessor\NetworkMonitorProcessor-Maui.csproj" />

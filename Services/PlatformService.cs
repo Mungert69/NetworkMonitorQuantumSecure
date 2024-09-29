@@ -13,7 +13,7 @@ namespace QuantumSecure.Services
 {
     public interface IPlatformService
     {
-        Task<bool> RequestPermissionsAsync();
+        bool RequestPermissionsAsync();
         Task StartBackgroundService();
         Task StopBackgroundService();
         bool IsServiceStarted { get; set; }
@@ -33,7 +33,7 @@ namespace QuantumSecure.Services
         protected string _serviceMessage;
         protected bool _disableAgentOnServiceShutdown = false;
         public event EventHandler ServiceStateChanged;
-        public event EventHandler CloseAgentChanged;
+        //public event EventHandler CloseAgentChanged;
         public bool IsServiceStarted
         {
             get => _isServiceStarted;
@@ -131,7 +131,7 @@ namespace QuantumSecure.Services
             Android.App.Application.Context.RegisterReceiver(_serviceStatusReceiver, filter);
         }
 
-        public async Task<bool> RequestPermissionsAsync()
+        public bool RequestPermissionsAsync()
         {
             try
             {
@@ -154,12 +154,18 @@ namespace QuantumSecure.Services
                 if (Build.VERSION.SdkInt >= BuildVersionCodes.M)
                 {
 #pragma warning disable CA1416
-                    var powerManager = (PowerManager)Platform.CurrentActivity.GetSystemService(Context.PowerService);
-                    if (!powerManager.IsIgnoringBatteryOptimizations(Platform.CurrentActivity.PackageName))
+var powerService=Context.PowerService;
+                    if (powerService!=null) {
+                        var powerManager = (PowerManager?)Platform.CurrentActivity?.GetSystemService(powerService);
+                    if (powerManager!=null && !powerManager.IsIgnoringBatteryOptimizations(Platform.CurrentActivity?.PackageName))
                     {
                         var intentBattery = new Intent(Settings.ActionRequestIgnoreBatteryOptimizations);
-                        intentBattery.SetData(Android.Net.Uri.Parse("package:" + Platform.CurrentActivity.PackageName));
+                        if (Platform.CurrentActivity!=null){
+                             intentBattery.SetData(Android.Net.Uri.Parse("package:" + Platform.CurrentActivity.PackageName));
                         Platform.CurrentActivity.StartActivity(intentBattery);
+                        }
+                       
+                        }
                     }
 #pragma warning restore CA1416
 
@@ -181,16 +187,18 @@ namespace QuantumSecure.Services
 
             try
             {
-                 Android.Content.Intent intent = new Android.Content.Intent(Android.App.Application.Context,typeof(AndroidBackgroundService));
-   
-                 if (Build.VERSION.SdkInt >= BuildVersionCodes.O)
+                 Android.Content.Intent? intent = new Android.Content.Intent(Android.App.Application.Context,typeof(AndroidBackgroundService));
+                if (intent!=null && Android.App.Application.Context!=null){
+                     if (Build.VERSION.SdkInt >= BuildVersionCodes.O)
                 {
-                Android.App.Application.Context.StartForegroundService(intent);
+                        Android.App.Application.Context.StartForegroundService(intent);
                 }
                 else{
   
-                Android.App.Application.Context.StartService(intent);
+                          Android.App.Application.Context.StartService(intent);
                 }
+                }
+                
                
                 //_serviceMessage = " Android Service started successfully.";
                 //_isServiceStarted=true;
@@ -210,10 +218,13 @@ namespace QuantumSecure.Services
 
             try
             {
-                var intent = new Intent(Platform.CurrentActivity, typeof(AndroidBackgroundService));
+                if (Platform.CurrentActivity!=null){
+                       var intent = new Intent(Platform.CurrentActivity, typeof(AndroidBackgroundService));
                 Platform.CurrentActivity.StopService(intent);
                 //_serviceMessage = " Android Service stopped successfully.";
                 //_isServiceStarted=false;
+                }
+             
 
                 return _serviceOperationCompletionSource.Task;
             }
@@ -279,14 +290,14 @@ namespace QuantumSecure.Services
                 _logger = logger;
             }
 
-            public override void OnReceive(Context context, Intent intent)
+            public override void OnReceive(Context? context, Intent? intent)
             {
                 try
                 {
-                    if (intent.Action == AndroidBackgroundService.ServiceBroadcastAction)
+                    if (intent?.Action == AndroidBackgroundService.ServiceBroadcastAction)
                     {
-                        bool serviceChangeSuccess = intent.GetBooleanExtra(AndroidBackgroundService.ServiceStatusExtra, false);
-                        string message = intent.GetStringExtra(AndroidBackgroundService.ServiceMessageExtra);
+                        bool serviceChangeSuccess = intent?.GetBooleanExtra(AndroidBackgroundService.ServiceStatusExtra, false) ?? false;
+                        string? message = intent?.GetStringExtra(AndroidBackgroundService.ServiceMessageExtra);
 
                         // Update PlatformService properties
                         if (serviceChangeSuccess)
@@ -334,17 +345,17 @@ namespace QuantumSecure.Services
             _backgroundService = backgroundService;
         }
 
-        public Task<bool> RequestPermissionsAsync()
+        public bool RequestPermissionsAsync()
         {
             try
             {
                 // Windows-specific permission logic here
-                return Task.FromResult(true);
+                return true;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error requesting permissions in WindowsPlatformService");
-                return Task.FromResult(false);
+                return false;
             }
         }
 

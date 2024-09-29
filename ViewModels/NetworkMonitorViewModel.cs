@@ -20,7 +20,7 @@ namespace QuantumSecure.ViewModels
         private string _responseTime;
         private string _resultStatus;
 
-        public ObservableCollection<string> EndpointTypes { get; } 
+        public ObservableCollection<string> EndpointTypes { get; }
 
         public string SelectedEndpointType
         {
@@ -75,7 +75,7 @@ namespace QuantumSecure.ViewModels
         public NetworkMonitorViewModel(IApiService apiService)
         {
             _apiService = apiService;
-             // Initialize the EndpointTypes collection with friendly names
+            // Initialize the EndpointTypes collection with friendly names
             EndpointTypes = new ObservableCollection<string>(EndPointTypeFactory.GetTypesFriendlyName());
 
             TestConnectionCommand = new Command(async () => await TestConnection());
@@ -102,8 +102,12 @@ namespace QuantumSecure.ViewModels
                 result = await EndPointTypeFactory.TestConnection(internalType, _apiService, hostObject, Address, Port);
 
                 ResultMessage = result.Success ? "Connection successful" : "Connection failed";
-                ResponseTime = result.Data.ResponseTime.ToString();
-                ResultStatus = result.Data.ResultStatus;
+                if (result.Data != null)
+                {
+                    if (result.Data.ResponseTime != null) ResponseTime = result.Data.ResponseTime.ToString();
+                    if (result.Data.ResultStatus!= null) ResultStatus = result.Data.ResultStatus;
+                }
+
                 HasResult = true;
             }
             catch (Exception ex)
@@ -117,8 +121,8 @@ namespace QuantumSecure.ViewModels
             }
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

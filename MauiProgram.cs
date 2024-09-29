@@ -98,10 +98,6 @@ namespace QuantumSecure
                return new LocalProcessorStates();
            });
             builder.Services.AddSingleton(provider =>
-            {
-                return new LocalPingCmdProcessorStates();
-            });
-            builder.Services.AddSingleton(provider =>
            {
                return new LocalNmapCmdProcessorStates();
            });
@@ -125,6 +121,11 @@ namespace QuantumSecure
            {
                return new LocalCrawlPageCmdProcessorStates();
            });
+            builder.Services.AddSingleton(provider =>
+           {
+               return new LocalPingCmdProcessorStates();
+           });
+           
             builder.Services.AddSingleton<IApiService>(provider =>
           {
               var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
@@ -196,7 +197,7 @@ namespace QuantumSecure
                     var crawlpageCmdProcessorStates = provider.GetRequiredService<LocalCrawlPageCmdProcessorStates>();
                     var pingCmdProcessorStates = provider.GetRequiredService<LocalPingCmdProcessorStates>();
 
-                    return new CmdProcessorFactory(loggerFactory, rabbitRepo, netConfig, nmapCmdProcessorStates, metaCmdProcessorStates, opensslCmdProcessorStates, busyboxCmdProcessorStates, searchwebCmdProcessorStates, crawlpageCmdProcessorStates, pingCmdProcessorStates);
+                    return new CmdProcessorFactory(loggerFactory, rabbitRepo, netConfig, nmapCmdProcessorStates, metaCmdProcessorStates, opensslCmdProcessorStates, busyboxCmdProcessorStates, searchwebCmdProcessorStates, crawlpageCmdProcessorStates, pingCmdProcessorStates );
 
 
                 });
@@ -371,9 +372,9 @@ namespace QuantumSecure
                         }
 
                         localFilePath = Path.Combine(localPath, assetFile);
-                        string localFileDirectory = Path.GetDirectoryName(localFilePath);
+                        string? localFileDirectory = Path.GetDirectoryName(localFilePath);
 
-                        if (!Directory.Exists(localFileDirectory))
+                        if (localFileDirectory!=null && !Directory.Exists(localFileDirectory))
                             Directory.CreateDirectory(localFileDirectory);
 
                         using (var fileStream = new FileStream(localFilePath, FileMode.Create, FileAccess.Write))

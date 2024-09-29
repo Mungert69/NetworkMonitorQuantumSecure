@@ -97,7 +97,7 @@ namespace QuantumSecure.ViewModels
                 ShowToggle = false;
                 ShowLoadingMessage?.Invoke(this, true);
                 await Task.Delay(200); // A short delay, adjust as necessary
-                await await Task.Run(async () => _platformService.ChangeServiceState(state));
+                await Task.Run(async () => await _platformService.ChangeServiceState(state));
             }
             finally
             {
@@ -161,7 +161,7 @@ namespace QuantumSecure.ViewModels
             //activity.FinishAffinity();
         }
 
-        private void PlatformServiceStateChanged(object sender, EventArgs e)
+        private void PlatformServiceStateChanged(object? sender, EventArgs e)
         {
             try
             {
@@ -175,7 +175,7 @@ namespace QuantumSecure.ViewModels
                 _logger.LogError($" Error : handling service state change: {ex.Message}");
             }
         }
-        private void OnAgentUserFlowPropertyChanged(object sender, PropertyChangedEventArgs e)
+        private void OnAgentUserFlowPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             switch (e.PropertyName)
             {
@@ -240,7 +240,7 @@ namespace QuantumSecure.ViewModels
             {
                 if (_isCompleted)
                 {
-                    if (App.Current.RequestedTheme == AppTheme.Dark)
+                    if (App.Current?.RequestedTheme == AppTheme.Dark)
                     {
                         return ColorResource.GetResourceColor("Grey(950");
                     }
@@ -285,7 +285,7 @@ namespace QuantumSecure.ViewModels
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        protected void SetProperty<T>(ref T storage, T value, [CallerMemberName] string propertyName = null)
+        protected void SetProperty<T>(ref T storage, T value, [CallerMemberName] string? propertyName = null)
         {
             if (Equals(storage, value))
             {

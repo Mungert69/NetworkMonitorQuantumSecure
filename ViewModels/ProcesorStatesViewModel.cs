@@ -27,7 +27,7 @@ namespace QuantumSecure.ViewModels
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error initializing ProcessorStatesViewModel: {ex}");
+                _logger?.LogError($"Error initializing ProcessorStatesViewModel: {ex}");
                 // Consider fallback logic or notifying the user of the error
             }
 
@@ -44,7 +44,7 @@ namespace QuantumSecure.ViewModels
         public string RunningMessage => _processorStates.RunningMessage;
         public string ConnectRunningMessage => _processorStates.ConnectRunningMessage;
 
-        private void OnProcessorStatesChanged(object sender, PropertyChangedEventArgs e)
+        private void OnProcessorStatesChanged(object? sender, PropertyChangedEventArgs e)
         {
             OnPropertyChanged(e.PropertyName);
 
@@ -55,7 +55,7 @@ namespace QuantumSecure.ViewModels
             }
         }
 
-        private void UpdatePopupMessage(string propertyName)
+        private void UpdatePopupMessage(string? propertyName)
         {
             // Logic to update PopupMessage based on propertyName
             switch (propertyName)

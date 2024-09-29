@@ -12,7 +12,7 @@ using NetworkMonitor.DTOs;
 using NetworkMonitor.Objects;
 using Microsoft.Extensions.Configuration;
 using AndroidX.Core.App;
-using NetworkMonitor.Processor.Services;
+
 
 
 namespace QuantumSecure.Services
@@ -44,7 +44,7 @@ public const string ServiceMessageExtra = "ServiceMessage";
 
         }
 
-        public override IBinder OnBind(Intent intent)
+        public override IBinder? OnBind(Intent? intent)
         {
             return null;
         }
@@ -92,7 +92,7 @@ public const string ServiceMessageExtra = "ServiceMessage";
             }
         }
 
-        private PendingIntent GetViewAppPendingIntent()
+        private PendingIntent? GetViewAppPendingIntent()
         {
             var viewAppIntent = new Intent(this, typeof(MainActivity)); // Replace 'MainActivity' with your main activity class
             viewAppIntent.SetAction(Intent.ActionMain);
@@ -100,14 +100,14 @@ public const string ServiceMessageExtra = "ServiceMessage";
             return PendingIntent.GetActivity(this, 0, viewAppIntent, 0);
         }
 
-        public override StartCommandResult OnStartCommand(Intent intent, StartCommandFlags flags, int startId)
+        public override StartCommandResult OnStartCommand(Intent? intent, StartCommandFlags flags, int startId)
         {
              if (_cts.IsCancellationRequested)
             {
                 _cts = new CancellationTokenSource();
             }
             try { 
-                if (intent.Action == "STOP_SERVICE") {
+                if (intent?.Action == "STOP_SERVICE") {
 
                 Task.Run(async () =>
                     {
@@ -135,8 +135,9 @@ public const string ServiceMessageExtra = "ServiceMessage";
 #pragma warning disable CA1416, CA1422
                     Notification notification;
                     NotificationChannel channel = new NotificationChannel("channel_id", "Quantum Secure Agent", NotificationImportance.Low);
-                    NotificationManager notificationManager = (NotificationManager)GetSystemService(Context.NotificationService);
-                    notificationManager.CreateNotificationChannel(channel);
+                    var notificationService=Context.NotificationService;
+                    NotificationManager? notificationManager = (NotificationManager?)GetSystemService(notificationService);
+                    notificationManager?.CreateNotificationChannel(channel);
                     /*var stopAction = new Notification.Action.Builder(
                             QuantumSecure.Resource.Drawable.stop,
                             "Stop",
