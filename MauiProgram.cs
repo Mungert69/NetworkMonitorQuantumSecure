@@ -121,6 +121,11 @@ namespace QuantumSecure
            {
                return new LocalCrawlPageCmdProcessorStates();
            });
+            builder.Services.AddSingleton(provider =>
+           {
+               return new LocalPingCmdProcessorStates();
+           });
+           
             builder.Services.AddSingleton<IApiService>(provider =>
           {
               var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
