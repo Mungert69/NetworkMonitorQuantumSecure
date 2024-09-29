@@ -3,6 +3,7 @@
     <PropertyGroup>
 
         <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net8.0-windows10.0.19041.0</TargetFrameworks>
+        <IsWindows Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'">true</IsWindows>
 
         <OutputType>Exe</OutputType>
         <RootNamespace>QuantumSecure</RootNamespace>
@@ -11,7 +12,7 @@
         <SelfContained>true</SelfContained>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-    <NoWarn>CS8618</NoWarn>
+        <NoWarn>CS8618</NoWarn>
         <!-- Display name -->
         <ApplicationTitle>Quantum Secure</ApplicationTitle>
 
@@ -34,7 +35,7 @@
         <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
         <PackageCertificateThumbprint>F13A020884C94F4309A40BD2B922FBB8FACABC45</PackageCertificateThumbprint>
         <IncludeSymbols>True</IncludeSymbols>
-
+        
     </PropertyGroup>
 
     <ItemGroup>
