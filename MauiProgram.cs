@@ -132,7 +132,7 @@ namespace QuantumSecure
               var configuration = provider.GetRequiredService<IConfiguration>();
              var cmdProcessorProvider=provider.GetRequiredService<ICmdProcessorProvider>();
                    
-              return new ApiService(loggerFactory, configuration, FileSystem.AppDataDirectory, cmdProcessorProvider);
+              return new ApiService(loggerFactory, configuration, cmdProcessorProvider, FileSystem.AppDataDirectory);
           });
 
 

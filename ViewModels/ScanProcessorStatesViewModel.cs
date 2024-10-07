@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using NetworkMonitor.Objects;
+using NetworkMonitor.Connection;
 using Microsoft.Extensions.DependencyInjection;
 using System.Windows.Input;
 using Microsoft.Maui.Controls;
@@ -31,12 +32,12 @@ namespace QuantumSecure.ViewModels
         }
 
 
-        public ScanProcessorStatesViewModel(ILogger logger, LocalCmdProcessorStates cmdProcessorStates, IApiService apiService, NetConnectConfig netConfig)
+        public ScanProcessorStatesViewModel(ILogger logger, LocalCmdProcessorStates scanProcessorStates, IApiService apiService, NetConnectConfig netConfig)
         {
             try
             {
-                _logger = logger; _scanProcessorStates = cmdProcessorStates;
-                 scanProcessorStates.EndPointTypes = netConfig.EndPointTypes;
+                _logger = logger; _scanProcessorStates = scanProcessorStates;
+                 scanProcessorStates.EndpointTypes = netConfig.EndpointTypes;
                 scanProcessorStates.UseDefaultEndpointType = netConfig.UseDefaultEndpointType;
                 scanProcessorStates.DefaultEndpointType = netConfig.DefaultEndpointType;
                 _apiService = apiService;
