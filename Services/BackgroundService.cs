@@ -49,34 +49,9 @@ namespace QuantumSecure.Services
             {
                 result = await _rabbitRepo.ConnectAndSetUp();
                 if (!result.Success) return result;
-                
-                var _connectFactory = new NetworkMonitor.Connection.ConnectFactory(_loggerFactory.CreateLogger<ConnectFactory>(), netConfig: _netConfig);
+
+                var _connectFactory = new NetworkMonitor.Connection.ConnectFactory(_loggerFactory.CreateLogger<ConnectFactory>(), netConfig: _netConfig, _cmdProcessorProvider);
                 _ = _connectFactory.SetupChromium(_netConfig);
-                _cmdProcessorProvider.NmapStates.UseDefaultEndpointType = _netConfig.UseDefaultEndpointType;
-                _cmdProcessorProvider.NmapStates.DefaultEndpointType = _netConfig.DefaultEndpointType;
-                _cmdProcessorProvider.NmapStates.EndpointTypes = _netConfig.EndpointTypes;
-                _cmdProcessorProvider.NmapStates.IsCmdAvailable = !_netConfig.DisabledCommands.Any(a => a == _cmdProcessorProvider.NmapStates.CmdName);
-                if (_cmdProcessorProvider.NmapStates.IsCmdAvailable) _logger.LogInformation(" Success : Nmap command is available.");
-
-                _cmdProcessorProvider.MetasploitStates.UseDefaultEndpointType = _netConfig.UseDefaultEndpointType;
-                _cmdProcessorProvider.MetasploitStates.DefaultEndpointType = _netConfig.DefaultEndpointType;
-                _cmdProcessorProvider.MetasploitStates.EndpointTypes = _netConfig.EndpointTypes;
-                _cmdProcessorProvider.MetasploitStates.IsCmdAvailable = !_netConfig.DisabledCommands.Any(a => a == _cmdProcessorProvider.MetasploitStates.CmdName);
-                if (_cmdProcessorProvider.MetasploitStates.IsCmdAvailable) _logger.LogInformation(" Success : Metasploit command is available.");
-
-                _cmdProcessorProvider.OpensslStates.IsCmdAvailable = !_netConfig.DisabledCommands.Any(a => a == _cmdProcessorProvider.OpensslStates.CmdName);
-                if (_cmdProcessorProvider.OpensslStates.IsCmdAvailable) _logger.LogInformation(" Success : Openssl command is available.");
-                
-                _cmdProcessorProvider.BusyboxStates.IsCmdAvailable = !_netConfig.DisabledCommands.Any(a => a == _cmdProcessorProvider.BusyboxStates.CmdName);
-                if (_cmdProcessorProvider.BusyboxStates.IsCmdAvailable) _logger.LogInformation(" Success : Busybox command is available.");
-                
-                _cmdProcessorProvider.SearchWebStates.IsCmdAvailable = !_netConfig.DisabledCommands.Any(a => a == _cmdProcessorProvider.SearchWebStates.CmdName);
-                if (_cmdProcessorProvider.SearchWebStates.IsCmdAvailable) _logger.LogInformation(" Success : SearchWeb command is available.");
-                
-                _cmdProcessorProvider.CrawlPageStates.IsCmdAvailable = !_netConfig.DisabledCommands.Any(a => a == _cmdProcessorProvider.CrawlPageStates.CmdName);
-                if (_cmdProcessorProvider.CrawlPageStates.IsCmdAvailable) _logger.LogInformation(" Success : CrawlPage command is available.");
-                
-
                 _monitorPingProcessor = new MonitorPingProcessor(_loggerFactory.CreateLogger<MonitorPingProcessor>(), _netConfig, _connectFactory, _fileRepo, _rabbitRepo, _processorStates, _monitorPingInfoView);
                 _rabbitListener = new RabbitListener(_monitorPingProcessor, _loggerFactory.CreateLogger<RabbitListener>(), _netConfig, _processorStates, _cmdProcessorProvider);
                 var resultListener = await _rabbitListener.SetupListener();
