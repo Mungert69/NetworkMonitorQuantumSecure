@@ -31,11 +31,14 @@ namespace QuantumSecure.ViewModels
         }
 
 
-        public ScanProcessorStatesViewModel(ILogger logger, LocalCmdProcessorStates cmdProcessorStates, IApiService apiService)
+        public ScanProcessorStatesViewModel(ILogger logger, LocalCmdProcessorStates cmdProcessorStates, IApiService apiService, NetConnectConfig netConfig)
         {
             try
             {
                 _logger = logger; _scanProcessorStates = cmdProcessorStates;
+                 scanProcessorStates.EndPointTypes = netConfig.EndPointTypes;
+                scanProcessorStates.UseDefaultEndpointType = netConfig.UseDefaultEndpointType;
+                scanProcessorStates.DefaultEndpointType = netConfig.DefaultEndpointType;
                 _apiService = apiService;
                 _scanProcessorStates.PropertyChanged += OnProcessorStatesChanged;
                 EndpointTypes = new ObservableCollection<string>(_scanProcessorStates.EndpointTypes);

@@ -130,7 +130,9 @@ namespace QuantumSecure
           {
               var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
               var configuration = provider.GetRequiredService<IConfiguration>();
-              return new ApiService(loggerFactory, configuration, FileSystem.AppDataDirectory);
+             var cmdProcessorProvider=provider.GetRequiredService<ICmdProcessorProvider>();
+                   
+              return new ApiService(loggerFactory, configuration, FileSystem.AppDataDirectory, cmdProcessorProvider);
           });
 
 
@@ -256,9 +258,11 @@ namespace QuantumSecure
            {
                var logger = provider.GetRequiredService<ILogger<ScanProcessorStatesViewModel>>();
                var nmapCmdProcessorStates = provider.GetRequiredService<LocalNmapCmdProcessorStates>();
+                var netConfig = provider.GetRequiredService<NetConnectConfig>();
+                   
                // Choose the appropriate constructor
                var apiService = provider.GetRequiredService<IApiService>();
-               return new ScanProcessorStatesViewModel(logger, nmapCmdProcessorStates, apiService);
+               return new ScanProcessorStatesViewModel(logger, nmapCmdProcessorStates, apiService,netConfig);
            });
 
             builder.Services.AddSingleton(provider =>
