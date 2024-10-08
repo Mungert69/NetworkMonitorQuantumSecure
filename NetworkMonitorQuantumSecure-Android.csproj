@@ -30,9 +30,9 @@
                 <AndroidSigningKeyPass>$(ANDROID_SIGNING_KEY_PASS)</AndroidSigningKeyPass>
                 <AndroidSigningStorePass>$(ANDROID_SIGNING_KEY_PASS)</AndroidSigningStorePass>
                 <AndroidKeyStore>true</AndroidKeyStore>
-                <Optimize>false</Optimize>
-                <PublishTrimmed>false</PublishTrimmed>
-                <RunAOTCompilation>false</RunAOTCompilation>
+                <Optimize>true</Optimize>
+                <PublishTrimmed>true</PublishTrimmed>
+                <RunAOTCompilation>true</RunAOTCompilation>
         </PropertyGroup>
 
 
