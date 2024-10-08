@@ -112,7 +112,7 @@ namespace QuantumSecure.ViewModels
                 if (result.Data != null)
                 {
                     if (result.Data.ResponseTime != null) ResponseTime = result?.Data?.ResponseTime ?? UInt16.MaxValue;
-                    if (result.Data.ResultStatus!= null) ResultStatus = result>.Data?.ResultStatus ?? "";
+                    if (result.Data.ResultStatus!= null) ResultStatus = result?.Data?.ResultStatus ?? "";
                 }
 
                 HasResult = true;
