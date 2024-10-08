@@ -19,13 +19,21 @@ namespace QuantumSecure.ViewModels
         private string _resultMessage;
         private string _responseTime;
         private string _resultStatus;
+        private string _internalEndpointType; // New field to store internal type
+
 
         public ObservableCollection<string> EndpointTypes { get; }
 
         public string SelectedEndpointType
         {
             get => _selectedEndpointType;
-            set { _selectedEndpointType = value; OnPropertyChanged(); }
+            set
+            {
+                _selectedEndpointType = value;
+                // Update internal type whenever the friendly name changes
+                _internalEndpointType = EndPointTypeFactory.GetInternalType(_selectedEndpointType);
+                OnPropertyChanged();
+            }
         }
 
         public string Address
@@ -96,11 +104,10 @@ namespace QuantumSecure.ViewModels
             try
             {
                 TResultObj<DataObj> result;
-                var hostObject = new HostObject { Address = Address, Port = Port };
-                string internalType = EndPointTypeFactory.GetInternalType(SelectedEndpointType);
+                var hostObject = new HostObject { Address = Address, Port = Port, EndPointType = _internalEndpointType, Timeout=59000 }; // Use internal type
+                result = await EndPointTypeFactory.TestConnection(_internalEndpointType, _apiService, hostObject, Address, Port);
 
-                result = await EndPointTypeFactory.TestConnection(internalType, _apiService, hostObject, Address, Port);
-
+               
                 ResultMessage = result.Success ? "Connection successful" : "Connection failed";
                 if (result.Data != null)
                 {

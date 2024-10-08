@@ -183,7 +183,7 @@ namespace QuantumSecure.ViewModels
                     {
                         Address = device.Address ?? "NoHostFound", // Assuming MonitorIP has a property IPAddress
                         Port = device.Port,         // Assuming MonitorIP has a property Port
-                        Timeout = 10000,             // Default timeout, can be customized
+                        Timeout = 59000,             // Default timeout, can be customized
                         EndPointType = device.EndPointType ?? "icmp"
                     };
                 }

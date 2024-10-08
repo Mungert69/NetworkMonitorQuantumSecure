@@ -20,8 +20,8 @@
         <ApplicationId>click.freenetworkmonitor.quantumsecure</ApplicationId>
 
         <!-- Versions -->
-        <ApplicationDisplayVersion>0.1</ApplicationDisplayVersion>
-        <ApplicationVersion>28</ApplicationVersion>
+        <ApplicationDisplayVersion>0.2</ApplicationDisplayVersion>
+        <ApplicationVersion>204</ApplicationVersion>
 
         <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
         <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
