@@ -9,7 +9,7 @@
         <RootNamespace>QuantumSecure</RootNamespace>
         <UseMaui>true</UseMaui>
         <SingleProject>true</SingleProject>
-        <SelfContained>true</SelfContained>
+        <SelfContained>false</SelfContained>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <NoWarn>CS8618</NoWarn>
@@ -20,8 +20,8 @@
         <ApplicationId>click.freenetworkmonitor.quantumsecure</ApplicationId>
 
         <!-- Versions -->
-        <ApplicationDisplayVersion>0.2</ApplicationDisplayVersion>
-        <ApplicationVersion>204</ApplicationVersion>
+        <ApplicationDisplayVersion>0.2.6</ApplicationDisplayVersion>
+        <ApplicationVersion>206</ApplicationVersion>
 
         <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
         <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
@@ -64,17 +64,17 @@
     </ItemGroup>
     <ItemGroup>
 
-        <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
-        <PackageReference Include="CommunityToolkit.Maui" Version="9.0.3" />
-        <PackageReference Include="Microsoft.Maui.Controls" Version="8.0.82" />
-        <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="8.0.82" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.1" />
+        <PackageReference Include="CommunityToolkit.Maui" Version="9.1.0" />
+        <PackageReference Include="Microsoft.Maui.Controls" Version="8.0.91" />
+        <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="8.0.91" />
         <PackageReference Include="MetroLog.Maui" Version="2.1.0" />
-        <PackageReference Include="Microsoft.Maui.Core" Version="8.0.82" />
-        <PackageReference Include="Microsoft.Maui.Essentials" Version="8.0.82" />
-        <PackageReference Include="Microsoft.Maui.Graphics" Version="8.0.82" />
-        <PackageReference Include="Microsoft.Maui.Graphics.Win2D.WinUI.Desktop" Version="8.0.82" />
+        <PackageReference Include="Microsoft.Maui.Core" Version="8.0.91" />
+        <PackageReference Include="Microsoft.Maui.Essentials" Version="8.0.91" />
+        <PackageReference Include="Microsoft.Maui.Graphics" Version="8.0.91" />
+        <PackageReference Include="Microsoft.Maui.Graphics.Win2D.WinUI.Desktop" Version="8.0.91" />
         <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.22621.3233" />
-        <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.5.240627000" />
+        <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.240923002" />
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="..\NetworkMonitorProcessor\NetworkMonitorProcessor-Maui.csproj" />
