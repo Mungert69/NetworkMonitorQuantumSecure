@@ -15,8 +15,8 @@
                 <ApplicationId>click.freenetworkmonitor.quantumsecure</ApplicationId>
                 <ApplicationIdGuid>d4f21b0e-2c97-4c50-b003-dca43bd9a888</ApplicationIdGuid>
                 <!-- Versions -->
-                <ApplicationDisplayVersion>0.2.4</ApplicationDisplayVersion>
-                <ApplicationVersion>204</ApplicationVersion>
+                <ApplicationDisplayVersion>0.2.6</ApplicationDisplayVersion>
+                <ApplicationVersion>206</ApplicationVersion>
                 <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
                 <AndroidSdkDirectory>/usr/lib/android-sdk</AndroidSdkDirectory>
                 <Nullable>enable</Nullable>
@@ -31,8 +31,8 @@
                 <AndroidSigningStorePass>$(ANDROID_SIGNING_KEY_PASS)</AndroidSigningStorePass>
                 <AndroidKeyStore>true</AndroidKeyStore>
                 <Optimize>true</Optimize>
-                <PublishTrimmed>true</PublishTrimmed>
-                <RunAOTCompilation>true</RunAOTCompilation>
+                <PublishTrimmed>false</PublishTrimmed>
+                <RunAOTCompilation>false</RunAOTCompilation>
         </PropertyGroup>
 
 
