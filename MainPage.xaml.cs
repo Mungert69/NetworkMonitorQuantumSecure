@@ -174,7 +174,7 @@ public partial class MainPage : ContentPage
 
             if (result.Success)
             {
-                 await DisplayAlert("Success", $"Authorization successful! Now login to Quantum Secure and add hosts to monitor from your device. choose '{_netConfig.MonitorLocation}' as the monitor location . ", "OK");
+                 await DisplayAlert("Success", $"Authorization successful! Now login to Free Network Monitor and add hosts to monitor from your device. choose '{_netConfig.MonitorLocation}' as the monitor location . ", "OK");
 
             }
             else

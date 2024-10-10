@@ -293,7 +293,7 @@ namespace QuantumSecure
             builder.Services.AddSingleton(provider =>
             {
                 var netConfig = provider.GetRequiredService<NetConnectConfig>();
-                var logger = provider.GetRequiredService<ILogger<MainPage>>();
+                var logger = provider.GetRequiredService<ILogger<ConfigPageViewModel>>();
                 return new ConfigPageViewModel(logger, netConfig);
             });
             builder.Services.AddSingleton(provider =>
