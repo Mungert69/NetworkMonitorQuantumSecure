@@ -11,5 +11,6 @@ fi
 
 # Proceed with the rest of the commands
 dotnet clean NetworkMonitorQuantumSecure-Android.csproj
+cp ./Resources/Raw/appsettings-live.json ./Resources/Raw/appsettings.json
 dotnet build -c Release -f net8.0-android NetworkMonitorQuantumSecure-Android.csproj
 
