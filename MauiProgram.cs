@@ -390,10 +390,12 @@ namespace QuantumSecure
                     if (IsWindowsBusyboxBinary(assetFile)) SetExecutablePermission(localFilePath);
                     if (IsWindowsOpenSSLBinary(assetFile)) SetExecutablePermission(localFilePath);
                     if (IsWindowsNmapBinary(assetFile)) SetExecutablePermission(localFilePath);
+                     if (IsWindowsCurlBinary(assetFile)) SetExecutablePermission(localFilePath);
 #else
                     if (IsBusyboxBinary(assetFile)) SetExecutablePermission(localFilePath);
                     if (IsOpenSSLBinary(assetFile)) SetExecutablePermission(localFilePath);
                     if (IsNmapBinary(assetFile)) SetExecutablePermission(localFilePath);
+                    if (IsCurlBinary(assetFile)) SetExecutablePermission(localFilePath);
 #endif
 
 
@@ -423,6 +425,11 @@ namespace QuantumSecure
             string trimmedPath = assetFile.Trim('/', '\\'); // Trim leading and trailing slashes
             return trimmedPath.EndsWith("/nmap", StringComparison.OrdinalIgnoreCase);
         }
+           private static bool IsCurlBinary(string assetFile)
+        {
+            string trimmedPath = assetFile.Trim('/', '\\'); // Trim leading and trailing slashes
+            return trimmedPath.EndsWith("/curl", StringComparison.OrdinalIgnoreCase);
+        }
         private static bool IsWindowsOpenSSLBinary(string assetFile)
         {
             string trimmedPath = assetFile.Trim('/', '\\'); // Trim leading and trailing slashes
@@ -437,6 +444,11 @@ namespace QuantumSecure
         {
             string trimmedPath = assetFile.Trim('/', '\\'); // Trim leading and trailing slashes
             return trimmedPath.EndsWith("/nmap.exe", StringComparison.OrdinalIgnoreCase);
+        }
+          private static bool IsWindowsCurlBinary(string assetFile)
+        {
+            string trimmedPath = assetFile.Trim('/', '\\'); // Trim leading and trailing slashes
+            return trimmedPath.EndsWith("/curl.exe", StringComparison.OrdinalIgnoreCase);
         }
         private static void SetExecutablePermission(string filePath)
         {
