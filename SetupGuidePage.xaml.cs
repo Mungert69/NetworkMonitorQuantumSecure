@@ -12,7 +12,7 @@ namespace QuantumSecure
 
         private async void OnDownloadLinkClicked(object sender, EventArgs e)
         {
-            await Browser.OpenAsync("http://freenetworkmonitor.click/download");
+            await Browser.Default.OpenAsync("http://freenetworkmonitor.click/download");
         }
     }
 }
