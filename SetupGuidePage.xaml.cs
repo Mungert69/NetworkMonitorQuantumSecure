@@ -1,10 +1,18 @@
-namespace QuantumSecure;
+using System;
+using Microsoft.Maui.Controls;
 
-public partial class SetupGuidePage : ContentPage
+namespace QuantumSecure
 {
-	public SetupGuidePage()
-	{
-		InitializeComponent();
-	}
- 
+    public partial class SetupGuidePage : ContentPage
+    {
+        public SetupGuidePage()
+        {
+            InitializeComponent();
+        }
+
+        private async void OnDownloadLinkClicked(object sender, EventArgs e)
+        {
+            await Browser.OpenAsync("http://freenetworkmonitor.click/download");
+        }
+    }
 }
