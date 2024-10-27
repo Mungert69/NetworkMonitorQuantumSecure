@@ -38,6 +38,9 @@
         
     </PropertyGroup>
 
+        <PropertyGroup Condition="'$(Configuration)'=='Release-Dev'">
+    <DefineConstants>DEV</DefineConstants>
+</PropertyGroup>
     <ItemGroup>
         <!-- App Icon -->
 

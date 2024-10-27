@@ -15,14 +15,16 @@
                 <ApplicationId>click.freenetworkmonitor.quantumsecure</ApplicationId>
                 <ApplicationIdGuid>d4f21b0e-2c97-4c50-b003-dca43bd9a888</ApplicationIdGuid>
                 <!-- Versions -->
-                <ApplicationDisplayVersion>0.2.8</ApplicationDisplayVersion>
-                <ApplicationVersion>208</ApplicationVersion>
+                <ApplicationDisplayVersion>0.2.9</ApplicationDisplayVersion>
+                <ApplicationVersion>209</ApplicationVersion>
                 <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
                 <AndroidSdkDirectory>/usr/lib/android-sdk</AndroidSdkDirectory>
                 <Nullable>enable</Nullable>
     <NoWarn>CS8618</NoWarn>
-
         </PropertyGroup>
+        <PropertyGroup Condition="'$(Configuration)'=='Release-Dev'">
+    <DefineConstants>DEV</DefineConstants>
+</PropertyGroup>
         <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
                 <AndroidPackageFormat>aab</AndroidPackageFormat>
                 <AndroidSigningKeyAlias>networkmonitormaui</AndroidSigningKeyAlias>
