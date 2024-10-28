@@ -13,4 +13,3 @@ fi
 dotnet clean NetworkMonitorQuantumSecure-Android.csproj
 cp ./Resources/Raw/appsettings-dev.json ./Resources/Raw/appsettings.json
 dotnet build -c Release-Dev -f net8.0-android NetworkMonitorQuantumSecure-Android.csproj
-

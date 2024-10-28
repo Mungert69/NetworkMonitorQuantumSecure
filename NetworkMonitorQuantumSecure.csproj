@@ -37,10 +37,12 @@
         <IncludeSymbols>True</IncludeSymbols>
         
     </PropertyGroup>
-
         <PropertyGroup Condition="'$(Configuration)'=='Release-Dev'">
     <DefineConstants>DEV</DefineConstants>
+    <Optimize>true</Optimize>
 </PropertyGroup>
+
+
     <ItemGroup>
         <!-- App Icon -->
 
