@@ -6,7 +6,6 @@ local match = require "match"
 local nmap = require "nmap"
 local stdnse = require "stdnse"
 local table = require "table"
-local comm = require "comm"
 _ENV = stdnse.module("redis", stdnse.seeall)
 
 Request = {
@@ -31,63 +30,6 @@ Request = {
 
 }
 
-local socket_wrapper = {
-  new = function(self, socket, init)
-    local o = {
-      socket = socket,
-      init = init,
-      pos = init and 1 or nil,
-    }
-    setmetatable (o,self)
-    self.__index = self
-    return o
-  end,
-
-  getline = function(self)
-    if self.pos then
-      local oldpos = self.pos
-      local first, last = self.init:find("\r\n", oldpos)
-      if first then
-        stdnse.debug1("getline: found line: %s", self.init:sub(oldpos, first-1))
-        self.pos = last < #self.init and (last + 1) or nil
-        return true, self.init:sub(oldpos, first-1)
-      else
-        stdnse.debug1("getline: no line found: %s", self.init:sub(oldpos))
-        self.pos = nil
-        local status, more = self.socket:receive_buf(match.pattern_limit("\r\n", 2048), false)
-        if not status then
-          return status, more
-        end
-        return true, self.init:sub(oldpos) .. more
-      end
-    end
-    return self.socket:receive_buf(match.pattern_limit("\r\n", 2048), false)
-  end,
-
-  getbytes = function(self, len)
-    if self.pos then
-      local remains = #self.init - self.pos + 1
-      stdnse.debug1("getbytes(%d), remains=%d", len, remains)
-      if remains == len then
-        self.pos = nil
-        return true, self.init:sub(-len)
-      elseif remains > len then
-        local part = self.init:sub(self.pos, self.pos + len - 1)
-        self.pos = self.pos + len
-        return true, part
-      else
-        local part = self.init:sub(self.pos)
-        self.pos = nil
-        local status, more = self.socket:receive_buf(match.numbytes(len - #part), false)
-        if not status then
-          return status, more
-        end
-        return true, part .. more
-      end
-    end
-    return self.socket:receive_buf(match.numbytes(len), true)
-  end,
-}
 
 Response = {
 
@@ -106,10 +48,8 @@ Response = {
     return o
   end,
 
-  receive = function(self, init)
-    stdnse.debug1("Response.receive(%d)", #(init or ""))
-    local sock = socket_wrapper:new(self.socket, init)
-    local status, data = sock:getline()
+  receive = function(self)
+    local status, data = self.socket:receive_buf(match.pattern_limit("\r\n", 2048), false)
     if ( not(status) ) then
       return false, "Failed to receive data from server"
     end
@@ -138,12 +78,12 @@ Response = {
 
       local len = tonumber(data:match("^%$(%d*)"))
       -- we should only have a single line, so we can just peel of the length
-      status, data = sock:getbytes(len)
+      status, data = self.socket:receive_buf(match.numbytes(len), true)
       if( not(status) ) then
         return false, "Failed to receive data from server"
       end
       -- move past the terminal CRLF
-      local status, crlf = sock:getline()
+      local status, crlf = self.socket:receive_buf(match.pattern_limit("\r\n", 2048), false)
 
       return true, { data = data, type = Response.Type.BULK }
     end
@@ -155,12 +95,12 @@ Response = {
 
       for i=1, count do
         -- peel of the length
-        local status = sock:getline()
+        local status = self.socket:receive_buf(match.pattern_limit("\r\n", 2048), false)
         if( not(status) ) then
           return false, "Failed to receive data from server"
         end
 
-        status, data = sock:getline()
+        status, data = self.socket:receive_buf(match.pattern_limit("\r\n", 2048), false)
         if( not(status) ) then
           return false, "Failed to receive data from server"
         end
@@ -185,27 +125,18 @@ Helper = {
     return o
   end,
 
-  connect = function(self)
-    return true
-  end,
-
-  do_send = function(self, payload)
-    local response
-    if not self.socket then
-      self.socket, response = comm.tryssl(self.host, self.port, payload)
-      return not not self.socket, response
-    else
-      return self.socket:send(payload)
-    end
+  connect = function(self, socket)
+    self.socket = socket or nmap.new_socket()
+    return self.socket:connect(self.host, self.port)
   end,
 
   reqCmd = function(self, cmd, ...)
     local req = Request:new(cmd, ...)
-    local status, err_or_response = self:do_send(tostring(req))
+    local status, err = self.socket:send(tostring(req))
     if (not(status)) then
       return false, "Failed to send command to server"
     end
-    return Response:new(self.socket):receive(err_or_response)
+    return Response:new(self.socket):receive()
   end,
 
   close = function(self)

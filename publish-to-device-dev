@@ -1,3 +1,3 @@
 cp ./Resources/Raw/appsettings-dev.json ./Resources/Raw/appsettings.json
-dotnet build NetworkMonitorQuantumSecure-Android.csproj -c Release-Dev  -t:Run -f net8.0-android
+dotnet build NetworkMonitorQuantumSecure-Android.csproj -t:Run -f net8.0-android
 

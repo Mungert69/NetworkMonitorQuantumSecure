@@ -39,9 +39,8 @@
 -- with pre-discovered instances (e.g. by <code>ms-sql-discover</code> or <code>broadcast-ms-sql-discover</code>):
 --
 -- <code>
--- local instances = mssql.Helper.GetDiscoveredInstances( host, port )
--- if ( instances ) then
---   local instance = next(instances)
+-- local instance = mssql.Helper.GetDiscoveredInstances( host, port )
+-- if ( instance ) then
 --   local helper = mssql.Helper:new()
 --   status, result = helper:ConnectEx( instance )
 --   status, result = helper:LoginEx( instance )
@@ -2561,8 +2560,8 @@ Helper =
 
   --- Establishes a connection to the SQL server
   --
-  -- @param instanceInfo A SqlServerInstanceInfo object for the instance
-  --                     to connect to
+  -- @param host table containing host information
+  -- @param port table containing port information
   -- @return status true on success, false on failure
   -- @return result containing error message on failure
   ConnectEx = function( self, instanceInfo )
@@ -2740,9 +2739,9 @@ Helper =
   DiscoverByTcp = function( host, port )
     local version, instance, status
     -- Check to see if we've already discovered an instance on this port
-    local instances = Helper.GetDiscoveredInstances(host, port)
-    if instances then
-      return true, instances
+    local instance = Helper.GetDiscoveredInstances(host, port)
+    if instance then
+      return true, {instance}
     end
     instance =  SqlServerInstanceInfo:new()
     instance.host = host
@@ -3103,7 +3102,7 @@ Helper =
     while( pos < data:len() ) do
       local rowtag = string.unpack("B", data, pos)
 
-      if rowtag == TokenType.Row or rowtag == TokenType.Done then
+      if ( rowtag == TokenType.Row ) then
         break
       end
 
@@ -3135,13 +3134,12 @@ Helper =
         for i=1, #colinfo do
           local val
 
-          local coltype = colinfo[i].type
-          if ( ColumnData.Parse[coltype] ) then
-            if coltype == DataTypes.DECIMALNTYPE or coltype == DataTypes.NUMERICNTYPE then
-              -- decimal / numeric types need precision and scale passed.
-              pos, val = ColumnData.Parse[coltype]( colinfo[i].precision,  colinfo[i].scale, data, pos)
+          if ( ColumnData.Parse[colinfo[i].type] ) then
+            if not ( colinfo[i].type == 106 or colinfo[i].type == 108) then
+              pos, val = ColumnData.Parse[colinfo[i].type](data, pos)
             else
-              pos, val = ColumnData.Parse[coltype](data, pos)
+              -- decimal / numeric types need precision and scale passed.
+              pos, val = ColumnData.Parse[colinfo[i].type]( colinfo[i].precision,  colinfo[i].scale, data, pos)
             end
 
             if ( -1 == pos ) then
@@ -3149,7 +3147,7 @@ Helper =
             end
             table.insert(columns, val)
           else
-            return false, ("unknown datatype=0x%X"):format(coltype)
+            return false, ("unknown datatype=0x%X"):format(colinfo[i].type)
           end
         end
         table.insert(rows, columns)
@@ -3227,8 +3225,8 @@ Helper =
     Helper.Discover( host )
 
     if ( port ) then
-      local instances = Helper.GetDiscoveredInstances(host, port)
-      if instances then
+      local status, instances = Helper.GetDiscoveredInstances(host, port)
+      if status then
         return true, instances
       else
         return false, "No SQL Server instance detected on this port"
@@ -3358,7 +3356,7 @@ Helper =
       for _, instance in ipairs(instances) do
         output[instance:GetName()] = process_instance(instance)
       end
-      if next(output) then
+      if #output > 0 then
         return outlib.sorted_by_key(output)
       end
       return nil
