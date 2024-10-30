@@ -20,12 +20,16 @@
                 <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
                 <AndroidSdkDirectory>/usr/lib/android-sdk</AndroidSdkDirectory>
                 <Nullable>enable</Nullable>
-    <NoWarn>CS8618</NoWarn>
+                <NoWarn>CS8618</NoWarn>
         </PropertyGroup>
         <PropertyGroup Condition="'$(Configuration)'=='Release-Dev'">
-    <DefineConstants>DEV</DefineConstants>
-</PropertyGroup>
-        <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU' or '$(Configuration)'=='Release-Dev'">
+                <DefineConstants>DEV</DefineConstants>
+                <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot> <!-- Optional -->
+                <AndroidLinkMode>None</AndroidLinkMode> <!-- Keeps symbols for debugging -->
+                <AndroidDebugSymbols>true</AndroidDebugSymbols>
+                <AndroidManifestPlaceholders>android:debuggable=true</AndroidManifestPlaceholders>
+        </PropertyGroup>
+        <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
                 <AndroidPackageFormat>aab</AndroidPackageFormat>
                 <AndroidSigningKeyAlias>networkmonitormaui</AndroidSigningKeyAlias>
                 <AndroidSigningKeyStore>/home/mahadeva/code/securefiles/networkmonitormaui.keystore</AndroidSigningKeyStore>
@@ -35,7 +39,9 @@
                 <Optimize>true</Optimize>
                 <PublishTrimmed>false</PublishTrimmed>
                 <RunAOTCompilation>false</RunAOTCompilation>
+                <AndroidDebugSymbols>true</AndroidDebugSymbols>
         </PropertyGroup>
+
 
 
         <ItemGroup>
