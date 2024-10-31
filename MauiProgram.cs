@@ -259,8 +259,6 @@ namespace QuantumSecure
                var logger = provider.GetRequiredService<ILogger<ScanProcessorStatesViewModel>>();
                var nmapCmdProcessorStates = provider.GetRequiredService<LocalNmapCmdProcessorStates>();
                 var netConfig = provider.GetRequiredService<NetConnectConfig>();
-                   
-               // Choose the appropriate constructor
                var apiService = provider.GetRequiredService<IApiService>();
                return new ScanProcessorStatesViewModel(logger, nmapCmdProcessorStates, apiService,netConfig);
            });
