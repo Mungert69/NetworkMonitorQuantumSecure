@@ -1,5 +1,4 @@
 ./ssl/openssl.cnf
-./grep
 ./bin/scripts/auth-owners.nse
 ./bin/scripts/bitcoin-info.nse
 ./bin/scripts/irc-sasl-brute.nse
@@ -610,6 +609,7 @@
 ./bin/scripts/s7-info.nse
 ./bin/scripts/ajp-methods.nse
 ./bin/scripts/http-robtex-shared-ns.nse
+./bin/services
 ./bin/curl
 ./bin/nmap-mac-prefixes
 ./bin/busybox
