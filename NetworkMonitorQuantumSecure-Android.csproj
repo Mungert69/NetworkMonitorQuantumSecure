@@ -2,7 +2,7 @@
         <PropertyGroup>
                 <AcceptAndroidSDKLicenses>true</AcceptAndroidSDKLicenses>
                 <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
-                <TargetFrameworks>net8.0-android</TargetFrameworks>
+                <TargetFrameworks>net9.0-android</TargetFrameworks>
                 <OutputType>Exe</OutputType>
                 <RootNamespace>QuantumSecure</RootNamespace>
                 <UseMaui>true</UseMaui>
@@ -15,12 +15,15 @@
                 <ApplicationId>click.freenetworkmonitor.quantumsecure</ApplicationId>
                 <ApplicationIdGuid>d4f21b0e-2c97-4c50-b003-dca43bd9a888</ApplicationIdGuid>
                 <!-- Versions -->
-                <ApplicationDisplayVersion>0.2.13</ApplicationDisplayVersion>
-                <ApplicationVersion>213</ApplicationVersion>
+                <ApplicationDisplayVersion>0.2.14</ApplicationDisplayVersion>
+                <ApplicationVersion>214</ApplicationVersion>
                 <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
                 <AndroidSdkDirectory>/usr/lib/android-sdk</AndroidSdkDirectory>
                 <Nullable>enable</Nullable>
                 <NoWarn>CS8618</NoWarn>
+                <RuntimeIdentifiers Condition="$(TargetFramework.Contains('-android'))">android-arm;android-arm64;android-x86;android-x64</RuntimeIdentifiers>
+
+
         </PropertyGroup>
         <PropertyGroup Condition="'$(Configuration)'=='Release-Dev'">
                 <DefineConstants>DEV</DefineConstants>
@@ -61,14 +64,14 @@
         </ItemGroup>
 
         <ItemGroup>
-                <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
-                <PackageReference Include="CommunityToolkit.Maui" Version="9.0.1" />
-               <PackageReference Include="Microsoft.Maui.Controls" Version="8.0.91" />
-                <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="8.0.91" />
+                <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0" />
+                <PackageReference Include="CommunityToolkit.Maui" Version="9.1.1" />
+               <PackageReference Include="Microsoft.Maui.Controls" Version="9.0.10" />
+                <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="9.0.10" />
                 <PackageReference Include="MetroLog.Maui" Version="2.1.0" />
-                <PackageReference Include="Microsoft.Maui.Core" Version="8.0.91" />
-                <PackageReference Include="Microsoft.Maui.Essentials" Version="8.0.91" />
-                <PackageReference Include="Microsoft.Maui.Graphics" Version="8.0.91" />
+                <PackageReference Include="Microsoft.Maui.Core" Version="9.0.10" />
+                <PackageReference Include="Microsoft.Maui.Essentials" Version="9.0.10" />
+                <PackageReference Include="Microsoft.Maui.Graphics" Version="9.0.10" />
                      
               </ItemGroup>
         <ItemGroup>
