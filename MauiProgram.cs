@@ -101,30 +101,6 @@ namespace QuantumSecure
            {
                return new LocalNmapCmdProcessorStates();
            });
-            builder.Services.AddSingleton(provider =>
-        {
-            return new LocalMetaCmdProcessorStates();
-        });
-            builder.Services.AddSingleton(provider =>
-           {
-               return new LocalOpensslCmdProcessorStates();
-           });
-            builder.Services.AddSingleton(provider =>
-           {
-               return new LocalBusyboxCmdProcessorStates();
-           });
-            builder.Services.AddSingleton(provider =>
-           {
-               return new LocalSearchWebCmdProcessorStates();
-           });
-            builder.Services.AddSingleton(provider =>
-           {
-               return new LocalCrawlPageCmdProcessorStates();
-           });
-            builder.Services.AddSingleton(provider =>
-           {
-               return new LocalPingCmdProcessorStates();
-           });
            
             builder.Services.AddSingleton<IApiService>(provider =>
           {
@@ -191,15 +167,8 @@ namespace QuantumSecure
                     var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
                     var rabbitRepo = provider.GetRequiredService<IRabbitRepo>();
                     var netConfig = provider.GetRequiredService<NetConnectConfig>();
-                    var nmapCmdProcessorStates = provider.GetRequiredService<LocalNmapCmdProcessorStates>();
-                    var metaCmdProcessorStates = provider.GetRequiredService<LocalMetaCmdProcessorStates>();
-                    var opensslCmdProcessorStates = provider.GetRequiredService<LocalOpensslCmdProcessorStates>();
-                    var busyboxCmdProcessorStates = provider.GetRequiredService<LocalBusyboxCmdProcessorStates>();
-                    var searchwebCmdProcessorStates = provider.GetRequiredService<LocalSearchWebCmdProcessorStates>();
-                    var crawlpageCmdProcessorStates = provider.GetRequiredService<LocalCrawlPageCmdProcessorStates>();
-                    var pingCmdProcessorStates = provider.GetRequiredService<LocalPingCmdProcessorStates>();
-
-                    return new CmdProcessorFactory(loggerFactory, rabbitRepo, netConfig, nmapCmdProcessorStates, metaCmdProcessorStates, opensslCmdProcessorStates, busyboxCmdProcessorStates, searchwebCmdProcessorStates, crawlpageCmdProcessorStates, pingCmdProcessorStates );
+                   
+                    return new CmdProcessorFactory(loggerFactory, rabbitRepo, netConfig );
 
 
                 });
