@@ -97,10 +97,6 @@ namespace QuantumSecure
            {
                return new LocalProcessorStates();
            });
-            builder.Services.AddSingleton(provider =>
-           {
-               return new LocalNmapCmdProcessorStates();
-           });
            
             builder.Services.AddSingleton<IApiService>(provider =>
           {
@@ -226,7 +222,8 @@ namespace QuantumSecure
             builder.Services.AddSingleton(provider =>
            {
                var logger = provider.GetRequiredService<ILogger<ScanProcessorStatesViewModel>>();
-               var nmapCmdProcessorStates = provider.GetRequiredService<LocalNmapCmdProcessorStates>();
+               var cmdProcessorProvider = provider.GetRequiredService<ICmdProcessorProvider>();
+               var nmapCmdProcessorStates = cmdProcessorProvider.GetProcessorStates("Nmap");
                 var netConfig = provider.GetRequiredService<NetConnectConfig>();
                var apiService = provider.GetRequiredService<IApiService>();
                return new ScanProcessorStatesViewModel(logger, nmapCmdProcessorStates, apiService,netConfig);

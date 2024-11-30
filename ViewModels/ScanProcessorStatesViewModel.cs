@@ -13,36 +13,37 @@ namespace QuantumSecure.ViewModels
 {
     public class ScanProcessorStatesViewModel : BasePopupViewModel
     {
-        private LocalCmdProcessorStates _scanProcessorStates;
+        private ILocalCmdProcessorStates _cmdProcessorStates;
         private ILogger _logger;
         private readonly IApiService _apiService;
         public ObservableCollection<string> EndpointTypes { get; set; }
         public ObservableCollection<NetworkInterfaceInfo> NetworkInterfaces =>
-           new ObservableCollection<NetworkInterfaceInfo>(_scanProcessorStates.AvailableNetworkInterfaces);
-        public string RunningMessage => _scanProcessorStates.RunningMessage;
-        public string CompletedMessage => _scanProcessorStates.CompletedMessage;
+           new ObservableCollection<NetworkInterfaceInfo>(_cmdProcessorStates.AvailableNetworkInterfaces);
+        public string RunningMessage => _cmdProcessorStates.RunningMessage;
+        public string CompletedMessage => _cmdProcessorStates.CompletedMessage;
         public NetworkInterfaceInfo SelectedNetworkInterface
         {
-            get => _scanProcessorStates.SelectedNetworkInterface;
+            get => _cmdProcessorStates.SelectedNetworkInterface;
             set
             {
-                _scanProcessorStates.SelectedNetworkInterface = value;
+                _cmdProcessorStates.SelectedNetworkInterface = value;
                 OnPropertyChanged();
             }
         }
 
 
-        public ScanProcessorStatesViewModel(ILogger logger, LocalCmdProcessorStates scanProcessorStates, IApiService apiService, NetConnectConfig netConfig)
+        public ScanProcessorStatesViewModel(ILogger logger, ILocalCmdProcessorStates cmdProcessorStates, IApiService apiService, NetConnectConfig netConfig)
         {
             try
             {
-                _logger = logger; _scanProcessorStates = scanProcessorStates;
-                 scanProcessorStates.EndpointTypes = netConfig.EndpointTypes;
-                scanProcessorStates.UseDefaultEndpointType = netConfig.UseDefaultEndpointType;
-                scanProcessorStates.DefaultEndpointType = netConfig.DefaultEndpointType;
+                _logger = logger;
+                _cmdProcessorStates = cmdProcessorStates;
+                _cmdProcessorStates.EndpointTypes = netConfig.EndpointTypes;
+                _cmdProcessorStates.UseDefaultEndpointType = netConfig.UseDefaultEndpointType;
+                _cmdProcessorStates.DefaultEndpointType = netConfig.DefaultEndpointType;
                 _apiService = apiService;
-                _scanProcessorStates.PropertyChanged += OnProcessorStatesChanged;
-                EndpointTypes = new ObservableCollection<string>(_scanProcessorStates.EndpointTypes);
+                _cmdProcessorStates.PropertyChanged += OnProcessorStatesChanged;
+                EndpointTypes = new ObservableCollection<string>(_cmdProcessorStates.EndpointTypes);
                 LoadNetworkInterfaces();
 
             }
@@ -54,12 +55,12 @@ namespace QuantumSecure.ViewModels
 
         }
 
-        public List<MonitorIP> SelectedDevices => _scanProcessorStates.SelectedDevices.ToList();
+        public List<MonitorIP> SelectedDevices => _cmdProcessorStates.SelectedDevices.ToList();
         public void LoadNetworkInterfaces()
         {
-            if (_scanProcessorStates != null) { 
-                 _scanProcessorStates.AvailableNetworkInterfaces = NetworkUtils.GetSuitableNetworkInterfaces(_logger, _scanProcessorStates);
-            if (_scanProcessorStates.AvailableNetworkInterfaces!=null && _scanProcessorStates.AvailableNetworkInterfaces.Count>0) _scanProcessorStates.SelectedNetworkInterface = _scanProcessorStates.AvailableNetworkInterfaces.First();
+            if (_cmdProcessorStates != null) { 
+                 _cmdProcessorStates.AvailableNetworkInterfaces = NetworkUtils.GetSuitableNetworkInterfaces(_logger, _cmdProcessorStates);
+            if (_cmdProcessorStates.AvailableNetworkInterfaces!=null && _cmdProcessorStates.AvailableNetworkInterfaces.Count>0) _cmdProcessorStates.SelectedNetworkInterface = _cmdProcessorStates.AvailableNetworkInterfaces.First();
       
             }
                  
@@ -67,47 +68,47 @@ namespace QuantumSecure.ViewModels
         public async Task Scan()
         {
             IsPopupVisible = true;
-            await _scanProcessorStates.Scan();
+            await _cmdProcessorStates.Scan();
         }
         public async Task Cancel()
         {
-            await _scanProcessorStates.Cancel();
+            await _cmdProcessorStates.Cancel();
         }
 
         public string DefaultEndpointType
         {
-            get => _scanProcessorStates.DefaultEndpointType;
+            get => _cmdProcessorStates.DefaultEndpointType;
             set
             {
-                _scanProcessorStates.DefaultEndpointType = value;
+                _cmdProcessorStates.DefaultEndpointType = value;
                 OnPropertyChanged();
             }
         }
 
         public bool UseDefaultEndpointType
         {
-            get => _scanProcessorStates.UseDefaultEndpointType;
+            get => _cmdProcessorStates.UseDefaultEndpointType;
             set
             {
-                _scanProcessorStates.UseDefaultEndpointType = value;
+                _cmdProcessorStates.UseDefaultEndpointType = value;
                 OnPropertyChanged();
             }
         }
           public bool UseFastScan
         {
-            get => _scanProcessorStates.UseFastScan;
+            get => _cmdProcessorStates.UseFastScan;
             set
             {
-                _scanProcessorStates.UseFastScan = value;
+                _cmdProcessorStates.UseFastScan = value;
                 OnPropertyChanged();
             }
         }
          public bool LimitPorts
         {
-            get => _scanProcessorStates.LimitPorts;
+            get => _cmdProcessorStates.LimitPorts;
             set
             {
-                _scanProcessorStates.LimitPorts = value;
+                _cmdProcessorStates.LimitPorts = value;
                 OnPropertyChanged();
             }
         }
@@ -140,23 +141,23 @@ namespace QuantumSecure.ViewModels
         {
             // Reset any previous state
             IsPopupVisible = true;
-            await _scanProcessorStates.Scan().ConfigureAwait(false);
+            await _cmdProcessorStates.Scan().ConfigureAwait(false);
 
             // Return the detected hosts
-            return _scanProcessorStates.ActiveDevices.ToList();
+            return _cmdProcessorStates.ActiveDevices.ToList();
         }
 
         public async Task AddServices()
         {
-            await _scanProcessorStates.AddServices().ConfigureAwait(false);
+            await _cmdProcessorStates.AddServices().ConfigureAwait(false);
         }
 
         public void AddSelectedHosts(List<MonitorIP> selectedServices)
         {
-            _scanProcessorStates.SelectedDevices.Clear();
+            _cmdProcessorStates.SelectedDevices.Clear();
             foreach (var service in selectedServices)
             {
-                _scanProcessorStates.SelectedDevices.Add(service);
+                _cmdProcessorStates.SelectedDevices.Add(service);
             }
             //IsPopupVisible = false;
         }
@@ -165,7 +166,7 @@ namespace QuantumSecure.ViewModels
             // Convert the selected devices to a list of IConnectionObject (HostObject)
             var connectionObjects = new List<IConnectionObject>();
 
-            foreach (var device in _scanProcessorStates.SelectedDevices)
+            foreach (var device in _cmdProcessorStates.SelectedDevices)
             {
                 IConnectionObject hostObject;
                 if (device.EndPointType == "quantum")
@@ -194,7 +195,7 @@ namespace QuantumSecure.ViewModels
 
             // Use the ApiService to check the connections
             var results = await _apiService.CheckConnections(connectionObjects).ConfigureAwait(false);
-            _scanProcessorStates.CompletedMessage += "\n\nChecking status of selected services...\n\n";
+            _cmdProcessorStates.CompletedMessage += "\n\nChecking status of selected services...\n\n";
             // Handle the results (e.g., display them or log them)
             foreach (var result in results)
             {
@@ -212,7 +213,7 @@ namespace QuantumSecure.ViewModels
                         _logger.LogWarning(message);
                     }
                 }
-                _scanProcessorStates.CompletedMessage += message;
+                _cmdProcessorStates.CompletedMessage += message;
             }
 
             // Update the UI or state based on results, if necessary
