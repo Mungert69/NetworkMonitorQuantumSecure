@@ -45,7 +45,7 @@
                             <ViewCell>
                                 <StackLayout Orientation="Horizontal" Padding="10">
                                     <CheckBox IsChecked="{Binding IsCompleted}" IsEnabled="False" />
-                                    <controls:AnimatedButton Text="{Binding ButtonText}" Command="{Binding TaskAction}" BackgroundColor="{Binding ButtonBackgroundColor}}" TextColor="{Binding ButtonTextColor}" CornerRadius="5" Padding="10" FontSize="16"/>
+                                    <controls:AnimatedButton Text="{Binding ButtonText}" Command="{Binding TaskAction}" BackgroundColor="{Binding ButtonBackgroundColor}" TextColor="{Binding ButtonTextColor}" CornerRadius="5" Padding="10" FontSize="16"/>
                                 </StackLayout>
                             </ViewCell>
                         </DataTemplate>
