@@ -242,7 +242,7 @@ namespace QuantumSecure.ViewModels
                 {
                     if (App.Current?.RequestedTheme == AppTheme.Dark)
                     {
-                        return ColorResource.GetResourceColor("Grey(950");
+                        return ColorResource.GetResourceColor("Grey950");
                     }
                     else
                     {

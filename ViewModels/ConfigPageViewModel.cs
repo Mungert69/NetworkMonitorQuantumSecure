@@ -42,17 +42,8 @@ namespace QuantumSecure.ViewModels
                     case nameof(NetConnectConfig.AppID):
                         OnPropertyChanged(nameof(AppID));
                         break;
-                    case nameof(NetConnectConfig.QuantumFilterSkip):
-                        OnPropertyChanged(nameof(QuantumFilterSkip));
-                        break;
-                    case nameof(NetConnectConfig.QuantumFilterStart):
-                        OnPropertyChanged(nameof(QuantumFilterStart));
-                        break;
-                    case nameof(NetConnectConfig.SmtpFilterSkip):
-                        OnPropertyChanged(nameof(SmtpFilterSkip));
-                        break;
-                    case nameof(NetConnectConfig.SmtpFilterStart):
-                        OnPropertyChanged(nameof(SmtpFilterStart));
+                    case nameof(NetConnectConfig.FilterStrategies):
+                        OnPropertyChanged(nameof(FilterStrategies));
                         break;
                     case nameof(NetConnectConfig.MaxTaskQueueSize):
                         OnPropertyChanged(nameof(MaxTaskQueueSize));
@@ -88,10 +79,8 @@ namespace QuantumSecure.ViewModels
         public string ClientId => _netConfig.ClientId;
         public string? LocalSystemUrlDisplay => _netConfig.LocalSystemUrl?.ExternalUrl;
         public string AppID => _netConfig.AppID;
-        public int QuantumFilterSkip => _netConfig.QuantumFilterSkip;
-        public int QuantumFilterStart => _netConfig.QuantumFilterStart;
-        public int SmtpFilterSkip => _netConfig.SmtpFilterSkip;
-        public int SmtpFilterStart => _netConfig.SmtpFilterStart;
+        public List<FilterStrategyConfig> FilterStrategies=> _netConfig.FilterStrategies;
+     
         public int MaxTaskQueueSize => _netConfig.MaxTaskQueueSize;
         public string OqsProviderPath => _netConfig.OqsProviderPath;
         public string ClientAuthUrl => _netConfig.ClientAuthUrl;
