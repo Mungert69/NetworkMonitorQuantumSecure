@@ -11,10 +11,11 @@ namespace QuantumSecure;
 public partial class MainPage : ContentPage
 {
     private IAuthService _authService;
-    private NetConnectConfig _netConfig;
+    private string _authUrl;
     private ILogger _logger;
     private CancellationTokenSource _cancellationTokenSource;
     private MainPageViewModel _mainPageViewModel;
+    private NetConnectConfig _netConfig;
 
 
     public MainPage(IAuthService authService, NetConnectConfig netConfig, ILogger logger, MainPageViewModel mainPageViewModel, ProcessorStatesViewModel processorStatesViewModel)
@@ -43,15 +44,32 @@ public partial class MainPage : ContentPage
         }
 
     }
+    private void OnSwitchToggled(object sender, ToggledEventArgs e)
+    {
+        try
+        {
+            if (_mainPageViewModel != null)
+            {
+                _ = _mainPageViewModel.SetServiceStartedAsync(e.Value); // Use `_` for fire-and-forget async call
+            }
+        }
+        catch (Exception ex)
+        {
+              DisplayAlert("Error", $" Error : in OnSwitchToggled on MainPage . Error was: {ex.Message}", "OK");
+           
+             _logger.LogError($" Error : in OnSwitchToggled on MainPage . Error was: {ex.Message}");
+                     
+        }
+    }
 
 
     private async void Authorize()
     {
-        string authUrl = "not set";
+       // string authUrl = "not set";
         try
         {
 
-            var resultInit = await Task.Run(async () => await  _authService.InitializeAsync());
+            var resultInit = await _authService.InitializeAsync();
 
             if (!resultInit.Success)
             {
@@ -59,7 +77,7 @@ public partial class MainPage : ContentPage
                 _mainPageViewModel.IsPolling = false; // Reset the flag
                 return;
             }
-            var resultSend = await Task.Run(async () => await _authService.SendAuthRequestAsync());
+            var resultSend = await _authService.SendAuthRequestAsync();
 
             if (!resultSend.Success)
             {
@@ -69,15 +87,15 @@ public partial class MainPage : ContentPage
             }
 
 
-            authUrl = _netConfig.ClientAuthUrl;
-            _logger.LogInformation($" authUrl is {authUrl}");
-            if (!string.IsNullOrWhiteSpace(authUrl))
+            _authUrl = _netConfig.ClientAuthUrl;
+            _logger.LogInformation($" _authUrl is {_authUrl}");
+            if (!string.IsNullOrWhiteSpace(_authUrl))
             {
 
                 PollForTokenInBackground();
-                //await Launcher.OpenAsync(authUrl);
+                //await Launcher.OpenAsync(_authUrl);
 
-                await Browser.Default.OpenAsync(authUrl, BrowserLaunchMode.SystemPreferred);
+                await Browser.Default.OpenAsync(_authUrl, BrowserLaunchMode.SystemPreferred);
 
 
             }
@@ -92,8 +110,8 @@ public partial class MainPage : ContentPage
         catch (Exception ex)
         {
             // Handle any exceptions
-            await DisplayAlert("Error", $"Could not authorize with requested authUrl {authUrl} . Errro was : {ex.Message}", "OK");
-            _logger.LogError($" Error : Could not authorize with requested authUrl {authUrl} . Errro was : {ex.ToString()}");
+            await DisplayAlert("Error", $"Could not authorize with requested authUrl {_authUrl} . Error was : {ex.Message}", "OK");
+            _logger.LogError($" Error : Could not authorize with requested authUrl {_authUrl} . Error was : {ex.ToString()}");
             _mainPageViewModel.IsPolling = false; // Reset the flag
         }
     }
@@ -108,8 +126,8 @@ public partial class MainPage : ContentPage
         catch (Exception ex)
         {
             // Handle any exceptions
-            await DisplayAlert("Error", $"Could not open browser . Errro was : {ex.Message}", "OK");
-            _logger.LogError($"Could not open browser. Errro was : {ex.ToString()}");
+            await DisplayAlert("Error", $"Could not open browser . Error was : {ex.Message}", "OK");
+            _logger.LogError($"Could not open browser. Error was : {ex.ToString()}");
 
         }
 
@@ -141,8 +159,8 @@ public partial class MainPage : ContentPage
         catch (Exception ex)
         {
             // Handle any exceptions
-            DisplayAlert("Error", $"Could not complete Cancel click . Errro was : {ex.Message}", "OK");
-            _logger.LogError($"Could not complete Cancel click. Errro was : {ex.ToString()}");
+            DisplayAlert("Error", $"Could not complete Cancel click . Error was : {ex.Message}", "OK");
+            _logger.LogError($"Could not complete Cancel click. Error was : {ex.ToString()}");
 
         }
 
@@ -151,15 +169,31 @@ public partial class MainPage : ContentPage
 
     private void ShowLoading(bool show)
     {
+        try {
         ProgressIndicator.IsVisible = show;
         ProgressIndicator.IsRunning = show;
-        CancelButton.IsVisible = show;
+        CancelButton.IsVisible = show;}
+          catch (Exception ex)
+        {
+            // Handle any exceptions
+            DisplayAlert("Error", $" Could not set ProgressIndicator, CancelButton IsVisible or IsRunning . Error was : {ex.Message}", "OK");
+            _logger.LogError($"Error : in ShowLoading on MainPage. Error was : {ex.ToString()}");
+
+        }
     }
     private void ShowLoadingNoCancel(bool show)
     {
+        try {
         ProgressIndicator.IsVisible = show;
         ProgressIndicator.IsRunning = show;
-        CancelButton.IsVisible = false;
+        CancelButton.IsVisible = false;}
+        catch (Exception ex)
+        {
+            // Handle any exceptions
+            DisplayAlert("Error", $" Could not set ProgressIndicator, CancelButton IsVisible or IsRunning . Error was : {ex.Message}", "OK");
+            _logger.LogError($"Error : in ShowLoadingNoCancel on MainPage. Error was : {ex.ToString()}");
+
+        }
     }
 
     private async void PollForTokenInBackground()
@@ -168,13 +202,13 @@ public partial class MainPage : ContentPage
         {
             _cancellationTokenSource = new CancellationTokenSource();
             ShowLoading(true); // Show progress indicator and cancel button
-            var result= await Task.Run(async () => await _authService.PollForTokenAsync(_cancellationTokenSource.Token)); 
+            var result = await _authService.PollForTokenAsync(_cancellationTokenSource.Token);
             ShowLoading(false);
             _mainPageViewModel.IsPolling = false; // Reset the flag
 
             if (result.Success)
             {
-                 await DisplayAlert("Success", $"Authorization successful! Now login to Free Network Monitor and add hosts to monitor from your device. choose '{_netConfig.MonitorLocation}' as the monitor location . ", "OK");
+                await DisplayAlert("Success", $"Authorization successful! Now login to Free Network Monitor and add hosts to monitor from your device. choose '{_netConfig.MonitorLocation}' as the monitor location . ", "OK");
 
             }
             else

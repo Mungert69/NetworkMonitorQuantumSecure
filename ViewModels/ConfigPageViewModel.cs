@@ -28,6 +28,8 @@ namespace QuantumSecure.ViewModels
         {
             try
             {
+                 MainThread.BeginInvokeOnMainThread(() =>
+                   {
                 switch (e.PropertyName)
                 {
                     case nameof(NetConnectConfig.BaseFusionAuthURL):
@@ -44,9 +46,6 @@ namespace QuantumSecure.ViewModels
                         break;
                     case nameof(NetConnectConfig.FilterStrategies):
                         OnPropertyChanged(nameof(FilterStrategies));
-                        break;
-                    case nameof(NetConnectConfig.MaxTaskQueueSize):
-                        OnPropertyChanged(nameof(MaxTaskQueueSize));
                         break;
                     case nameof(NetConnectConfig.OqsProviderPath):
                         OnPropertyChanged(nameof(OqsProviderPath));
@@ -67,7 +66,7 @@ namespace QuantumSecure.ViewModels
                         // If the property name does not match any known properties, you might choose to log this or handle it as needed.
                         // This could be useful for debugging or if you're expecting other properties to change that are not listed here.
                         break;
-                }
+                }});
             }
             catch (Exception ex)
             {
@@ -79,8 +78,7 @@ namespace QuantumSecure.ViewModels
         public string ClientId => _netConfig.ClientId;
         public string? LocalSystemUrlDisplay => _netConfig.LocalSystemUrl?.ExternalUrl;
         public string AppID => _netConfig.AppID;
-        public List<FilterStrategyConfig> FilterStrategies=> _netConfig.FilterStrategies;
-     
+        public List<FilterStrategyConfig> FilterStrategies => _netConfig.FilterStrategies;
         public int MaxTaskQueueSize => _netConfig.MaxTaskQueueSize;
         public string OqsProviderPath => _netConfig.OqsProviderPath;
         public string ClientAuthUrl => _netConfig.ClientAuthUrl;
