@@ -27,11 +27,12 @@
             <Button x:Name="CancelButton" Text="Cancel" IsVisible="False" Clicked="OnCancelClicked" HorizontalOptions="Center" VerticalOptions="Center"/>
             <Frame IsVisible="{Binding ShowToggle}" BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Gray950}}" Padding="0" CornerRadius="10" HorizontalOptions="FillAndExpand">
                 <VerticalStackLayout Spacing="10">
-                    <StackLayout Orientation="Horizontal" HorizontalOptions="CenterAndExpand">
+                     <StackLayout Orientation="Horizontal" HorizontalOptions="CenterAndExpand">
                         <Label Text="Enable Agent" VerticalOptions="Center" TextColor="{DynamicResource Primary}"/>
-                        <Switch  IsToggled="{Binding IsServiceStarted}" VerticalOptions="Center"/>
+                        <Switch IsToggled="{Binding IsServiceStarted}" Toggled="OnSwitchToggled"/>
 
                     </StackLayout>
+
                     <Label Text="{Binding ServiceMessage}" VerticalOptions="Center" HorizontalOptions="StartAndExpand" TextColor="{DynamicResource Primary}"/>
                 </VerticalStackLayout>
             </Frame>
