@@ -19,7 +19,7 @@ using System.Runtime.InteropServices;
 using System.IO;
 using System.Text;
 
-namespace NetworkMonitorAgent
+namespace QuantumSecure
 {
     public static class MauiProgram
     {
@@ -75,7 +75,7 @@ namespace NetworkMonitorAgent
             try
             {
                 string localAppSettingsPath = Path.Combine(FileSystem.AppDataDirectory, $"appsettings.json");
-                //string packagedAppSettingsPath = "NetworkMonitorAgent.appsettings.json";
+                //string packagedAppSettingsPath = "QuantumSecure.appsettings.json";
                 IConfigurationRoot config;
                 // Check if a local copy of appsettings.json exists
                 if (File.Exists(localAppSettingsPath))

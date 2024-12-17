@@ -10,7 +10,7 @@ using NetworkMonitor.Maui.Views;
 using NetworkMonitor.Maui.ViewModels;
 using NetworkMonitor.Maui.Controls;
 using MetroLog.Maui;
-namespace NetworkMonitorAgent;
+namespace QuantumSecure;
 public partial class AppShell : Shell
 {
     IPlatformService? _platformService;

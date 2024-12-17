@@ -4,7 +4,7 @@ using NetworkMonitor.Maui.ViewModels;
 using Microsoft.Extensions.Logging;
 using NetworkMonitor.Objects;
 
-namespace NetworkMonitorAgent;
+namespace QuantumSecure;
 
 public partial class ScanPage : ContentPage
 {

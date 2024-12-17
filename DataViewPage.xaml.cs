@@ -18,7 +18,7 @@ using Microsoft.Maui.Graphics;
 using Microsoft.Maui.Layouts;
 using CommunityToolkit.Maui.Views;
 
-namespace NetworkMonitorAgent;
+namespace QuantumSecure;
 public partial class DateViewPage : ContentPage
 {
 

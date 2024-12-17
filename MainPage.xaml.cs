@@ -5,7 +5,7 @@ using NetworkMonitor.Maui.Views;
 using NetworkMonitor.Maui.ViewModels;
 using NetworkMonitor.Maui.Controls;
 
-namespace NetworkMonitorAgent;
+namespace QuantumSecure;
 
 public partial class MainPage : ContentPage
 {

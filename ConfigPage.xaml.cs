@@ -9,7 +9,7 @@ using System.Diagnostics;
 using Microsoft.Maui.Graphics;  // For Rectangle
 using Microsoft.Maui.Layouts;  // For AbsoluteLayoutFlags
 
-namespace NetworkMonitorAgent;
+namespace QuantumSecure;
 public partial class ConfigPage : ContentPage
 {
     public ConfigPage(ConfigPageViewModel configPageViewModel)
