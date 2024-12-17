@@ -2,7 +2,7 @@ using NetworkMonitor.Objects;
 using NetworkMonitor.Maui.ViewModels;
 using NetworkMonitor.DTOs;
 using Microsoft.Extensions.Logging;
-namespace QuantumSecure;
+namespace NetworkMonitorAgent;
 public partial class DetailsPage : ContentPage
 {
 

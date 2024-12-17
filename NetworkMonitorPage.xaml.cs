@@ -1,6 +1,6 @@
 using NetworkMonitor.Api.Services;
 using NetworkMonitor.Maui.ViewModels;
-namespace QuantumSecure;
+namespace NetworkMonitorAgent;
 public partial class NetworkMonitorPage : ContentPage
 {
     public NetworkMonitorPage(IApiService apiService)

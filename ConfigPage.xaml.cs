@@ -1,6 +1,6 @@
 using MetroLog.Maui;
 using NetworkMonitor.Processor.Services;
-using QuantumSecure.Services;
+using NetworkMonitor.Maui.Services;
 using NetworkMonitor.Maui.ViewModels;
 using NetworkMonitor.Connection;
 using Microsoft.Extensions.Logging;
@@ -9,7 +9,7 @@ using System.Diagnostics;
 using Microsoft.Maui.Graphics;  // For Rectangle
 using Microsoft.Maui.Layouts;  // For AbsoluteLayoutFlags
 
-namespace QuantumSecure;
+namespace NetworkMonitorAgent;
 public partial class ConfigPage : ContentPage
 {
     public ConfigPage(ConfigPageViewModel configPageViewModel)

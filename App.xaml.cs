@@ -1,11 +1,16 @@
 ﻿using MetroLog.Maui;
-using QuantumSecure.Services;
+using NetworkMonitor.Maui.Services;
 using NetworkMonitor.Maui.ViewModels;
 using Microsoft.Extensions.Logging;
-namespace QuantumSecure;
+using NetworkMonitor.Maui;
+using NetworkMonitor.Maui.Views;
+using NetworkMonitor.Maui.ViewModels;
+using NetworkMonitor.Maui.Controls;
+namespace NetworkMonitorAgent;
 
 public partial class App : Application
 {
+
 
    // public static ProcessorStatesViewModel ProcessorStatesVM { get; private set; }
     private ILogger? _logger;

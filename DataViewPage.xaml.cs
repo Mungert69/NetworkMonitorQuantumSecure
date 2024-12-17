@@ -3,7 +3,7 @@ using NetworkMonitor.Processor.Services;
 using NetworkMonitor.DTOs;
 using NetworkMonitor.Objects;
 using NetworkMonitor.Maui.Controls;
-using QuantumSecure.Services;
+using NetworkMonitor.Maui.Services;
 using NetworkMonitor.Maui.ViewModels;
 using NetworkMonitor.Connection;
 using Microsoft.Extensions.Logging;
@@ -18,7 +18,7 @@ using Microsoft.Maui.Graphics;
 using Microsoft.Maui.Layouts;
 using CommunityToolkit.Maui.Views;
 
-namespace QuantumSecure;
+namespace NetworkMonitorAgent;
 public partial class DateViewPage : ContentPage
 {
 
