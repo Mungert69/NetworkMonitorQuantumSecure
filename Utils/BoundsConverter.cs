@@ -4,7 +4,7 @@ using Microsoft.Maui;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Graphics;
 using Microsoft.Maui.Layouts;
-using QuantumSecure.ViewModels;
+using NetworkMonitor.Maui.ViewModels;
 using NetworkMonitor.DTOs;
 
 namespace QuantumSecure;

@@ -2,9 +2,9 @@
 using NetworkMonitor.Processor.Services;
 using NetworkMonitor.DTOs;
 using NetworkMonitor.Objects;
-using QuantumSecure.Controls;
+using NetworkMonitor.Maui.Controls;
 using QuantumSecure.Services;
-using QuantumSecure.ViewModels;
+using NetworkMonitor.Maui.ViewModels;
 using NetworkMonitor.Connection;
 using Microsoft.Extensions.Logging;
 using System.ComponentModel;

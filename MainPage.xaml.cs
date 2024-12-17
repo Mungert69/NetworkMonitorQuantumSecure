@@ -1,7 +1,7 @@
 ﻿using MetroLog.Maui;
 using NetworkMonitor.Processor.Services;
 using QuantumSecure.Services;
-using QuantumSecure.ViewModels;
+using NetworkMonitor.Maui.ViewModels;
 using NetworkMonitor.Connection;
 using Microsoft.Extensions.Logging;
 

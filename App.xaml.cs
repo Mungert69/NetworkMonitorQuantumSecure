@@ -1,6 +1,6 @@
 ﻿using MetroLog.Maui;
 using QuantumSecure.Services;
-using QuantumSecure.ViewModels;
+using NetworkMonitor.Maui.ViewModels;
 using Microsoft.Extensions.Logging;
 namespace QuantumSecure;
 

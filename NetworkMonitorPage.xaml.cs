@@ -1,5 +1,5 @@
 using NetworkMonitor.Api.Services;
-using QuantumSecure.ViewModels;
+using NetworkMonitor.Maui.ViewModels;
 namespace QuantumSecure;
 public partial class NetworkMonitorPage : ContentPage
 {

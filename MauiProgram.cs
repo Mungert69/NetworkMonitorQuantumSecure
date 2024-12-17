@@ -9,7 +9,7 @@ using NetworkMonitor.Api.Services;
 using QuantumSecure.Services;
 using NetworkMonitor.Objects.ServiceMessage;
 using NetworkMonitor.Objects;
-using QuantumSecure.ViewModels;
+using NetworkMonitor.Maui.ViewModels;
 using CommunityToolkit.Maui;
 using Microsoft.Maui.Hosting;
 using Microsoft.Maui.Storage;

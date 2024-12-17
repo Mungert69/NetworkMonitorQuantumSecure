@@ -4,10 +4,13 @@
 			"path": "."
 		},
 		{
-			"path": "../NetworkMonitor"
+			"path": "../NetworkMonitorMaui"
 		},
 		{
 			"path": "../NetworkMonitorProcessor"
+		},
+		{
+			"path": "../NetworkMonitor"
 		}
 	],
 	"settings": {}

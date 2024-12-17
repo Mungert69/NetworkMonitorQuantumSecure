@@ -1,6 +1,6 @@
 
 using QuantumSecure.Services;
-using QuantumSecure.ViewModels;
+using NetworkMonitor.Maui.ViewModels;
 using Microsoft.Extensions.Logging;
 using NetworkMonitor.Objects;
 
