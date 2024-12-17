@@ -1,16 +1,16 @@
 {
 	"folders": [
 		{
-			"path": "."
+			"path": "../NetworkMonitorProcessor"
+		},
+		{
+			"path": "../NetworkMonitor"
 		},
 		{
 			"path": "../NetworkMonitorMaui"
 		},
 		{
-			"path": "../NetworkMonitorProcessor"
-		},
-		{
-			"path": "../NetworkMonitor"
+			"path": "."
 		}
 	],
 	"settings": {}
