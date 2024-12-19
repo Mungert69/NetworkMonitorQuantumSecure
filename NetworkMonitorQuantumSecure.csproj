@@ -31,6 +31,7 @@
         <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
         <PackageCertificateThumbprint>F13A020884C94F4309A40BD2B922FBB8FACABC45</PackageCertificateThumbprint>
         <IncludeSymbols>True</IncludeSymbols>
+         <DefineConstants>WINDOWS</DefineConstants>
         
     </PropertyGroup>
         <PropertyGroup Condition="'$(Configuration)'=='Release-Dev'">
