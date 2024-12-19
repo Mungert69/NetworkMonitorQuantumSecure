@@ -26,15 +26,16 @@ namespace QuantumSecure
         public static IServiceProvider ServiceProvider { get; private set; }
         public static MauiApp CreateMauiApp()
         {
-            ServiceInitializer.Initialize(new RootNamespaceProvider());
+           
 
             var os = "linux";
 #if ANDROID
 			os="android";
+             ServiceInitializer.Initialize(new RootNamespaceProvider());
 #endif
 
 #if WINDOWS
-            os="windows";
+            os = "windows";
 #endif
 
             var builder = MauiApp.CreateBuilder();

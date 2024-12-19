@@ -1,3 +1,4 @@
+#if ANDROID
 using NetworkMonitor.Maui.Services;
 
 namespace QuantumSecure
@@ -24,3 +25,4 @@ namespace QuantumSecure
 
     }
 }
+#endif
