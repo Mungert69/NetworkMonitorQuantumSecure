@@ -17,8 +17,8 @@
         <!-- App Identifier -->
         <ApplicationId>click.freenetworkmonitor.quantumsecure</ApplicationId>
 
-        <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
-        <TargetPlatformMinVersion >10.0.17763.0</TargetPlatformMinVersion>
+        <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+        <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
         <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
         <AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>
         <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
@@ -29,6 +29,7 @@
         <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
         <PackageCertificateThumbprint>F13A020884C94F4309A40BD2B922FBB8FACABC45</PackageCertificateThumbprint>
         <IncludeSymbols>True</IncludeSymbols>
+         <DefineConstants>WINDOWS</DefineConstants>
         
     </PropertyGroup>
         <PropertyGroup Condition="'$(Configuration)'=='Release-Dev'">
