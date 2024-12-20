@@ -22,7 +22,7 @@
                 <Nullable>enable</Nullable>
                 <NoWarn>CS8618</NoWarn>
                 <RuntimeIdentifiers Condition="$(TargetFramework.Contains('-android'))">android-arm;android-arm64;android-x86;android-x64</RuntimeIdentifiers>
-                <DefineConstants>ANDROID</DefineConstants>
+
 
         </PropertyGroup>
         <PropertyGroup Condition="'$(Configuration)'=='Release-Dev'">
@@ -86,6 +86,12 @@
                         <Private>true</Private>
                 </Reference>
         </ItemGroup>
+	        <ItemGroup>
+  <Reference Include="NetworkMonitorMaui">
+    <HintPath>..\NetworkMonitorMaui\bin\Debug\net9.0-android\NetworkMonitorMaui.dll</HintPath>
+    <Private>true</Private>
+  </Reference>
+</ItemGroup>
 
 <ItemGroup>
   <AndroidAsset Include="$(OutputPath)/*.dll">
