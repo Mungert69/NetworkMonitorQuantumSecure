@@ -61,8 +61,8 @@ private bool _isUpdatingSwitch = false;
             return; // Ignore programmatic changes
         }
        
-            var switchControl = (Switch)sender;
-            bool originalState = switchControl.IsToggled;
+        var switchControl = (Switch)sender;
+        bool originalState = switchControl.IsToggled;
        
         try
         {
