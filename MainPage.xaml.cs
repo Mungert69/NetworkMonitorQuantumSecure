@@ -55,21 +55,15 @@ private bool _isUpdatingSwitch = false;
 
     private async void OnSwitchToggled(object sender, ToggledEventArgs e)
     {
+       
         if (_isUpdatingSwitch)
         {
             return; // Ignore programmatic changes
         }
-        try
-        {
+       
             var switchControl = (Switch)sender;
             bool originalState = switchControl.IsToggled;
-        }
-        catch (Exception e ){ 
-             _logger.LogError(e, "Error in OnSwitchToggled");
-             await DisplayAlert("Error", $"Failed to find switch to change state : {e.Message}", "OK");
-
-        }
-
+       
         try
         {
             _isUpdatingSwitch = true;
