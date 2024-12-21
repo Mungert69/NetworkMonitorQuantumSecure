@@ -15,10 +15,6 @@ namespace QuantumSecure
 #if ANDROID
         public Type MainActivity { get => typeof(MainActivity); }
      
-
-        // Removed duplicate 'Resource' property; accessing Drawable via GetDrawable method instead.
-        public string GetAppDataDirectory() => FileSystem.AppDataDirectory;
-
         // Method to retrieve a Drawable field dynamically (Optional based on use case)
         public int GetDrawable(string drawableName)
         {
