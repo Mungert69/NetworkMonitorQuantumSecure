@@ -32,11 +32,6 @@
          <DefineConstants>WINDOWS</DefineConstants>
         
     </PropertyGroup>
-        <PropertyGroup Condition="'$(Configuration)'=='Release-Dev'">
-    <DefineConstants>DEV</DefineConstants>
-    <Optimize>true</Optimize>
-</PropertyGroup>
-
 
     <ItemGroup>
         <!-- App Icon -->
@@ -55,12 +50,13 @@
         <MauiImage Update="Resources\Images\dotneplaceholder.png" Resize="True" BaseSize="300,185" />
 
         <!-- Custom Fonts -->
-        <MauiFont Include="Resources\Fonts\*" />
-
+        <MauiFont Include="Resources\Fonts\*"/> 
+       
         <!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
-        <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+        <MauiAsset Include="Resources\Raw\**"  LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
         <MauiAsset Include="Resources\Raw\openssl-3.3.1-windows\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
 
+        <MauiStyles Include="Resources\Styles\*" />
     </ItemGroup>
     <ItemGroup>
 

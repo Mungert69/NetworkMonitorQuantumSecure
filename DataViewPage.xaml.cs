@@ -1,23 +1,10 @@
 
-using NetworkMonitor.Processor.Services;
 using NetworkMonitor.DTOs;
 using NetworkMonitor.Objects;
-using NetworkMonitor.Maui.Controls;
-using NetworkMonitor.Maui.Services;
-using NetworkMonitor.Maui.ViewModels;
-using QuantumSecure.Views;
-using NetworkMonitor.Connection;
 using Microsoft.Extensions.Logging;
-using System.ComponentModel;
-using System.Collections.Specialized;
-using System;
-using System.Diagnostics;
-using System.Collections.Generic;
-using Microsoft.Maui;
-using Microsoft.Maui.Controls;
-using Microsoft.Maui.Graphics;
-using Microsoft.Maui.Layouts;
 using CommunityToolkit.Maui.Views;
+using QuantumSecure.Views;
+
 
 namespace QuantumSecure;
 public partial class DateViewPage : ContentPage
@@ -25,12 +12,12 @@ public partial class DateViewPage : ContentPage
 
     private ILogger _logger;
     private IMonitorPingInfoView _monitorPingInfoView;
-    public DateViewPage(IMonitorPingInfoView monitorPingInfoView)
+    public DateViewPage(ILogger logger, IMonitorPingInfoView monitorPingInfoView)
     {
         try
         {
             InitializeComponent();
-            _logger = MauiProgram.ServiceProvider.GetRequiredService<ILogger<DateViewPage>>();
+            _logger = logger;
             _monitorPingInfoView = monitorPingInfoView;
             BindingContext = monitorPingInfoView;
         }
@@ -79,7 +66,7 @@ public partial class DateViewPage : ContentPage
                 if (boolResult)
                 {
 
-                    var detailsPage = new DetailsPage(_logger,_monitorPingInfoView);
+                    var detailsPage = new DetailsPage(_logger, _monitorPingInfoView);
                     await Shell.Current.Navigation.PushAsync(detailsPage);
 
                 }

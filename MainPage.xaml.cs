@@ -4,6 +4,7 @@ using NetworkMonitor.Maui;
 using QuantumSecure.Views;
 using NetworkMonitor.Maui.ViewModels;
 using NetworkMonitor.Maui.Controls;
+using NetworkMonitor.Maui.Services;
 
 namespace QuantumSecure;
 
@@ -55,15 +56,23 @@ private bool _isUpdatingSwitch = false;
 
     private async void OnSwitchToggled(object sender, ToggledEventArgs e)
     {
-       
+
         if (_isUpdatingSwitch)
         {
             return; // Ignore programmatic changes
         }
-       
         var switchControl = (Switch)sender;
         bool originalState = switchControl.IsToggled;
-       
+        _isUpdatingSwitch = true;
+
+        if (!RootNamespaceProvider.AssetsReady)
+        {
+            switchControl.IsToggled = false;
+            await DisplayAlert("Warning", $"Resource files still copying please wait. Check out the Setup Guide for information on the apps features. You may find the Network Monitor Assistant interesting.", "OK");
+            _isUpdatingSwitch = false;
+            return;
+        }
+
         try
         {
             _isUpdatingSwitch = true;
@@ -79,8 +88,6 @@ private bool _isUpdatingSwitch = false;
             // Reflect the actual service state on the toggle
             switchControl.IsToggled = isStarted;
 
-            // Update UI feedback
-            _mainPageViewModel.ServiceMessage = isStarted ? "Service is running" : "Failed to start service.";
         }
         catch (Exception ex)
         {
