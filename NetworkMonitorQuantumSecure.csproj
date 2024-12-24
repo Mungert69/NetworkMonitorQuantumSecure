@@ -50,10 +50,10 @@
         <MauiImage Update="Resources\Images\dotneplaceholder.png" Resize="True" BaseSize="300,185" />
 
         <!-- Custom Fonts -->
-        <MauiFont Include="Resources\Fonts\*"/> 
+        <MauiFont Include="Resources\Fonts\*" /> 
        
         <!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
-        <MauiAsset Include="Resources\Raw\**"  LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+        <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
         <MauiAsset Include="Resources\Raw\openssl-3.3.1-windows\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
 
         <MauiStyles Include="Resources\Styles\*" />
@@ -121,6 +121,10 @@
         <Generator>ResXFileCodeGenerator</Generator>
         <LastGenOutput>Resources.Designer.cs</LastGenOutput>
       </EmbeddedResource>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Resources\Raw\windowsdlls\" />
     </ItemGroup>
 
 
