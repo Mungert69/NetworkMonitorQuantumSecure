@@ -50,6 +50,7 @@
 ./System.Runtime.InteropServices.dll
 ./System.Reflection.Extensions.dll
 ./System.Security.Cryptography.OpenSsl.dll
+./NetworkMonitor.dll
 ./System.Collections.NonGeneric.dll
 ./System.Security.Claims.dll
 ./System.Linq.dll
@@ -135,7 +136,6 @@
 ./System.Globalization.dll
 ./System.Xml.ReaderWriter.dll
 ./Microsoft.CodeAnalysis.CSharp.dll
-./NetworkMonitor-Maui-Android.dll
 ./Microsoft.Extensions.Configuration.Json.dll
 ./System.IO.Compression.dll
 ./System.Threading.dll
