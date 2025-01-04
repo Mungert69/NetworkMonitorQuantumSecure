@@ -30,11 +30,12 @@
       <uap:VisualElements
         DisplayName="Quantum Secure"
         Description="$placeholder$"
-        BackgroundColor="transparent" Square44x44Logo="Resources\Images\SquareLogo\logosquare.png" Square150x150Logo="Resources\Images\SquareLogo\logosquare.png">
+        BackgroundColor="transparent" Square150x150Logo="Resources\Images\SquareLogo\logosquare.png" Square44x44Logo="Resources\Images\SquareLogo\logosquare.png">
         <uap:DefaultTile  Square310x310Logo="Resources\Images\SquareLogo\logomediumsquare.png" Wide310x150Logo="Resources\Images\Logos\logosquare.png" Square71x71Logo="Resources\Images\SquareLogo\logosquare.png">
           <uap:ShowNameOnTiles>
             <uap:ShowOn Tile="square310x310Logo"/>
             <uap:ShowOn Tile="wide310x150Logo"/>
+            <uap:ShowOn Tile="square150x150Logo"/>
           </uap:ShowNameOnTiles>
         </uap:DefaultTile >
         <uap:SplashScreen Image="Resources\Images\Logos\placeholder.png"/>
