@@ -120,6 +120,62 @@
     </ItemGroup>
 
     <ItemGroup>
+      <None Remove="Resources\Images\Logos\logosquare.scale-100.png" />
+      <None Remove="Resources\Images\Logos\logosquare.scale-125.png" />
+      <None Remove="Resources\Images\Logos\logosquare.scale-150.png" />
+      <None Remove="Resources\Images\Logos\logosquare.scale-200.png" />
+      <None Remove="Resources\Images\Logos\logosquare.scale-400.png" />
+      <None Remove="Resources\Images\Logos\placeholder.scale-100.png" />
+      <None Remove="Resources\Images\Logos\placeholder.scale-125.png" />
+      <None Remove="Resources\Images\Logos\placeholder.scale-150.png" />
+      <None Remove="Resources\Images\Logos\placeholder.scale-200.png" />
+      <None Remove="Resources\Images\Logos\placeholder.scale-400.png" />
+      <None Remove="Resources\Images\SquareLogo\logomediumsquare.scale-100.png" />
+      <None Remove="Resources\Images\SquareLogo\logomediumsquare.scale-125.png" />
+      <None Remove="Resources\Images\SquareLogo\logomediumsquare.scale-150.png" />
+      <None Remove="Resources\Images\SquareLogo\logomediumsquare.scale-200.png" />
+      <None Remove="Resources\Images\SquareLogo\logomediumsquare.scale-400.png" />
+      <None Remove="Resources\Images\SquareLogo\logosquare.scale-100.png" />
+      <None Remove="Resources\Images\SquareLogo\logosquare.scale-125.png" />
+      <None Remove="Resources\Images\SquareLogo\logosquare.scale-150.png" />
+      <None Remove="Resources\Images\SquareLogo\logosquare.scale-200.png" />
+      <None Remove="Resources\Images\SquareLogo\logosquare.scale-400.png" />
+      <None Remove="Resources\Images\SquareLogo\placeholder.scale-100.png" />
+      <None Remove="Resources\Images\SquareLogo\placeholder.scale-125.png" />
+      <None Remove="Resources\Images\SquareLogo\placeholder.scale-150.png" />
+      <None Remove="Resources\Images\SquareLogo\placeholder.scale-200.png" />
+      <None Remove="Resources\Images\SquareLogo\placeholder.scale-400.png" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Include="Resources\Images\Logos\logosquare.scale-100.png" />
+      <Content Include="Resources\Images\Logos\logosquare.scale-125.png" />
+      <Content Include="Resources\Images\Logos\logosquare.scale-150.png" />
+      <Content Include="Resources\Images\Logos\logosquare.scale-200.png" />
+      <Content Include="Resources\Images\Logos\logosquare.scale-400.png" />
+      <Content Include="Resources\Images\Logos\placeholder.scale-100.png" />
+      <Content Include="Resources\Images\Logos\placeholder.scale-125.png" />
+      <Content Include="Resources\Images\Logos\placeholder.scale-150.png" />
+      <Content Include="Resources\Images\Logos\placeholder.scale-200.png" />
+      <Content Include="Resources\Images\Logos\placeholder.scale-400.png" />
+      <Content Include="Resources\Images\SquareLogo\logomediumsquare.scale-100.png" />
+      <Content Include="Resources\Images\SquareLogo\logomediumsquare.scale-125.png" />
+      <Content Include="Resources\Images\SquareLogo\logomediumsquare.scale-150.png" />
+      <Content Include="Resources\Images\SquareLogo\logomediumsquare.scale-200.png" />
+      <Content Include="Resources\Images\SquareLogo\logomediumsquare.scale-400.png" />
+      <Content Include="Resources\Images\SquareLogo\logosquare.scale-100.png" />
+      <Content Include="Resources\Images\SquareLogo\logosquare.scale-125.png" />
+      <Content Include="Resources\Images\SquareLogo\logosquare.scale-150.png" />
+      <Content Include="Resources\Images\SquareLogo\logosquare.scale-200.png" />
+      <Content Include="Resources\Images\SquareLogo\logosquare.scale-400.png" />
+      <Content Include="Resources\Images\SquareLogo\placeholder.scale-100.png" />
+      <Content Include="Resources\Images\SquareLogo\placeholder.scale-125.png" />
+      <Content Include="Resources\Images\SquareLogo\placeholder.scale-150.png" />
+      <Content Include="Resources\Images\SquareLogo\placeholder.scale-200.png" />
+      <Content Include="Resources\Images\SquareLogo\placeholder.scale-400.png" />
+    </ItemGroup>
+
+    <ItemGroup>
         <Compile Update="Properties\Resources.Designer.cs">
             <DesignTime>True</DesignTime>
             <AutoGen>True</AutoGen>
