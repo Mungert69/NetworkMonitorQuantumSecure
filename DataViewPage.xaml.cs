@@ -12,12 +12,12 @@ public partial class DataViewPage : ContentPage
 
     private ILogger _logger;
     private IMonitorPingInfoView _monitorPingInfoView;
-    public DataViewPage(ILogger logger, IMonitorPingInfoView monitorPingInfoView)
+    public DataViewPage( IMonitorPingInfoView monitorPingInfoView)
     {
         try
         {
             InitializeComponent();
-            _logger = logger;
+            _logger = null;
             _monitorPingInfoView = monitorPingInfoView;
             BindingContext = monitorPingInfoView;
         }
@@ -75,7 +75,7 @@ public partial class DataViewPage : ContentPage
         }
         catch (Exception e)
         {
-            _logger.LogError($" Error: Could not navigate to page {nameof(DetailsPage)}. Error was: {e.ToString()}");
+            if (_logger != null) _logger.LogError($" Error: Could not navigate to page {nameof(DetailsPage)}. Error was: {e.ToString()}");
         }// Yes was tapped
     }
 }
