@@ -7,12 +7,12 @@ using QuantumSecure.Views;
 
 
 namespace QuantumSecure;
-public partial class DateViewPage : ContentPage
+public partial class DataViewPage : ContentPage
 {
 
     private ILogger _logger;
     private IMonitorPingInfoView _monitorPingInfoView;
-    public DateViewPage(ILogger logger, IMonitorPingInfoView monitorPingInfoView)
+    public DataViewPage(ILogger logger, IMonitorPingInfoView monitorPingInfoView)
     {
         try
         {
