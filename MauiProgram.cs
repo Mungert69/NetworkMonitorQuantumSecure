@@ -27,11 +27,11 @@ namespace QuantumSecure
 {
     public static class MauiProgram
     {
-              public static IServiceProvider ServiceProvider { get; private set; }
+        public static IServiceProvider ServiceProvider { get; private set; }
         public static MauiApp CreateMauiApp()
         {
 
-              // Add Global Exception Handling
+            // Add Global Exception Handling
             AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
             {
                 ExceptionHelper.HandleGlobalException(e.ExceptionObject as Exception, "Unhandled Domain Exception");
@@ -70,7 +70,7 @@ namespace QuantumSecure
             }
             catch (Exception ex)
             {
-                 ExceptionHelper.HandleGlobalException(ex," Error : could not setup logging");
+                ExceptionHelper.HandleGlobalException(ex, " Error : could not setup logging");
             }
 
 
@@ -113,7 +113,7 @@ namespace QuantumSecure
             {
                 string localAppSettingsPath = Path.Combine(FileSystem.AppDataDirectory, $"appsettings.json");
                 //string packagedAppSettingsPath = "QuantumSecure.appsettings.json";
-               
+
                 // Check if a local copy of appsettings.json exists
                 if (File.Exists(localAppSettingsPath))
                 {
@@ -136,26 +136,26 @@ namespace QuantumSecure
             try
             {
                 if (config != null)
-                Task.Run(async () =>
-                {
-                    string output = "";
-                    string opensslVersion = config["OpensslVersion"];
-                    string versionStr = opensslVersion;
-                    if (!string.IsNullOrEmpty(os)) versionStr = $"{opensslVersion}-{os}";
-                    output = await CopyAssetsHelper.CopyAssetsToLocalStorage(versionStr, "cs-assets", "dlls");
-                    RootNamespaceProvider.AssetsReady = true;
-                    
-                });
-                else    ExceptionHelper.HandleGlobalException(new Exception(),"Config is null");
+                    Task.Run(async () =>
+                    {
+                        string output = "";
+                        string opensslVersion = config["OpensslVersion"];
+                        string versionStr = opensslVersion;
+                        if (!string.IsNullOrEmpty(os)) versionStr = $"{opensslVersion}-{os}";
+                        output = await CopyAssetsHelper.CopyAssetsToLocalStorage(versionStr, "cs-assets", "dlls");
+                        RootNamespaceProvider.AssetsReady = true;
+
+                    });
+                else ExceptionHelper.HandleGlobalException(new Exception(), "Config is null");
 
 
             }
             catch (Exception ex)
             {
-                 ExceptionHelper.HandleGlobalException(ex," Error could not load assets");
+                ExceptionHelper.HandleGlobalException(ex, " Error could not load assets");
             }
 
-          
+
         }
         private static MauiAppBuilder CreateBuilder()
         {
@@ -174,7 +174,7 @@ namespace QuantumSecure
             }
             catch (Exception ex)
             {
-                 ExceptionHelper.HandleGlobalException(ex,"Error: Could not create builder");
+                ExceptionHelper.HandleGlobalException(ex, "Error: Could not create builder");
                 throw new InvalidOperationException("Failed to initialize MauiAppBuilder.", ex);
             }
         }
@@ -199,12 +199,19 @@ namespace QuantumSecure
                 }
                 catch (Exception ex)
                 {
-                     ExceptionHelper.HandleGlobalException(ex,"Error : initializing FileRepo");
+                    ExceptionHelper.HandleGlobalException(ex, "Error : initializing FileRepo");
                     return new FileRepo();
 
                 }
 
             });
+            builder.Services.AddSingleton<NetConnectConfig>(provider =>
+           {
+               // Assuming Configuration is properly set up
+               var configuration = provider.GetRequiredService<IConfiguration>();
+               var appDataDirectory = FileSystem.AppDataDirectory;
+               return new NetConnectConfig(configuration, appDataDirectory);
+           });
             builder.Services.AddSingleton<IRabbitRepo>(provider =>
            {
                var logger = provider.GetRequiredService<ILogger<RabbitRepo>>();
@@ -213,20 +220,23 @@ namespace QuantumSecure
                return new RabbitRepo(logger, netConfig);
            });
 
-
-            builder.Services.AddSingleton<NetConnectConfig>(provider =>
-            {
-                // Assuming Configuration is properly set up
-                var configuration = provider.GetRequiredService<IConfiguration>();
-                var appDataDirectory = FileSystem.AppDataDirectory;
-                return new NetConnectConfig(configuration, appDataDirectory);
-            });
-
-
         }
 
         private static void BuildServices(MauiAppBuilder builder)
         {
+              builder.Services.AddSingleton<ICmdProcessorProvider>
+                (provider =>
+                {
+
+                    var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
+                    var rabbitRepo = provider.GetRequiredService<IRabbitRepo>();
+                    var netConfig = provider.GetRequiredService<NetConnectConfig>();
+
+                    return new CmdProcessorProvider(loggerFactory, rabbitRepo, netConfig);
+
+
+                });
+
 
             builder.Services.AddSingleton<IApiService>(provider =>
     {
@@ -244,36 +254,7 @@ namespace QuantumSecure
              var processorStates = provider.GetRequiredService<LocalProcessorStates>();
              return new AuthService(logger, netConfig, rabbitRepo, processorStates);
          });
-            builder.Services.AddSingleton<ICmdProcessorProvider>
-                (provider =>
-                {
-
-                    var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
-                    var rabbitRepo = provider.GetRequiredService<IRabbitRepo>();
-                    var netConfig = provider.GetRequiredService<NetConnectConfig>();
-
-                    return new CmdProcessorProvider(loggerFactory, rabbitRepo, netConfig);
-
-
-                });
-
-
-            builder.Services.AddSingleton<IPlatformService>(provider =>
-            {
-#if ANDROID
-				  var logger = provider.GetRequiredService<ILogger<AndroidPlatformService>>();
-				   //var dialogService = provider.GetRequiredService<IDialogService>();
-				   return new AndroidPlatformService(logger);
-#endif
-
-#if WINDOWS
-                var logger = provider.GetRequiredService<ILogger<WindowsPlatformService>>();
-                //var dialogService = provider.GetRequiredService<IDialogService>();
-                var backgroundService = provider.GetRequiredService<IBackgroundService>();
-                return new WindowsPlatformService(backgroundService, logger);
-#endif
-                // throw new NotImplementedException("Unsupported platform");
-            });
+          
 #if WINDOWS
             builder.Services.AddSingleton<IBackgroundService>
                 (provider =>
@@ -293,6 +274,22 @@ namespace QuantumSecure
 
                 });
 #endif
+            builder.Services.AddSingleton<IPlatformService>(provider =>
+            {
+#if ANDROID
+				  var logger = provider.GetRequiredService<ILogger<AndroidPlatformService>>();
+				   //var dialogService = provider.GetRequiredService<IDialogService>();
+				   return new AndroidPlatformService(logger);
+#endif
+
+#if WINDOWS
+                var logger = provider.GetRequiredService<ILogger<WindowsPlatformService>>();
+                //var dialogService = provider.GetRequiredService<IDialogService>();
+                var backgroundService = provider.GetRequiredService<IBackgroundService>();
+                return new WindowsPlatformService(backgroundService, logger);
+#endif
+                // throw new NotImplementedException("Unsupported platform");
+            });
 
 
         }
@@ -375,6 +372,6 @@ namespace QuantumSecure
             });
         }
 
-       
+
     }
 }
