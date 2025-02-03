@@ -1,39 +1,20 @@
-﻿using MetroLog.Maui;
-using NetworkMonitor.Maui.Services;
-using NetworkMonitor.Maui.ViewModels;
-using Microsoft.Extensions.Logging;
-using NetworkMonitor.Maui;
-using QuantumSecure.Views;
-using NetworkMonitor.Maui.ViewModels;
-using NetworkMonitor.Maui.Controls;
+﻿using Microsoft.Extensions.Logging;
+using NetworkMonitor.Maui.Utils;
 namespace QuantumSecure;
 
 public partial class App : Application
 {
-
-
-   // public static ProcessorStatesViewModel ProcessorStatesVM { get; private set; }
-    private ILogger? _logger;
-
     public App(IServiceProvider serviceProvider)
     {   
         try
         {        
             InitializeComponent();
-            _logger = serviceProvider.GetRequiredService<ILogger<App>>();
-            MainPage = serviceProvider.GetRequiredService<AppShell>(); ;
-
-            //ProcessorStatesVM = new ProcessorStatesViewModel();
-            LogController.InitializeNavigation(
-           page => MainPage!.Navigation.PushModalAsync(page),
-           () => MainPage!.Navigation.PopModalAsync());
+            MainPage = serviceProvider.GetRequiredService<AppShell>();
         }
         catch (Exception ex)
         {
-            _logger?.LogError($" Error initializing App {ex.Message} ");
+            Console.WriteLine($"Error initializing App: {ex.Message}");
         }
-
-
-
     }
+   
 }

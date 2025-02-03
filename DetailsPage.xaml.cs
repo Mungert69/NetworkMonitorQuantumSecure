@@ -1,12 +1,12 @@
-using NetworkMonitor.Objects;
-using NetworkMonitor.Maui.ViewModels;
+
 using NetworkMonitor.DTOs;
 using Microsoft.Extensions.Logging;
 namespace QuantumSecure;
 public partial class DetailsPage : ContentPage
 {
 
-    private ILogger _logger;
+
+    private readonly ILogger _logger;
     public DetailsPage(ILogger logger,IMonitorPingInfoView monitorPingInfoView)
     {
         try
@@ -14,10 +14,11 @@ public partial class DetailsPage : ContentPage
             InitializeComponent();
             _logger=logger;
             BindingContext = monitorPingInfoView;
+
         }
         catch (Exception ex)
         {
-            if (_logger != null) _logger.LogError($" Error : Unable to load DetailsPage. Error was: {ex.Message}");
+             _logger?.LogError($" Error : Unable to load DetailsPage. Error was: {ex.Message}");
         }
     }
 
@@ -28,7 +29,7 @@ public partial class DetailsPage : ContentPage
         await Shell.Current.Navigation.PopAsync();}
          catch (Exception ex)
         {
-            if (_logger != null) _logger.LogError($" Error : in OnBackButton_Clicked on DetailsPage. Error was: {ex.Message}");
+            _logger?.LogError($" Error : in OnBackButton_Clicked on DetailsPage. Error was: {ex.Message}");
         }
     }
 

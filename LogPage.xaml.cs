@@ -1,17 +1,6 @@
 using MetroLog.Maui;
-using NetworkMonitor.Processor.Services;
-using NetworkMonitor.Maui.Services;
-using NetworkMonitor.Maui.ViewModels;
-using NetworkMonitor.Connection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Maui.Controls;
-using System.Diagnostics;
-using Microsoft.Maui.Graphics;  // For Rectangle
-using Microsoft.Maui.Layouts;  // For AbsoluteLayoutFlags
-using NetworkMonitor.Maui;
-using QuantumSecure.Views;
-using NetworkMonitor.Maui.ViewModels;
-using NetworkMonitor.Maui.Controls;
+
 namespace QuantumSecure;
 public partial class LogsPage : ContentPage
 {
