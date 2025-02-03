@@ -1,9 +1,7 @@
 
-using NetworkMonitor.Processor.Services;
+
 using NetworkMonitor.DTOs;
 using NetworkMonitor.Objects;
-using NetworkMonitor.Maui.Controls;
-using NetworkMonitor.Maui.Services;
 
 using Microsoft.Extensions.Logging;
 using QuantumSecure.Views;
