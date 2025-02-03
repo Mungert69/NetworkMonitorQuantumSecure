@@ -9,13 +9,14 @@ namespace QuantumSecure;
 public partial class DataViewPage : ContentPage
 {
 
-    private readonly ILogger _logger;
-    private readonly IMonitorPingInfoView _monitorPingInfoView;
-    public DataViewPage(IMonitorPingInfoView monitorPingInfoView)
+    private ILogger _logger;
+    private IMonitorPingInfoView _monitorPingInfoView;
+    public DataViewPage( IMonitorPingInfoView monitorPingInfoView)
     {
         try
         {
             InitializeComponent();
+            _logger = logger;
             _monitorPingInfoView = monitorPingInfoView;
             BindingContext = _monitorPingInfoView;
         }
@@ -71,7 +72,7 @@ public partial class DataViewPage : ContentPage
         }
         catch (Exception e)
         {
-             _logger?.LogError($" Error: Could not navigate to page {nameof(DetailsPage)}. Error was: {e.ToString()}");
+            _logger.LogError($" Error: Could not navigate to page {nameof(DetailsPage)}. Error was: {e.ToString()}");
         }// Yes was tapped
     }
 }

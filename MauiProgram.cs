@@ -19,7 +19,8 @@ namespace QuantumSecure
         public static IServiceProvider ServiceProvider { get; private set; }
         public static MauiApp CreateMauiApp()
         {
-            // Global exception handlers
+
+            // Add Global Exception Handling
             AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
             {
                 var exception = e.ExceptionObject as Exception;
@@ -60,7 +61,7 @@ namespace QuantumSecure
             }
             catch (Exception ex)
             {
-                ExceptionHelper.HandleGlobalException(ex, "Error: could not setup logging");
+                 ExceptionHelper.HandleGlobalException(ex," Error : could not setup logging");
             }
 
             try
@@ -98,7 +99,8 @@ namespace QuantumSecure
             try
             {
                 string localAppSettingsPath = Path.Combine(FileSystem.AppDataDirectory, $"appsettings.json");
-                //string packagedAppSettingsPath = "NetworkMonitorAgent.appsettings.json";
+                //string packagedAppSettingsPath = "QuantumSecure.appsettings.json";
+               
                 // Check if a local copy of appsettings.json exists
                 if (File.Exists(localAppSettingsPath))
                 {
@@ -121,21 +123,26 @@ namespace QuantumSecure
             try
             {
                 if (config != null)
-                    Task.Run(async () =>
-                    {
-                        string output = "";
-                        string opensslVersion = config["OpensslVersion"];
-                        string versionStr = opensslVersion;
-                        if (!string.IsNullOrEmpty(os)) versionStr = $"{opensslVersion}-{os}";
-                        output = await CopyAssetsHelper.CopyAssetsToLocalStorage(versionStr, "cs-assets", "dlls");
-                        RootNamespaceProvider.AssetsReady = true;
-                    });
-                else ExceptionHelper.HandleGlobalException(new Exception(), "Config is null");
+                Task.Run(async () =>
+                {
+                    string output = "";
+                    string opensslVersion = config["OpensslVersion"];
+                    string versionStr = opensslVersion;
+                    if (!string.IsNullOrEmpty(os)) versionStr = $"{opensslVersion}-{os}";
+                    output = await CopyAssetsHelper.CopyAssetsToLocalStorage(versionStr, "cs-assets", "dlls");
+                    RootNamespaceProvider.AssetsReady = true;
+                    
+                });
+                else    ExceptionHelper.HandleGlobalException(new Exception(),"Config is null");
+
+
             }
             catch (Exception ex)
             {
                 ExceptionHelper.HandleGlobalException(ex, " Error could not load assets");
             }
+
+          
         }
         private static MauiAppBuilder CreateBuilder()
         {
@@ -179,6 +186,13 @@ namespace QuantumSecure
                     return new FileRepo();
                 }
             });
+            builder.Services.AddSingleton<NetConnectConfig>(provider =>
+           {
+               // Assuming Configuration is properly set up
+               var configuration = provider.GetRequiredService<IConfiguration>();
+               var appDataDirectory = FileSystem.AppDataDirectory;
+               return new NetConnectConfig(configuration, appDataDirectory);
+           });
             builder.Services.AddSingleton<IRabbitRepo>(provider =>
            {
                var logger = provider.GetRequiredService<ILogger<RabbitRepo>>();
@@ -186,6 +200,8 @@ namespace QuantumSecure
                // Choose the appropriate constructor
                return new RabbitRepo(logger, netConfig);
            });
+
+
             builder.Services.AddSingleton<NetConnectConfig>(provider =>
             {
                 // Assuming Configuration is properly set up
@@ -193,10 +209,13 @@ namespace QuantumSecure
                 var appDataDirectory = FileSystem.AppDataDirectory;
                 return new NetConnectConfig(configuration, appDataDirectory);
             });
+
+
         }
+
         private static void BuildServices(MauiAppBuilder builder)
         {
-            builder.Services.AddSingleton<IMonitorPingInfoView, MonitorPingInfoView>();
+
             builder.Services.AddSingleton<IApiService>(provider =>
     {
         var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
@@ -212,14 +231,23 @@ namespace QuantumSecure
              var processorStates = provider.GetRequiredService<LocalProcessorStates>();
              return new AuthService(logger, netConfig, rabbitRepo, processorStates);
          });
-            builder.Services.AddSingleton<ICmdProcessorProvider>
+          
+#if WINDOWS
+            builder.Services.AddSingleton<IBackgroundService>
                 (provider =>
                 {
+
                     var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
+                    var netConfig = provider.GetRequiredService<NetConnectConfig>();
                     var rabbitRepo = provider.GetRequiredService<IRabbitRepo>();
                     var netConfig = provider.GetRequiredService<NetConnectConfig>();
+
                     return new CmdProcessorProvider(loggerFactory, rabbitRepo, netConfig);
+
+
                 });
+
+
             builder.Services.AddSingleton<IPlatformService>(provider =>
             {
 #if ANDROID
@@ -237,17 +265,23 @@ namespace QuantumSecure
             builder.Services.AddSingleton<IBackgroundService>
                 (provider =>
                 {
+
                     var logger = provider.GetRequiredService<ILogger<BackgroundService>>();
                     var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
                     var netConfig = provider.GetRequiredService<NetConnectConfig>();
                     var rabbitRepo = provider.GetRequiredService<IRabbitRepo>();
                     var fileRepo = provider.GetRequiredService<IFileRepo>();
                     var processorStates = provider.GetRequiredService<LocalProcessorStates>();
-                    var cmdProcessorProvider = provider.GetRequiredService<ICmdProcessorProvider>();
+                    var cmdProcessorProvider=provider.GetRequiredService<ICmdProcessorProvider>();
                     var monitorPingInfoView = provider.GetRequiredService<IMonitorPingInfoView>();
+
                     return new BackgroundService(logger, netConfig, loggerFactory, rabbitRepo, fileRepo, processorStates, monitorPingInfoView, cmdProcessorProvider);
+
+
                 });
 #endif
+
+
         }
         private static void BuildViewModels(MauiAppBuilder builder)
         {
@@ -258,28 +292,43 @@ namespace QuantumSecure
         }
         private static void BuildPages(MauiAppBuilder builder)
         {
-            builder.Services.AddSingleton<ScanPage>();
-            builder.Services.AddSingleton<NetworkMonitorPage>();
-            builder.Services.AddSingleton<MainPage>();
-            builder.Services.AddSingleton<ConfigPage>();
-            builder.Services.AddSingleton<DataViewPage>();
-        }
-        private static void ShowAlertBlocking(string title, string? message)
-        {
-            var fullMessage = string.IsNullOrWhiteSpace(message) ? title : $"{title}\n{message}";
-            MainThread.BeginInvokeOnMainThread(() =>
+            builder.Services.AddSingleton(provider =>
+                        {
+                            var scanProcessorStatesViewModel = provider.GetRequiredService<ScanProcessorStatesViewModel>();
+                            var logger = provider.GetRequiredService<ILogger<ScanPage>>();
+                            var platformService = provider.GetRequiredService<IPlatformService>();
+
+                            return new ScanPage(logger, scanProcessorStatesViewModel, platformService);
+                        });
+
+            builder.Services.AddSingleton(provider =>
+           {
+               var apiService = provider.GetRequiredService<IApiService>();
+               return new NetworkMonitorPage(apiService);
+           });
+            builder.Services.AddSingleton(provider =>
+           {
+
+               var logger = provider.GetRequiredService<ILogger<MainPage>>();
+               var processorStatesViewModel = provider.GetRequiredService<ProcessorStatesViewModel>();
+               var mainPageViewModel = provider.GetRequiredService<MainPageViewModel>();
+               return new MainPage(logger, mainPageViewModel, processorStatesViewModel);
+           });
+            builder.Services.AddSingleton(provider =>
             {
-                var mainPage = Application.Current?.MainPage;
-                if (mainPage != null)
-                {
-                    mainPage.DisplayAlert("Error", fullMessage, "OK").GetAwaiter().GetResult();
-                }
-                else
-                {
-                    // Fallback if MainPage is not available
-                    Console.WriteLine(fullMessage);
-                }
+
+                var logger = provider.GetRequiredService<ILogger<DataViewPage>>();
+                var monitorPingInfoView = provider.GetRequiredService<IMonitorPingInfoView>();
+
+                return new DataViewPage(logger, monitorPingInfoView);
+            });
+            builder.Services.AddSingleton(provider =>
+            {
+                var configPageViewModel = provider.GetRequiredService<ConfigPageViewModel>();
+                return new ConfigPage(configPageViewModel);
             });
         }
+
+       
     }
 }
