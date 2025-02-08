@@ -68,11 +68,15 @@
                             Padding="0,0,5,0"/>
 
                         <Switch  Toggled="OnSwitchToggled"/>
-                        <Label Text="{Binding ServiceMessage}"
-                               VerticalOptions="Center"
-                               TextColor="{DynamicResource Secondary}"/>
-                    </StackLayout>
-
+		</StackLayout>
+		  <Grid HorizontalOptions="CenterAndExpand">
+        <Label Text="{Binding ServiceMessage}"
+               TextColor="{DynamicResource Secondary}"
+               LineBreakMode="WordWrap"
+               HorizontalTextAlignment="Center"
+               VerticalTextAlignment="Center"
+               WidthRequest="300" />
+    </Grid>
                 </VerticalStackLayout>
             </Frame>
 
