@@ -11,7 +11,7 @@ using NetworkMonitor.Objects;
 using NetworkMonitor.Maui.ViewModels;
 using NetworkMonitor.Utils.Helpers;
 using CommunityToolkit.Maui;
-using Microsoft.JSInterop;
+//using Microsoft.JSInterop;
 using System.Xml;
 using System.Text.Json;
 
