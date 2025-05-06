@@ -11,8 +11,11 @@ using NetworkMonitor.Objects;
 using NetworkMonitor.Maui.ViewModels;
 using NetworkMonitor.Utils.Helpers;
 using CommunityToolkit.Maui;
+using Microsoft.JSInterop;
+using System.Xml;
+using System.Text.Json;
 
-namespace QuantumSecure
+namespace NetworkMonitorQuantumSecure
 {
     public static class MauiProgram
     {
@@ -48,8 +51,6 @@ namespace QuantumSecure
                 {
                     loggingBuilder.ClearProviders(); // Optional: Clears default providers if necessary
                     loggingBuilder.SetMinimumLevel(LogLevel.Information); // Set the minimum log level
-
-                    // Add standard logging providers
                     loggingBuilder.AddConsole(); // Console logger (useful for debugging)
                     loggingBuilder.AddDebug();   // Debug output window (useful in Visual Studio)
 
@@ -65,7 +66,8 @@ namespace QuantumSecure
 
             try
             {
-                LoadConfiguration(builder, os);
+                IConfigurationRoot? config=LoadConfiguration(builder);
+                LoadAssets(builder, os,config);
                 BuildRepoAndConfig(builder);
                 BuildServices(builder);
                 BuildViewModels(builder);
@@ -92,32 +94,90 @@ namespace QuantumSecure
             ServiceProvider = app.Services;
             return app;
         }
-        private static void LoadConfiguration(MauiAppBuilder builder, string os)
+
+    private static IConfigurationRoot? LoadConfiguration(MauiAppBuilder builder)
+{
+    IConfigurationRoot? config = null;
+    try
+    {
+        string localAppSettingsPath = Path.Combine(FileSystem.AppDataDirectory, "appsettings.json");
+
+        // List of fields that should always be overwritten by the packaged version
+        var fieldsToOverwrite = new List<string>
         {
-            IConfigurationRoot? config = null;
-            try
+            "ClientId",  
+            "BaseFusionAuthURL",
+            "LoadServer",
+            "ServiceDomain",
+	    "ChatServer",
+            "ServiceServer",
+            "FrontEndUrl",
+            "TranscribeAudioUrl",
+            "IsChatMode",
+            "OpensslVersion",
+            "LocalSystemUrl:RabbitHostName",
+            "LocalSystemUrl:RabbitPort"
+
+        };
+
+        // Load the packaged configuration first
+        using var stream = FileSystem.OpenAppPackageFileAsync("appsettings.json").Result;
+        IConfigurationRoot packagedConfig = new ConfigurationBuilder()
+            .AddJsonStream(stream)
+            .Build();
+
+        // Convert to dictionary for easier comparison
+        var packagedDict = GetConfigDictionary(packagedConfig);
+
+        if (File.Exists(localAppSettingsPath))
+        {
+            // Load existing user configuration
+            IConfigurationRoot userConfig = new ConfigurationBuilder()
+                .AddJsonFile(localAppSettingsPath, optional: false, reloadOnChange: false)
+                .Build();
+
+            var userDict = GetConfigDictionary(userConfig);
+
+            // Process all fields
+            foreach (var kvp in packagedDict)
             {
-                string localAppSettingsPath = Path.Combine(FileSystem.AppDataDirectory, $"appsettings.json");
-                //string packagedAppSettingsPath = "NetworkMonitorAgent.appsettings.json";
-                // Check if a local copy of appsettings.json exists
-                if (File.Exists(localAppSettingsPath))
+                if (!userDict.ContainsKey(kvp.Key))
                 {
-                    // Use the local copy
-                    config = new ConfigurationBuilder()
-                        .AddJsonFile(localAppSettingsPath, optional: false, reloadOnChange: false)
-                        .Build();
+                    // Add new field if it doesn't exist in user config
+                    userDict[kvp.Key] = kvp.Value;
                 }
-                else
+                else if (fieldsToOverwrite.Contains(kvp.Key))
                 {
-                    using var stream = FileSystem.OpenAppPackageFileAsync($"appsettings.json").Result;
-                    config = new ConfigurationBuilder().AddJsonStream(stream).Build();
+                    // Overwrite the field if it's in our overwrite list
+                    userDict[kvp.Key] = kvp.Value;
                 }
-                builder.Configuration.AddConfiguration(config);
+                // Existing fields not in the overwrite list remain unchanged
             }
-            catch (Exception ex)
-            {
-                ExceptionHelper.HandleGlobalException(ex, $" Error could not load appsetting.json");
-            }
+
+            // Save the augmented configuration
+            File.WriteAllText(localAppSettingsPath,
+                JsonSerializer.Serialize(userDict, new JsonSerializerOptions { WriteIndented = true }));
+            config = new ConfigurationBuilder()
+                    .AddInMemoryCollection(ConvertToKeyValuePairs(userDict))
+                    .Build();
+        }
+        else
+        {
+            // First run - just use the packaged config
+            File.WriteAllText(localAppSettingsPath,
+                JsonSerializer.Serialize(packagedDict, new JsonSerializerOptions { WriteIndented = true }));
+            config = packagedConfig;
+        }
+    }
+    catch (Exception ex)
+    {
+        ExceptionHelper.HandleGlobalException(ex, "Error loading appsettings.json");
+    }
+    builder.Configuration.AddConfiguration(config);
+    return config;
+}
+        private static void LoadAssets(MauiAppBuilder builder, string os, IConfigurationRoot? config)
+        {
             try
             {
                 if (config != null)
@@ -150,6 +210,13 @@ namespace QuantumSecure
                         fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                         fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
                     });
+
+                builder.Services.AddMauiBlazorWebView();
+
+
+#if DEBUG
+                builder.Services.AddBlazorWebViewDeveloperTools();
+#endif
                 return builder;
             }
             catch (Exception ex)
@@ -196,6 +263,26 @@ namespace QuantumSecure
         }
         private static void BuildServices(MauiAppBuilder builder)
         {
+         
+            
+            builder.Services.AddScoped<ILLMService,LLMService>();
+            builder.Services.AddScoped<AudioService>(provider =>
+              new AudioService(provider.GetService<IJSRuntime>(),provider.GetRequiredService<NetConnectConfig>()));
+            builder.Services.AddScoped<ChatStateService>(provider =>
+                new ChatStateService(provider.GetService<IJSRuntime>()));
+
+            builder.Services.AddScoped<WebSocketService>(provider => {
+
+                return new WebSocketService(
+                    provider.GetRequiredService<ChatStateService>(),
+                    provider.GetService<IJSRuntime>(),
+                    provider.GetRequiredService<AudioService>(),
+                    provider.GetRequiredService<ILLMService>(),
+                    provider.GetRequiredService<NetConnectConfig>());
+            });
+
+          
+
             builder.Services.AddSingleton<IMonitorPingInfoView, MonitorPingInfoView>();
             builder.Services.AddSingleton<IApiService>(provider =>
     {
@@ -263,6 +350,7 @@ namespace QuantumSecure
             builder.Services.AddSingleton<MainPage>();
             builder.Services.AddSingleton<ConfigPage>();
             builder.Services.AddSingleton<DataViewPage>();
+            builder.Services.AddSingleton<ChatPage>();
         }
         private static void ShowAlertBlocking(string title, string? message)
         {
@@ -281,5 +369,41 @@ namespace QuantumSecure
                 }
             });
         }
+        // Helper to convert configuration to flat dictionary
+        private static Dictionary<string, object> GetConfigDictionary(IConfiguration config)
+        {
+            var dict = new Dictionary<string, object>();
+            void RecurseChildren(IEnumerable<IConfigurationSection> children, string prefix = "")
+            {
+                foreach (var child in children)
+                {
+                    var key = string.IsNullOrEmpty(prefix) ? child.Key : $"{prefix}:{child.Key}";
+
+                    if (child.Value == null && child.GetChildren().Any())
+                    {
+                        // This is a section node with children
+                        RecurseChildren(child.GetChildren(), key);
+                    }
+                    else
+                    {
+                        // This is a value node
+                        dict[key] = child.Value;
+                    }
+                }
+            }
+
+            RecurseChildren(config.GetChildren());
+            return dict;
+        }
+
+        // Helper to convert dictionary back to key-value pairs for ConfigurationBuilder
+        private static IEnumerable<KeyValuePair<string, string>> ConvertToKeyValuePairs(Dictionary<string, object> dict)
+        {
+            foreach (var kvp in dict)
+            {
+                yield return new KeyValuePair<string, string>(kvp.Key, kvp.Value?.ToString());
+            }
+        }
+
     }
 }
