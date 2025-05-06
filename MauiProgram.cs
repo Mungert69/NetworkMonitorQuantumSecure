@@ -15,7 +15,7 @@ using Microsoft.JSInterop;
 using System.Xml;
 using System.Text.Json;
 
-namespace NetworkMonitorQuantumSecure
+namespace QuantumSecure
 {
     public static class MauiProgram
     {
@@ -211,12 +211,12 @@ namespace NetworkMonitorQuantumSecure
                         fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
                     });
 
-                builder.Services.AddMauiBlazorWebView();
+               /* builder.Services.AddMauiBlazorWebView();
 
 
 #if DEBUG
                 builder.Services.AddBlazorWebViewDeveloperTools();
-#endif
+#endif */
                 return builder;
             }
             catch (Exception ex)
@@ -265,7 +265,7 @@ namespace NetworkMonitorQuantumSecure
         {
          
             
-            builder.Services.AddScoped<ILLMService,LLMService>();
+           /* builder.Services.AddScoped<ILLMService,LLMService>();
             builder.Services.AddScoped<AudioService>(provider =>
               new AudioService(provider.GetService<IJSRuntime>(),provider.GetRequiredService<NetConnectConfig>()));
             builder.Services.AddScoped<ChatStateService>(provider =>
@@ -280,7 +280,7 @@ namespace NetworkMonitorQuantumSecure
                     provider.GetRequiredService<ILLMService>(),
                     provider.GetRequiredService<NetConnectConfig>());
             });
-
+*/
           
 
             builder.Services.AddSingleton<IMonitorPingInfoView, MonitorPingInfoView>();
@@ -350,7 +350,6 @@ namespace NetworkMonitorQuantumSecure
             builder.Services.AddSingleton<MainPage>();
             builder.Services.AddSingleton<ConfigPage>();
             builder.Services.AddSingleton<DataViewPage>();
-            builder.Services.AddSingleton<ChatPage>();
         }
         private static void ShowAlertBlocking(string title, string? message)
         {

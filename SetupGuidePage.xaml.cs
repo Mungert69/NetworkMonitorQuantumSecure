@@ -1,4 +1,5 @@
 
+using NetworkMonitor.Objects;
 namespace QuantumSecure
 {
     public partial class SetupGuidePage : ContentPage
@@ -10,7 +11,7 @@ namespace QuantumSecure
 
         private async void OnDownloadLinkClicked(object sender, EventArgs e)
         {
-            await Browser.Default.OpenAsync("http://freenetworkmonitor.click/download");
+            await Browser.Default.OpenAsync($"http://{AppConstants.AppDomain}/download");
         }
     }
 }

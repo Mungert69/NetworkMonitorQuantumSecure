@@ -12,6 +12,7 @@ public partial class ScanPage : ContentPage
     private readonly ILogger _logger;
 
     private readonly ScanProcessorStatesViewModel _scanProcessorStatesViewModel;
+ public string FrontendUrl => AppConstants.FrontendUrl;
 
     private readonly IPlatformService _platformService;
 
@@ -79,8 +80,7 @@ public partial class ScanPage : ContentPage
     {
 
         try
-        {//await Launcher.OpenAsync("https://freenetworkmonitor.click/dashboard");
-            await Browser.Default.OpenAsync("https://freenetworkmonitor.click/dashboard", BrowserLaunchMode.SystemPreferred);
+        {   await Browser.Default.OpenAsync($"https://{AppConstants.AppDomain}/dashboard", BrowserLaunchMode.SystemPreferred);
         }
         catch (Exception ex)
         {
@@ -129,7 +129,7 @@ public partial class ScanPage : ContentPage
         try
         {
             await _scanProcessorStatesViewModel.AddServices();
-            await DisplayAlert("Success", $"Added {_scanProcessorStatesViewModel.SelectedDevices.Count} services to be monitored. You will receive alerts if any of these servers are down. View host monitoring details under the Monitored Hosts tab. Alternatively you can manage and view more detailed host data at https://freenetworkmonitor.click/dashboard. Login using the same email you registerd this agent with.", "OK");
+            await DisplayAlert("Success", $"Added {_scanProcessorStatesViewModel.SelectedDevices.Count} services to be monitored. You will receive alerts if any of these servers are down. View host monitoring details under the Monitored Hosts tab. Alternatively you can manage and view more detailed host data at https://{AppConstants.AppDomain}/dashboard. Login using the same email you registerd this agent with.", "OK");
 
         }
         catch (Exception ex)
