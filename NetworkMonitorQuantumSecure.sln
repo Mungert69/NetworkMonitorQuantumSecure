@@ -7,7 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetworkMonitorQuantumSecure
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetworkMonitorProcessor-Maui", "..\NetworkMonitorProcessor\NetworkMonitorProcessor-Maui.csproj", "{2A747F74-B750-4CC7-ACB9-AA6C963396CC}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetworkMonitor-Maui", "..\NetworkMonitor\NetworkMonitor-Maui.csproj", "{1026F0F9-A1CD-4475-A655-DD6A95D57323}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetworkMonitor-Maui", "..\NetworkMonitorLib\NetworkMonitor-Maui.csproj", "{1026F0F9-A1CD-4475-A655-DD6A95D57323}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetworkMonitorMaui", "..\NetworkMonitorMaui\NetworkMonitorMaui.csproj", "{6B5EB6E3-5A21-4FDD-8766-D35364B5AD38}"
 EndProject
