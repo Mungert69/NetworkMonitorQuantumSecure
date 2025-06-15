@@ -20,7 +20,7 @@
                                HorizontalOptions="FillAndExpand">
                                 <VerticalStackLayout Spacing="10">
                                         <Image Source="logo.png"
-                                               SemanticProperties.Description="Free Network Monitor Logo"
+                                               SemanticProperties.Description="Quantum Network Monitor Logo"
                                                HeightRequest="100"
                                                HorizontalOptions="Center"/>
                                         <Label Text="Quantum Secure Agent Setup Guide"
@@ -77,7 +77,7 @@
 
                                         <Label HorizontalOptions="Center"
                                                Padding="5"
-                                               Text="Step 3: Access the Free Network Monitor Dashboard"
+                                               Text="Step 3: Access the Quantum Network Monitor Dashboard"
                                                FontSize="16"
                                                FontAttributes="Bold"
                                                TextColor="{DynamicResource Primary}"/>
@@ -85,9 +85,9 @@
                                         <Label>
                                                 <Label.FormattedText>
                                                         <FormattedString>
-                                                                <Span Text="After authorization, tap 'Login to Free Network Monitor' to access the dashboard at "/>
+                                                                <Span Text="After authorization, tap 'Login to Quantum Network Monitor' to access the dashboard at "/>
                                                                 <Span Text="{Binding FrontendUrl}"/>
-                                                                <Span Text="/dashboard using the same email you used for authorization. This is where you manage and monitor network activities, and it’s also where the Free Network Monitor Assistant is available to help with advanced tasks and insights."/>
+                                                                <Span Text="/dashboard using the same email you used for authorization. This is where you manage and monitor network activities, and it’s also where the Quantum Network Monitor Assistant is available to help with advanced tasks and insights."/>
                                                         </FormattedString>
                                                 </Label.FormattedText>
                                         </Label>
@@ -104,7 +104,7 @@
                                                FontSize="14"
                                                FontAttributes="Bold"
                                                TextColor="{DynamicResource Primary}"/>
-                                        <Label Text="In the Free Network Monitor Dashboard, you can manually add hosts you want to monitor. For instance, to monitor a local router, enter its IP address (e.g., 192.168.1.1) and select 'icmp' as the endpoint type."/>
+                                        <Label Text="In the Quantum Network Monitor Dashboard, you can manually add hosts you want to monitor. For instance, to monitor a local router, enter its IP address (e.g., 192.168.1.1) and select 'icmp' as the endpoint type."/>
 
                                         <!-- Adding Hosts via the Network Monitor Assistant -->
                                         <Label Padding="5"
@@ -196,8 +196,8 @@
                                                 FontSize="16"
                                                 FontAttributes="Bold"
                                                 TextColor="{DynamicResource Primary}"/>
-                                        <Label Text="You can view detailed monitoring data in three ways: through the Free Network Monitor Dashboard, within the app's Host Data tab, or by using the Network Monitor Assistant."/>
-                                        <Label Text="• Using the Free Network Monitor Dashboard: Access the dashboard to view comprehensive monitoring data and analyses for each host."/>
+                                        <Label Text="You can view detailed monitoring data in three ways: through the Quantum Network Monitor Dashboard, within the app's Host Data tab, or by using the Network Monitor Assistant."/>
+                                        <Label Text="• Using the Quantum Network Monitor Dashboard: Access the dashboard to view comprehensive monitoring data and analyses for each host."/>
                                         <Label Text="• Using the Monitored Hosts Tab in the App: Host data is visually represented in the app with indicator circles for each host. Each circle will appear green if the host is active or red if down."/>
                                         <Label Text="  - Tap the Circle: Tap a circle to view detailed monitoring information for the corresponding host."/>
                                         <Label Text="  - Pulsing Circles: A pulsing circle signifies that the host is up, and the pulse rate reflects the response time—the faster the pulse, the quicker the response time."/>
@@ -234,7 +234,7 @@
                                                FontSize="16"
                                                FontAttributes="Bold"
                                                TextColor="{DynamicResource Primary}"/>
-                                        <Label Text="The Network Monitor Assistant provides advanced capabilities, including Nmap scans, OpenSSL checks, and BusyBox commands. You can also perform internet searches for technical assistance directly via the Free Network Monitor Assistant on the dashboard."/>
+                                        <Label Text="The Network Monitor Assistant provides advanced capabilities, including Nmap scans, OpenSSL checks, and BusyBox commands. You can also perform internet searches for technical assistance directly via the Quantum Network Monitor Assistant on the dashboard."/>
                                         <Label Text="Note for Windows Users: The assistant can also utilize Metasploit for penetration testing, but you must install the Metasploit Framework separately. After installation, ensure 'msfconsole' is accessible from the system's PATH."/>
                                         <Label Text="Note for Android Users: The Metasploit framework is not available for Android at the time of publishing."/>
                                         <Label Text="Important: Ensure you have permission to run any security tests, scans, or commands on systems being tested. Unauthorized testing can lead to legal consequences."/>
