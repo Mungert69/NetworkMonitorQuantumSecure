@@ -7,9 +7,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetworkMonitorQuantumSecure
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetworkMonitorProcessor-Maui", "..\NetworkMonitorProcessor\NetworkMonitorProcessor-Maui.csproj", "{2A747F74-B750-4CC7-ACB9-AA6C963396CC}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NetworkMonitor-Maui", "..\NetworkMonitor\NetworkMonitor-Maui.csproj", "{1026F0F9-A1CD-4475-A655-DD6A95D57323}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetworkMonitorMaui", "..\NetworkMonitorMaui\NetworkMonitorMaui.csproj", "{6B5EB6E3-5A21-4FDD-8766-D35364B5AD38}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetworkMonitor-Maui", "..\NetworkMonitorLib\NetworkMonitor-Maui.csproj", "{74B7BAA5-A048-E25D-7971-44BAEC0AAF3A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -30,18 +30,18 @@ Global
 		{2A747F74-B750-4CC7-ACB9-AA6C963396CC}.Release|Any CPU.Build.0 = Release|Any CPU
 		{2A747F74-B750-4CC7-ACB9-AA6C963396CC}.Release-Dev|Any CPU.ActiveCfg = Release-Dev|Any CPU
 		{2A747F74-B750-4CC7-ACB9-AA6C963396CC}.Release-Dev|Any CPU.Build.0 = Release-Dev|Any CPU
-		{1026F0F9-A1CD-4475-A655-DD6A95D57323}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{1026F0F9-A1CD-4475-A655-DD6A95D57323}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{1026F0F9-A1CD-4475-A655-DD6A95D57323}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1026F0F9-A1CD-4475-A655-DD6A95D57323}.Release|Any CPU.Build.0 = Release|Any CPU
-		{1026F0F9-A1CD-4475-A655-DD6A95D57323}.Release-Dev|Any CPU.ActiveCfg = Release-Dev|Any CPU
-		{1026F0F9-A1CD-4475-A655-DD6A95D57323}.Release-Dev|Any CPU.Build.0 = Release-Dev|Any CPU
 		{6B5EB6E3-5A21-4FDD-8766-D35364B5AD38}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{6B5EB6E3-5A21-4FDD-8766-D35364B5AD38}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6B5EB6E3-5A21-4FDD-8766-D35364B5AD38}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6B5EB6E3-5A21-4FDD-8766-D35364B5AD38}.Release|Any CPU.Build.0 = Release|Any CPU
 		{6B5EB6E3-5A21-4FDD-8766-D35364B5AD38}.Release-Dev|Any CPU.ActiveCfg = Release|Any CPU
 		{6B5EB6E3-5A21-4FDD-8766-D35364B5AD38}.Release-Dev|Any CPU.Build.0 = Release|Any CPU
+		{74B7BAA5-A048-E25D-7971-44BAEC0AAF3A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{74B7BAA5-A048-E25D-7971-44BAEC0AAF3A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{74B7BAA5-A048-E25D-7971-44BAEC0AAF3A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{74B7BAA5-A048-E25D-7971-44BAEC0AAF3A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{74B7BAA5-A048-E25D-7971-44BAEC0AAF3A}.Release-Dev|Any CPU.ActiveCfg = Release|Any CPU
+		{74B7BAA5-A048-E25D-7971-44BAEC0AAF3A}.Release-Dev|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
