@@ -16,8 +16,8 @@
                 <ApplicationId>click.freenetworkmonitor.quantumsecure</ApplicationId>
                 <ApplicationIdGuid>d4f21b0e-2c97-4c50-b003-dca43bd9a888</ApplicationIdGuid>
                 <!-- Versions -->
-                <ApplicationDisplayVersion>0.4.32</ApplicationDisplayVersion>
-                <ApplicationVersion>432</ApplicationVersion>
+                <ApplicationDisplayVersion>0.4.33</ApplicationDisplayVersion>
+                <ApplicationVersion>433</ApplicationVersion>
                 <SupportedOSPlatformVersion>21.0</SupportedOSPlatformVersion>
                 <AndroidSdkDirectory>/usr/lib/android-sdk</AndroidSdkDirectory>
                 <Nullable>enable</Nullable>

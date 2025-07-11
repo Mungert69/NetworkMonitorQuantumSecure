@@ -7,7 +7,7 @@ SERVICE_ACCOUNT_FILE = '/home/mahadeva/code/securefiles/gaccount.json'
 SCOPES = ['https://www.googleapis.com/auth/androidpublisher']
 PACKAGE_NAME = 'click.freenetworkmonitor.quantumsecure'
 AAB_PATH = '/home/mahadeva/code/NetworkMonitorQuantumSecure/bin/Release/net9.0-android/click.freenetworkmonitor.quantumsecure-Signed.aab'
-TRACK = 'beta'  
+TRACK = 'production'  
 
 def main():
     try:
