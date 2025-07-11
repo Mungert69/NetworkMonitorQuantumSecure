@@ -46,12 +46,12 @@ def main():
             track=TRACK,
             body={
                 'releases': [{
-                    'name': f'Internal Test Release {version_code}',
+                    'name': f'Release {version_code}',
                     'status': 'completed',
                     'versionCodes': [version_code],
                     'releaseNotes': [{
                         'language': 'en-GB',
-                        'text': 'Automated internal testing upload.'
+                        'text': 'Automated upload.'
                     }]
                 }]
             }
@@ -59,9 +59,9 @@ def main():
         print(f"Assigned to track: {track_response['track']}")
 
         # 4. Commit the edit (publish)
-        print("Committing/publishing the edit to internal test track...")
+        print("Committing/publishing ...")
         commit_request = service.edits().commit(editId=edit_id, packageName=PACKAGE_NAME).execute()
-        print('✅ App uploaded and published to internal testing!')
+        print('✅ App uploaded and published')
 
     except Exception as e:
         print(f"❌ Error: {e}")
