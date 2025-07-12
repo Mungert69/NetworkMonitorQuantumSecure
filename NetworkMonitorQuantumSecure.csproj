@@ -72,9 +72,7 @@
         <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="9.0.80" />
         <PackageReference Include="Microsoft.Maui.Controls.Core" Version="9.0.80" />
         <PackageReference Include="Microsoft.Maui.Controls.Xaml" Version="9.0.80" />
-        <PackageReference Include="Microsoft.Maui.Essentials" Version="9.0.80" />
         <PackageReference Include="Microsoft.Maui.Core" Version="9.0.80" />
-        <PackageReference Include="Microsoft.Maui.Essentials" Version="9.0.80" />
         <PackageReference Include="Microsoft.Maui.Resizetizer" Version="9.0.80" />
         <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.7.250606001" />
         <PackageReference Include="Syncfusion.Maui.Core" Version="29.2.11" />

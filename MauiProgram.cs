@@ -263,25 +263,25 @@ namespace QuantumSecure
         }
         private static void BuildServices(MauiAppBuilder builder)
         {
-         
-            
-           /* builder.Services.AddScoped<ILLMService,LLMService>();
-            builder.Services.AddScoped<AudioService>(provider =>
-              new AudioService(provider.GetService<IJSRuntime>(),provider.GetRequiredService<NetConnectConfig>()));
-            builder.Services.AddScoped<ChatStateService>(provider =>
-                new ChatStateService(provider.GetService<IJSRuntime>()));
 
-            builder.Services.AddScoped<WebSocketService>(provider => {
 
-                return new WebSocketService(
-                    provider.GetRequiredService<ChatStateService>(),
-                    provider.GetService<IJSRuntime>(),
-                    provider.GetRequiredService<AudioService>(),
-                    provider.GetRequiredService<ILLMService>(),
-                    provider.GetRequiredService<NetConnectConfig>());
-            });
-*/
-          
+            /* builder.Services.AddScoped<ILLMService,LLMService>();
+             builder.Services.AddScoped<AudioService>(provider =>
+               new AudioService(provider.GetService<IJSRuntime>(),provider.GetRequiredService<NetConnectConfig>()));
+             builder.Services.AddScoped<ChatStateService>(provider =>
+                 new ChatStateService(provider.GetService<IJSRuntime>()));
+
+             builder.Services.AddScoped<WebSocketService>(provider => {
+
+                 return new WebSocketService(
+                     provider.GetRequiredService<ChatStateService>(),
+                     provider.GetService<IJSRuntime>(),
+                     provider.GetRequiredService<AudioService>(),
+                     provider.GetRequiredService<ILLMService>(),
+                     provider.GetRequiredService<NetConnectConfig>());
+             });
+ */
+            builder.Services.AddSingleton<ILaunchHelper, LaunchHelper>();
 
             builder.Services.AddSingleton<IMonitorPingInfoView, MonitorPingInfoView>();
             builder.Services.AddSingleton<IApiService>(provider =>
@@ -305,7 +305,9 @@ namespace QuantumSecure
                     var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
                     var rabbitRepo = provider.GetRequiredService<IRabbitRepo>();
                     var netConfig = provider.GetRequiredService<NetConnectConfig>();
-                    return new CmdProcessorProvider(loggerFactory, rabbitRepo, netConfig);
+                    var launchHelper = provider.GetRequiredService<ILaunchHelper>();
+                    return new CmdProcessorProvider(loggerFactory, rabbitRepo, netConfig, launchHelper);
+
                 });
             builder.Services.AddSingleton<IPlatformService>(provider =>
             {
@@ -332,7 +334,8 @@ namespace QuantumSecure
                     var processorStates = provider.GetRequiredService<LocalProcessorStates>();
                     var cmdProcessorProvider = provider.GetRequiredService<ICmdProcessorProvider>();
                     var monitorPingInfoView = provider.GetRequiredService<IMonitorPingInfoView>();
-                    return new BackgroundService(logger, netConfig, loggerFactory, rabbitRepo, fileRepo, processorStates, monitorPingInfoView, cmdProcessorProvider);
+                    var launchHelper = provider.GetRequiredService<ILaunchHelper>();
+                    return new BackgroundService(logger, netConfig, loggerFactory, rabbitRepo, fileRepo, processorStates, monitorPingInfoView, cmdProcessorProvider,launchHelper);
                 });
 #endif
         }
