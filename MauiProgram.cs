@@ -161,7 +161,12 @@ namespace QuantumSecure
                     .AddInMemoryCollection(ConvertToKeyValuePairs(userDict))
                     .Build();
         }
-        else
+        else<<<<<<< SEARCH
+        string nativeLibDir = Android.App.Application.Context.NativeLibraryDir;
+=======
+        string nativeLibDir = Android.App.Application.Context.ApplicationInfo.NativeLibraryDir;
+>>>>>>> REPLACE
+
         {
             // First run - just use the packaged config
             File.WriteAllText(localAppSettingsPath,
