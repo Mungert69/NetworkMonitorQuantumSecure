@@ -173,6 +173,28 @@ namespace QuantumSecure
     {
         ExceptionHelper.HandleGlobalException(ex, "Error loading appsettings.json");
     }
+    // Android-specific overwrite for OqsProviderPath, OqsProviderPathReadOnly, and CommandPath
+#if ANDROID
+    try
+    {
+        string nativeLibDir = Android.App.Application.Context.NativeLibraryDir;
+        var dict = GetConfigDictionary(config);
+        dict["OqsProviderPath"] = nativeLibDir;
+        dict["OqsProviderPathReadOnly"] = nativeLibDir;
+        dict["CommandPath"] = nativeLibDir;
+        // Save the updated config back to file and reload into config
+        string localAppSettingsPath = Path.Combine(FileSystem.AppDataDirectory, "appsettings.json");
+        File.WriteAllText(localAppSettingsPath,
+            JsonSerializer.Serialize(dict, new JsonSerializerOptions { WriteIndented = true }));
+        config = new ConfigurationBuilder()
+            .AddInMemoryCollection(ConvertToKeyValuePairs(dict))
+            .Build();
+    }
+    catch (Exception ex)
+    {
+        ExceptionHelper.HandleGlobalException(ex, "Error setting Android NativeLibraryDir config fields");
+    }
+#endif
     builder.Configuration.AddConfiguration(config);
     return config;
 }
