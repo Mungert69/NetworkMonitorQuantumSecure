@@ -66,8 +66,8 @@ namespace QuantumSecure
 
             try
             {
-                IConfigurationRoot? config=LoadConfiguration(builder);
-                LoadAssets(builder, os,config);
+                IConfigurationRoot? config = LoadConfiguration(builder);
+                LoadAssets(builder, os, config);
                 BuildRepoAndConfig(builder);
                 BuildServices(builder);
                 BuildViewModels(builder);
@@ -95,21 +95,21 @@ namespace QuantumSecure
             return app;
         }
 
-    private static IConfigurationRoot? LoadConfiguration(MauiAppBuilder builder)
-{
-    IConfigurationRoot? config = null;
-    try
-    {
-        string localAppSettingsPath = Path.Combine(FileSystem.AppDataDirectory, "appsettings.json");
-
-        // List of fields that should always be overwritten by the packaged version
-        var fieldsToOverwrite = new List<string>
+        private static IConfigurationRoot? LoadConfiguration(MauiAppBuilder builder)
         {
-            "ClientId",  
+            IConfigurationRoot? config = null;
+            try
+            {
+                string localAppSettingsPath = Path.Combine(FileSystem.AppDataDirectory, "appsettings.json");
+
+                // List of fields that should always be overwritten by the packaged version
+                var fieldsToOverwrite = new List<string>
+        {
+            "ClientId",
             "BaseFusionAuthURL",
             "LoadServer",
             "ServiceDomain",
-	    "ChatServer",
+        "ChatServer",
             "ServiceServer",
             "FrontEndUrl",
             "TranscribeAudioUrl",
@@ -120,69 +120,65 @@ namespace QuantumSecure
 
         };
 
-        // Load the packaged configuration first
-        using var stream = FileSystem.OpenAppPackageFileAsync("appsettings.json").Result;
-        IConfigurationRoot packagedConfig = new ConfigurationBuilder()
-            .AddJsonStream(stream)
-            .Build();
-
-        // Convert to dictionary for easier comparison
-        var packagedDict = GetConfigDictionary(packagedConfig);
-
-        if (File.Exists(localAppSettingsPath))
-        {
-            // Load existing user configuration
-            IConfigurationRoot userConfig = new ConfigurationBuilder()
-                .AddJsonFile(localAppSettingsPath, optional: false, reloadOnChange: false)
-                .Build();
-
-            var userDict = GetConfigDictionary(userConfig);
-
-            // Process all fields
-            foreach (var kvp in packagedDict)
-            {
-                if (!userDict.ContainsKey(kvp.Key))
-                {
-                    // Add new field if it doesn't exist in user config
-                    userDict[kvp.Key] = kvp.Value;
-                }
-                else if (fieldsToOverwrite.Contains(kvp.Key))
-                {
-                    // Overwrite the field if it's in our overwrite list
-                    userDict[kvp.Key] = kvp.Value;
-                }
-                // Existing fields not in the overwrite list remain unchanged
-            }
-
-            // Save the augmented configuration
-            File.WriteAllText(localAppSettingsPath,
-                JsonSerializer.Serialize(userDict, new JsonSerializerOptions { WriteIndented = true }));
-            config = new ConfigurationBuilder()
-                    .AddInMemoryCollection(ConvertToKeyValuePairs(userDict))
+                // Load the packaged configuration first
+                using var stream = FileSystem.OpenAppPackageFileAsync("appsettings.json").Result;
+                IConfigurationRoot packagedConfig = new ConfigurationBuilder()
+                    .AddJsonStream(stream)
                     .Build();
-        }
-        else<<<<<<< SEARCH
-        string nativeLibDir = Android.App.Application.Context.NativeLibraryDir;
-=======
-        string nativeLibDir = Android.App.Application.Context.ApplicationInfo.NativeLibraryDir;
->>>>>>> REPLACE
 
-        {
-            // First run - just use the packaged config
-            File.WriteAllText(localAppSettingsPath,
-                JsonSerializer.Serialize(packagedDict, new JsonSerializerOptions { WriteIndented = true }));
-            config = packagedConfig;
-        }
-    }
-    catch (Exception ex)
-    {
-        ExceptionHelper.HandleGlobalException(ex, "Error loading appsettings.json");
-    }
-    // Android-specific overwrite for OqsProviderPath, OqsProviderPathReadOnly, and CommandPath
+                // Convert to dictionary for easier comparison
+                var packagedDict = GetConfigDictionary(packagedConfig);
+
+                if (File.Exists(localAppSettingsPath))
+                {
+                    // Load existing user configuration
+                    IConfigurationRoot userConfig = new ConfigurationBuilder()
+                        .AddJsonFile(localAppSettingsPath, optional: false, reloadOnChange: false)
+                        .Build();
+
+                    var userDict = GetConfigDictionary(userConfig);
+
+                    // Process all fields
+                    foreach (var kvp in packagedDict)
+                    {
+                        if (!userDict.ContainsKey(kvp.Key))
+                        {
+                            // Add new field if it doesn't exist in user config
+                            userDict[kvp.Key] = kvp.Value;
+                        }
+                        else if (fieldsToOverwrite.Contains(kvp.Key))
+                        {
+                            // Overwrite the field if it's in our overwrite list
+                            userDict[kvp.Key] = kvp.Value;
+                        }
+                        // Existing fields not in the overwrite list remain unchanged
+                    }
+
+                    // Save the augmented configuration
+                    File.WriteAllText(localAppSettingsPath,
+                        JsonSerializer.Serialize(userDict, new JsonSerializerOptions { WriteIndented = true }));
+                    config = new ConfigurationBuilder()
+                            .AddInMemoryCollection(ConvertToKeyValuePairs(userDict))
+                            .Build();
+                }
+                else
+                {
+                    // First run - just use the packaged config
+                    File.WriteAllText(localAppSettingsPath,
+                        JsonSerializer.Serialize(packagedDict, new JsonSerializerOptions { WriteIndented = true }));
+                    config = packagedConfig;
+                }
+            }
+            catch (Exception ex)
+            {
+                ExceptionHelper.HandleGlobalException(ex, "Error loading appsettings.json");
+            }
+            // Android-specific overwrite for OqsProviderPath, OqsProviderPathReadOnly, and CommandPath
 #if ANDROID
     try
     {
-        string nativeLibDir = Android.App.Application.Context.NativeLibraryDir;
+       string nativeLibDir = Android.App.Application.Context.ApplicationInfo.NativeLibraryDir;
+
         var dict = GetConfigDictionary(config);
         dict["OqsProviderPath"] = nativeLibDir;
         dict["OqsProviderPathReadOnly"] = nativeLibDir;
@@ -200,9 +196,9 @@ namespace QuantumSecure
         ExceptionHelper.HandleGlobalException(ex, "Error setting Android NativeLibraryDir config fields");
     }
 #endif
-    builder.Configuration.AddConfiguration(config);
-    return config;
-}
+            builder.Configuration.AddConfiguration(config);
+            return config;
+        }
         private static void LoadAssets(MauiAppBuilder builder, string os, IConfigurationRoot? config)
         {
             try
@@ -238,12 +234,12 @@ namespace QuantumSecure
                         fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
                     });
 
-               /* builder.Services.AddMauiBlazorWebView();
+                /* builder.Services.AddMauiBlazorWebView();
 
 
-#if DEBUG
-                builder.Services.AddBlazorWebViewDeveloperTools();
-#endif */
+ #if DEBUG
+                 builder.Services.AddBlazorWebViewDeveloperTools();
+ #endif */
                 return builder;
             }
             catch (Exception ex)
