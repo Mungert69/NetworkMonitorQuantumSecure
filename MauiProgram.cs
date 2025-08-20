@@ -174,28 +174,6 @@ namespace QuantumSecure
                 ExceptionHelper.HandleGlobalException(ex, "Error loading appsettings.json");
             }
             // Android-specific overwrite for OqsProviderPath, OqsProviderPathReadOnly, and CommandPath
-#if ANDROID
-    try
-    {
-       string nativeLibDir = Android.App.Application.Context.ApplicationInfo.NativeLibraryDir;
-
-        var dict = GetConfigDictionary(config);
-        dict["OqsProviderPath"] = nativeLibDir;
-        dict["OqsProviderPathReadOnly"] = nativeLibDir;
-        dict["CommandPath"] = nativeLibDir;
-        // Save the updated config back to file and reload into config
-        string localAppSettingsPath = Path.Combine(FileSystem.AppDataDirectory, "appsettings.json");
-        File.WriteAllText(localAppSettingsPath,
-            JsonSerializer.Serialize(dict, new JsonSerializerOptions { WriteIndented = true }));
-        config = new ConfigurationBuilder()
-            .AddInMemoryCollection(ConvertToKeyValuePairs(dict))
-            .Build();
-    }
-    catch (Exception ex)
-    {
-        ExceptionHelper.HandleGlobalException(ex, "Error setting Android NativeLibraryDir config fields");
-    }
-#endif
             builder.Configuration.AddConfiguration(config);
             return config;
         }
@@ -250,80 +228,55 @@ namespace QuantumSecure
         }
         private static void BuildRepoAndConfig(MauiAppBuilder builder)
         {
-            builder.Services.AddSingleton<LocalProcessorStates>(provider =>
-         {
-             return new LocalProcessorStates();
-         });
-            builder.Services.AddSingleton<IFileRepo>(provider =>
-            {
-                try
-                {
-                    bool isRunningOnMauiAndroid = true;
-                    string prefixPath = FileSystem.AppDataDirectory;
-                    var fileRepo = new FileRepo(isRunningOnMauiAndroid, prefixPath);
-                    return fileRepo;
-                }
-                catch (Exception ex)
-                {
-                    ExceptionHelper.HandleGlobalException(ex, "Error : initializing FileRepo");
-                    return new FileRepo();
-                }
-            });
-            builder.Services.AddSingleton<IRabbitRepo>(provider =>
-           {
-               var logger = provider.GetRequiredService<ILogger<RabbitRepo>>();
-               var netConfig = provider.GetRequiredService<NetConnectConfig>();
-               // Choose the appropriate constructor
-               return new RabbitRepo(logger, netConfig);
-           });
             builder.Services.AddSingleton<NetConnectConfig>(provider =>
-            {
-                // Assuming Configuration is properly set up
-                var configuration = provider.GetRequiredService<IConfiguration>();
-                var appDataDirectory = FileSystem.AppDataDirectory;
-                return new NetConnectConfig(configuration, appDataDirectory);
-            });
+                {
+                    // Assuming Configuration is properly set up
+                    var configuration = provider.GetRequiredService<IConfiguration>();
+                    string appDataDirectory = FileSystem.AppDataDirectory;
+                    string nativeLibDir = string.Empty;
+#if ANDROID
+                nativeLibDir = Android.App.Application.Context.ApplicationInfo.NativeLibraryDir; 
+#endif
+
+                    return new NetConnectConfig(configuration, appDataDirectory, nativeLibDir);
+                });
+            builder.Services.AddSingleton<LocalProcessorStates>(provider =>
+                {
+                    return new LocalProcessorStates();
+                });
+            builder.Services.AddSingleton<IFileRepo>(provider =>
+                {
+                    try
+                    {
+                        bool isRunningOnMauiAndroid = true;
+                        string prefixPath = FileSystem.AppDataDirectory;
+                        var fileRepo = new FileRepo(isRunningOnMauiAndroid, prefixPath);
+                        return fileRepo;
+                    }
+                    catch (Exception ex)
+                    {
+                        ExceptionHelper.HandleGlobalException(ex, "Error : initializing FileRepo");
+                        return new FileRepo();
+                    }
+                });
+
+            builder.Services.AddSingleton<IRabbitRepo>(provider =>
+                {
+                    var logger = provider.GetRequiredService<ILogger<RabbitRepo>>();
+                    var netConfig = provider.GetRequiredService<NetConnectConfig>();
+                    // Choose the appropriate constructor
+                    return new RabbitRepo(logger, netConfig);
+                });
+
         }
         private static void BuildServices(MauiAppBuilder builder)
         {
 
-
-            /* builder.Services.AddScoped<ILLMService,LLMService>();
-             builder.Services.AddScoped<AudioService>(provider =>
-               new AudioService(provider.GetService<IJSRuntime>(),provider.GetRequiredService<NetConnectConfig>()));
-             builder.Services.AddScoped<ChatStateService>(provider =>
-                 new ChatStateService(provider.GetService<IJSRuntime>()));
-
-             builder.Services.AddScoped<WebSocketService>(provider => {
-
-                 return new WebSocketService(
-                     provider.GetRequiredService<ChatStateService>(),
-                     provider.GetService<IJSRuntime>(),
-                     provider.GetRequiredService<AudioService>(),
-                     provider.GetRequiredService<ILLMService>(),
-                     provider.GetRequiredService<NetConnectConfig>());
-             });
- */
             builder.Services.AddSingleton<ILaunchHelper, LaunchHelper>();
 
             builder.Services.AddSingleton<IMonitorPingInfoView, MonitorPingInfoView>();
-            builder.Services.AddSingleton<IApiService>(provider =>
-    {
-        var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
-        var configuration = provider.GetRequiredService<IConfiguration>();
-        var cmdProcessorProvider = provider.GetRequiredService<ICmdProcessorProvider>();
-        return new ApiService(loggerFactory, configuration, cmdProcessorProvider, FileSystem.AppDataDirectory);
-    });
-            builder.Services.AddSingleton<IAuthService>(provider =>
-         {
-             var logger = provider.GetRequiredService<ILogger<AuthService>>();
-             var netConfig = provider.GetRequiredService<NetConnectConfig>();
-             var rabbitRepo = provider.GetRequiredService<IRabbitRepo>();
-             var processorStates = provider.GetRequiredService<LocalProcessorStates>();
-             return new AuthService(logger, netConfig, rabbitRepo, processorStates);
-         });
-            builder.Services.AddSingleton<ICmdProcessorProvider>
-                (provider =>
+
+            builder.Services.AddSingleton<ICmdProcessorProvider>(provider =>
                 {
                     var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
                     var rabbitRepo = provider.GetRequiredService<IRabbitRepo>();
@@ -332,8 +285,29 @@ namespace QuantumSecure
                     return new CmdProcessorProvider(loggerFactory, rabbitRepo, netConfig, launchHelper);
 
                 });
+            builder.Services.AddSingleton<IApiService>(provider =>
+                {
+                    var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
+                    var configuration = provider.GetRequiredService<IConfiguration>();
+                    string appDataDirectory = FileSystem.AppDataDirectory;
+                    string nativeLibDir = string.Empty;
+#if ANDROID
+                    nativeLibDir = Android.App.Application.Context.ApplicationInfo.NativeLibraryDir; 
+#endif
+                    var cmdProcessorProvider = provider.GetRequiredService<ICmdProcessorProvider>();
+                    return new ApiService(loggerFactory, configuration, cmdProcessorProvider, appDataDirectory, nativeLibDir);
+                });
+            builder.Services.AddSingleton<IAuthService>(provider =>
+                {
+                    var logger = provider.GetRequiredService<ILogger<AuthService>>();
+                    var netConfig = provider.GetRequiredService<NetConnectConfig>();
+                    var rabbitRepo = provider.GetRequiredService<IRabbitRepo>();
+                    var processorStates = provider.GetRequiredService<LocalProcessorStates>();
+                    return new AuthService(logger, netConfig, rabbitRepo, processorStates);
+                });
+
             builder.Services.AddSingleton<IPlatformService>(provider =>
-            {
+                {
 #if ANDROID
 				  var logger = provider.GetRequiredService<ILogger<AndroidPlatformService>>();
 				   return new AndroidPlatformService(logger);
@@ -343,8 +317,8 @@ namespace QuantumSecure
                  var backgroundService = provider.GetRequiredService<IBackgroundService>();
                 return new WindowsPlatformService(backgroundService, logger);
 #endif
-                // throw new NotImplementedException("Unsupported platform");
-            });
+                    // throw new NotImplementedException("Unsupported platform");
+                });
 #if WINDOWS
             builder.Services.AddSingleton<IBackgroundService>
                 (provider =>
