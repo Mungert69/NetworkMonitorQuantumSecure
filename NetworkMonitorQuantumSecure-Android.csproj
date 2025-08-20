@@ -16,8 +16,8 @@
                 <ApplicationId>click.freenetworkmonitor.quantumsecure</ApplicationId>
                 <ApplicationIdGuid>d4f21b0e-2c97-4c50-b003-dca43bd9a888</ApplicationIdGuid>
                 <!-- Versions -->
-                <ApplicationDisplayVersion>0.4.36</ApplicationDisplayVersion>
-                <ApplicationVersion>436</ApplicationVersion>
+                <ApplicationDisplayVersion>0.4.37</ApplicationDisplayVersion>
+                <ApplicationVersion>437</ApplicationVersion>
                 <SupportedOSPlatformVersion>21.0</SupportedOSPlatformVersion>
                 <AndroidSdkDirectory>/usr/lib/android-sdk</AndroidSdkDirectory>
                 <Nullable>enable</Nullable>
@@ -68,12 +68,9 @@
   <ItemGroup>
     <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\libc++_shared.so" />
     <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\libcrypto.so" />
-    <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\libcrypto.so.3" />
     <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\libssl.so" />
-    <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\libssl.so.3" />
     <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\nmap" />
     <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\openssl" />
-    <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\openssl.so" />
     <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\oqsprovider.so" />
     <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\ssl_helper" />
   </ItemGroup>
