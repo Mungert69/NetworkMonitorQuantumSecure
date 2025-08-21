@@ -1,3 +1,9 @@
+#if ANDROID
+using Android.Content.Res;
+using Android.App;
+using Android.Graphics;
+using AndroidX.Core.Content;
+#endif
 
 using NetworkMonitor.Maui.Services;
 using NetworkMonitor.Maui.Controls;
@@ -5,11 +11,6 @@ using NetworkMonitor.Objects;
 
 namespace QuantumSecure
 {
-    using Microsoft.Maui.Graphics;
-
-
-    
-
     public class RootNamespaceProvider : IRootNamespaceProvider
     {
         private static bool _assetsReady = false;
@@ -21,7 +22,7 @@ namespace QuantumSecure
 
 
 #if ANDROID
-            public Type MainActivity { get => typeof(MainActivity); }
+        public Type MainActivity { get => typeof(MainActivity); }
            // Method to retrieve a Drawable field dynamically (Optional based on use case)
        public int GetDrawable(string drawableName)
 {
@@ -74,7 +75,7 @@ private bool IsValidResourceId(int resourceId)
         public Type MainActivity { get => typeof(object); }
 
         public int GetDrawable(string drawableName) => 0;
-
+        
 #endif
 
     }
