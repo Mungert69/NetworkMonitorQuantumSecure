@@ -5,6 +5,17 @@ using NetworkMonitor.Objects;
 
 namespace QuantumSecure
 {
+    using Microsoft.Maui.Graphics;
+
+
+    public interface IColorResource
+    {
+        AppTheme GetRequestedTheme();
+        Color GetResourceColor(string key);
+        Color LightenColor(Color color, float factor);
+        void AnimateColor(BoxView boxView, Color fromColor, Color toColor, uint length);
+    }
+
     public class RootNamespaceProvider : IRootNamespaceProvider
     {
         private static bool _assetsReady = false;
@@ -69,7 +80,7 @@ private bool IsValidResourceId(int resourceId)
         public Type MainActivity { get => typeof(object); }
 
         public int GetDrawable(string drawableName) => 0;
-        
+
 #endif
 
     }
