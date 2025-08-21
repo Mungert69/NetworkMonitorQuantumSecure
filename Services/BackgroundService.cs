@@ -9,12 +9,13 @@ using NetworkMonitor.Objects;
 using Microsoft.Extensions.Configuration;
 using System.Reflection;
 using System.Runtime.InteropServices;
-namespace QuantumSecure.Services
+namespace NetworkMonitor.Maui.Services
 {
     public interface IBackgroundService
     {
         Task<ResultObj> Start();
         Task<ResultObj> Stop();
+        bool IsRunning { get; }
     }
     public class BackgroundService : IBackgroundService
     {
@@ -29,7 +30,9 @@ namespace QuantumSecure.Services
         private IMonitorPingInfoView _monitorPingInfoView;
         private LocalProcessorStates _processorStates;
         private ICmdProcessorProvider _cmdProcessorProvider;
-        public BackgroundService(ILogger logger, NetConnectConfig netConfig, ILoggerFactory loggerFactory, IRabbitRepo rabbitRepo, IFileRepo fileRepo, LocalProcessorStates processorStates, IMonitorPingInfoView monitorPingInfoView, ICmdProcessorProvider cmdProcessorProvider)
+        private ILaunchHelper? _launchHelper;
+        private bool _isRunning = false;
+        public BackgroundService(ILogger logger, NetConnectConfig netConfig, ILoggerFactory loggerFactory, IRabbitRepo rabbitRepo, IFileRepo fileRepo, LocalProcessorStates processorStates, IMonitorPingInfoView monitorPingInfoView, ICmdProcessorProvider cmdProcessorProvider, ILaunchHelper launchHelper)
         {
             _logger = logger;
             _netConfig = netConfig;
@@ -39,8 +42,12 @@ namespace QuantumSecure.Services
             _monitorPingInfoView = monitorPingInfoView;
             _processorStates = processorStates;
             _cmdProcessorProvider = cmdProcessorProvider;
+            _launchHelper = launchHelper;
 
         }
+
+        public bool IsRunning { get => _isRunning; }
+
         public async Task<ResultObj> Start()
         {
             var result = new ResultObj();
@@ -48,16 +55,25 @@ namespace QuantumSecure.Services
             try
             {
                 result = await _rabbitRepo.ConnectAndSetUp();
-                if (!result.Success) return result;
+                if (!result.Success)
+                {
+                    _isRunning = false;
+                    return result;
+                }
+                var resultCmdProcessorFactory = await _cmdProcessorProvider.Setup();
+                var _connectFactory = new NetworkMonitor.Connection.ConnectFactory(_loggerFactory.CreateLogger<ConnectFactory>(), netConfig: _netConfig, _cmdProcessorProvider,_launchHelper);
+# if Android 
 
-                var _connectFactory = new NetworkMonitor.Connection.ConnectFactory(_loggerFactory.CreateLogger<ConnectFactory>(), netConfig: _netConfig, _cmdProcessorProvider);
-                _ = _connectFactory.SetupChromium(_netConfig);
+# else
+  _ = _connectFactory.SetupChromium(_netConfig);
+# endif
                 _monitorPingProcessor = new MonitorPingProcessor(_loggerFactory.CreateLogger<MonitorPingProcessor>(), _netConfig, _connectFactory, _fileRepo, _rabbitRepo, _processorStates, _monitorPingInfoView);
                 _rabbitListener = new RabbitListener(_monitorPingProcessor, _loggerFactory.CreateLogger<RabbitListener>(), _netConfig, _processorStates, _cmdProcessorProvider);
                 var resultListener = await _rabbitListener.Setup();
                 var resultProcessor = await _monitorPingProcessor.Init(new ProcessorInitObj());
-                result.Message += resultListener.Message + resultProcessor.Message;
-                result.Success = resultProcessor.Success && resultListener.Success;
+                result.Message += resultCmdProcessorFactory.Message + resultListener.Message + resultProcessor.Message;
+                result.Success = resultCmdProcessorFactory.Success && resultProcessor.Success && resultListener.Success;
+                //result.Success = true;
             }
             catch (Exception e)
             {
@@ -65,7 +81,7 @@ namespace QuantumSecure.Services
                 result.Message += $" Error : failed to start background service . Error was : {e.Message}";
                 _logger.LogError(result.Message);
             }
-
+            _isRunning = result.Success;
             return result;
 
         }
@@ -79,6 +95,7 @@ namespace QuantumSecure.Services
                 _logger.LogInformation("Shutting down RabbitListener.");
                 await _rabbitListener.Shutdown();
                 result.Message += " Success : Shutdown RabbitListener.";
+
             }
             catch (Exception e)
             {
@@ -99,17 +116,8 @@ namespace QuantumSecure.Services
                 _logger.LogError("Error during shutting down MonitorPingProcessor: " + e.ToString());
                 result.Success = false;
             }
-            try
-            {
-                _logger.LogInformation("Shutting down RabbitRepo.");
-                _rabbitRepo.ShutdownRepo();
-                result.Message += " Success : Shutdown RabbitRepo.";
-            }
-            catch (Exception e)
-            {
-                _logger.LogError("Error during shutting down RabbitRepo: " + e.ToString());
-                result.Success = false;
-            }
+           
+            _isRunning = result.Success;
 
             return result;
         }
