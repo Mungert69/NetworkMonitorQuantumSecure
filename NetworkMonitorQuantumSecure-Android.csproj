@@ -53,7 +53,7 @@
                 <!-- Custom Fonts -->
                 <MauiFont Include="Resources\Fonts\*" />
                 <!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
-                <MauiAsset Include="Resources\Raw\**" Exclude="Resources\Raw\openssl-3.4.2-windows\**;Resources\Raw\windowsdlls\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+                <MauiAsset Include="Resources\Raw\**" Exclude="Resources\Raw\openssl-windows\**;Resources\Raw\windowsdlls\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
 
 
                 <MauiStyles Include="Resources\Styles\*" />
