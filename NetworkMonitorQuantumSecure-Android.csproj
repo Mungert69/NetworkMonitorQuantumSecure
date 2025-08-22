@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.Razor">
         <PropertyGroup>
                 <TargetFrameworks>net9.0-android</TargetFrameworks>
                 <AcceptAndroidSDKLicenses>true</AcceptAndroidSDKLicenses>
@@ -28,12 +28,8 @@
         </PropertyGroup>
         <PropertyGroup Condition="'$(Configuration)'=='Release-Dev'">
                 <DefineConstants>DEV</DefineConstants>
-                <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>                <!-- Optional -->
-                <AndroidLinkMode>None</AndroidLinkMode>                <!-- Keeps symbols for debugging -->
-                <AndroidDebugSymbols>true</AndroidDebugSymbols>
-                <AndroidManifestPlaceholders>android:debuggable=true</AndroidManifestPlaceholders>
         </PropertyGroup>
-        <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+        <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU' or '$(Configuration)'=='Release-Dev'">
                 <AndroidPackageFormat>aab</AndroidPackageFormat>
                 <AndroidSigningKeyAlias>networkmonitormaui</AndroidSigningKeyAlias>
                 <AndroidSigningKeyStore>/home/mahadeva/code/securefiles/networkmonitormaui.keystore</AndroidSigningKeyStore>
@@ -44,9 +40,7 @@
                 <PublishTrimmed>false</PublishTrimmed>
                 <RunAOTCompilation>false</RunAOTCompilation>
                 <EnableDefaultStaticWebAssets>true</EnableDefaultStaticWebAssets>
-          </PropertyGroup>
-
-
+        </PropertyGroup>
 
         <ItemGroup>
                 <!-- App Icon -->
@@ -77,6 +71,7 @@
         </ItemGroup>
 
         <ItemGroup>
+                <PackageReference Include="MetroLog.Maui" Version="2.1.0" />
                 <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="9.0.90" />
                 <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.8" />
                 <PackageReference Include="CommunityToolkit.Maui" Version="11.2.0" />

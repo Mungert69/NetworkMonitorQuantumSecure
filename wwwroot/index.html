@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Quantum Network Monitor Assistant</title>
+    <base href="/" />
+    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
+    <link rel="stylesheet" href="css/chat.css" />
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+
+    <link rel="icon" href="data:,">
+</head>
+
+<body>
+
+    <div class="status-bar-safe-area"></div>
+
+    <div id="app">Loading...</div>
+
+    <script src="_framework/blazor.webview.js" autostart="false"></script>
+    <script src="js/chatInterop.js"></script>
+    <script>
+        // Auto-detect system theme and apply CSS class
+        function updateTheme() {
+            const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.classList.toggle('dark-theme', isDark);
+        }
+
+        // Run on load and when system theme changes
+        updateTheme();
+        window.matchMedia('(prefers-color-scheme: dark)').addListener(updateTheme);
+    </script>
+</body>
+
+</html>
