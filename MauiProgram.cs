@@ -10,8 +10,9 @@ using NetworkMonitor.Maui;
 using NetworkMonitor.Objects;
 using NetworkMonitor.Maui.ViewModels;
 using NetworkMonitor.Utils.Helpers;
+using NetworkMonitorChat;
 using CommunityToolkit.Maui;
-//using Microsoft.JSInterop;
+using Microsoft.JSInterop;
 using System.Xml;
 using System.Text.Json;
 
@@ -108,10 +109,9 @@ namespace QuantumSecure
             "ClientId",
             "BaseFusionAuthURL",
             "LoadServer",
+            "ChatServer",
             "ServiceDomain",
-        "ChatServer",
             "ServiceServer",
-            "FrontEndUrl",
             "TranscribeAudioUrl",
             "IsChatMode",
             "OpensslVersion",
@@ -173,7 +173,6 @@ namespace QuantumSecure
             {
                 ExceptionHelper.HandleGlobalException(ex, "Error loading appsettings.json");
             }
-            // Android-specific overwrite for OqsProviderPath, OqsProviderPathReadOnly, and CommandPath
             builder.Configuration.AddConfiguration(config);
             return config;
         }
@@ -212,12 +211,12 @@ namespace QuantumSecure
                         fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
                     });
 
-                /* builder.Services.AddMauiBlazorWebView();
+                builder.Services.AddMauiBlazorWebView();
 
 
- #if DEBUG
-                 builder.Services.AddBlazorWebViewDeveloperTools();
- #endif */
+#if DEBUG
+                builder.Services.AddBlazorWebViewDeveloperTools();
+#endif
                 return builder;
             }
             catch (Exception ex)
@@ -229,17 +228,17 @@ namespace QuantumSecure
         private static void BuildRepoAndConfig(MauiAppBuilder builder)
         {
             builder.Services.AddSingleton<NetConnectConfig>(provider =>
-                {
-                    // Assuming Configuration is properly set up
-                    var configuration = provider.GetRequiredService<IConfiguration>();
-                    string appDataDirectory = FileSystem.AppDataDirectory;
-                    string nativeLibDir = string.Empty;
+               {
+                   // Assuming Configuration is properly set up
+                   var configuration = provider.GetRequiredService<IConfiguration>();
+                   string appDataDirectory = FileSystem.AppDataDirectory;
+                   string nativeLibDir = string.Empty;
 #if ANDROID
                 nativeLibDir = Android.App.Application.Context.ApplicationInfo.NativeLibraryDir; 
 #endif
 
-                    return new NetConnectConfig(configuration, appDataDirectory, nativeLibDir);
-                });
+                   return new NetConnectConfig(configuration, appDataDirectory, nativeLibDir);
+               });
             builder.Services.AddSingleton<LocalProcessorStates>(provider =>
                 {
                     return new LocalProcessorStates();
@@ -259,7 +258,6 @@ namespace QuantumSecure
                         return new FileRepo();
                     }
                 });
-
             builder.Services.AddSingleton<IRabbitRepo>(provider =>
                 {
                     var logger = provider.GetRequiredService<ILogger<RabbitRepo>>();
@@ -267,24 +265,31 @@ namespace QuantumSecure
                     // Choose the appropriate constructor
                     return new RabbitRepo(logger, netConfig);
                 });
-
         }
         private static void BuildServices(MauiAppBuilder builder)
         {
 
             builder.Services.AddSingleton<ILaunchHelper, LaunchHelper>();
+            builder.Services.AddScoped<ILLMService, LLMService>();
+            builder.Services.AddScoped<AudioService>(provider =>
+              new AudioService(provider.GetService<IJSRuntime>(), provider.GetRequiredService<NetConnectConfig>()));
+            builder.Services.AddScoped<ChatStateService>(provider =>
+                new ChatStateService(provider.GetService<IJSRuntime>()));
+
+            builder.Services.AddScoped<WebSocketService>(provider =>
+            {
+
+                return new WebSocketService(
+                    provider.GetRequiredService<ChatStateService>(),
+                    provider.GetService<IJSRuntime>(),
+                    provider.GetRequiredService<AudioService>(),
+                    provider.GetRequiredService<ILLMService>(),
+                    provider.GetRequiredService<NetConnectConfig>());
+            });
+
+
 
             builder.Services.AddSingleton<IMonitorPingInfoView, MonitorPingInfoView>();
-
-            builder.Services.AddSingleton<ICmdProcessorProvider>(provider =>
-                {
-                    var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
-                    var rabbitRepo = provider.GetRequiredService<IRabbitRepo>();
-                    var netConfig = provider.GetRequiredService<NetConnectConfig>();
-                    var launchHelper = provider.GetRequiredService<ILaunchHelper>();
-                    return new CmdProcessorProvider(loggerFactory, rabbitRepo, netConfig, launchHelper);
-
-                });
             builder.Services.AddSingleton<IApiService>(provider =>
                 {
                     var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
@@ -297,17 +302,26 @@ namespace QuantumSecure
                     var cmdProcessorProvider = provider.GetRequiredService<ICmdProcessorProvider>();
                     return new ApiService(loggerFactory, configuration, cmdProcessorProvider, appDataDirectory, nativeLibDir);
                 });
-            builder.Services.AddSingleton<IAuthService>(provider =>
-                {
-                    var logger = provider.GetRequiredService<ILogger<AuthService>>();
-                    var netConfig = provider.GetRequiredService<NetConnectConfig>();
-                    var rabbitRepo = provider.GetRequiredService<IRabbitRepo>();
-                    var processorStates = provider.GetRequiredService<LocalProcessorStates>();
-                    return new AuthService(logger, netConfig, rabbitRepo, processorStates);
-                });
 
-            builder.Services.AddSingleton<IPlatformService>(provider =>
+            builder.Services.AddSingleton<IAuthService>(provider =>
+         {
+             var logger = provider.GetRequiredService<ILogger<AuthService>>();
+             var netConfig = provider.GetRequiredService<NetConnectConfig>();
+             var rabbitRepo = provider.GetRequiredService<IRabbitRepo>();
+             var processorStates = provider.GetRequiredService<LocalProcessorStates>();
+             return new AuthService(logger, netConfig, rabbitRepo, processorStates);
+         });
+            builder.Services.AddSingleton<ICmdProcessorProvider>
+                (provider =>
                 {
+                    var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
+                    var rabbitRepo = provider.GetRequiredService<IRabbitRepo>();
+                    var netConfig = provider.GetRequiredService<NetConnectConfig>();
+                    var launchHelper = provider.GetRequiredService<ILaunchHelper>();
+                    return new CmdProcessorProvider(loggerFactory, rabbitRepo, netConfig, launchHelper);
+                });
+            builder.Services.AddSingleton<IPlatformService>(provider =>
+            {
 #if ANDROID
 				  var logger = provider.GetRequiredService<ILogger<AndroidPlatformService>>();
 				   return new AndroidPlatformService(logger);
@@ -317,8 +331,8 @@ namespace QuantumSecure
                  var backgroundService = provider.GetRequiredService<IBackgroundService>();
                 return new WindowsPlatformService(backgroundService, logger);
 #endif
-                    // throw new NotImplementedException("Unsupported platform");
-                });
+                // throw new NotImplementedException("Unsupported platform");
+            });
 #if WINDOWS
             builder.Services.AddSingleton<IBackgroundService>
                 (provider =>
@@ -350,6 +364,7 @@ namespace QuantumSecure
             builder.Services.AddSingleton<MainPage>();
             builder.Services.AddSingleton<ConfigPage>();
             builder.Services.AddSingleton<DataViewPage>();
+            builder.Services.AddSingleton<ChatPage>();
         }
         private static void ShowAlertBlocking(string title, string? message)
         {
