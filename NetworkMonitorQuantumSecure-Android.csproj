@@ -66,13 +66,13 @@
         </ItemGroup>
 
         <ItemGroup>
-                <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\libc++_shared.so" />
-                <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\libcrypto.so" />
-                <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\libssl.so" />
-                <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\nmap.so" />
-                <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\openssl.so" />
-                <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\oqsprovider.so" />
-                <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\ssl_helper.so" />
+                <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.8" />
+                <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+                 <PackageReference Include="MatBlazor" Version="2.10.0" />
+                <PackageReference Include="Microsoft.AspNetCore.Components" Version="9.0.8" />
+                <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="9.0.8" />
+                <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="9.0.8" />
+                <PackageReference Include="Microsoft.JSInterop" Version="9.0.8" />
         </ItemGroup>
 
         <ItemGroup>
