@@ -64,7 +64,8 @@
                 <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\libc++_shared.so" />
                 <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\libcrypto.so" />
                 <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\libssl.so" />
-                <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\nmap.so" />
+                <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\nmap-exe.so" />
+                <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\openssl-exe.so" />
                 <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\openssl.so" />
                 <AndroidNativeLibrary Include="Platforms\Android\jniLibs\arm64-v8a\oqsprovider.so" />
         </ItemGroup>
