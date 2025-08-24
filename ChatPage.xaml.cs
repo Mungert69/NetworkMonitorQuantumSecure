@@ -52,8 +52,8 @@ namespace QuantumSecure
             {
                 MainThread.BeginInvokeOnMainThread(() =>
                 {
-                    ChatView.IsVisible = _platformService.IsServiceStarted;
-                    AgentDisabledMessage.IsVisible = !_platformService.IsServiceStarted;
+                    ChatView.IsVisible = _platformService.IsAuthorised;
+                    AgentDisabledMessage.IsVisible = !_platformService.IsAuthorised;
                 });
             }
             catch (Exception ex)
