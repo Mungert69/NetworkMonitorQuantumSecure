@@ -46,5 +46,5 @@ python3 publish_to_store.py \
   --service-account-file "$HOME/code/securefiles/gaccount.json" \
   --package-name click.freenetworkmonitor.quantumsecure \
   --aab "$HOME/code/NetworkMonitorQuantumSecure/bin/Release/net9.0-android/click.freenetworkmonitor.quantumsecure-Signed.aab" \
-  --track testing
+  --track internal
 
