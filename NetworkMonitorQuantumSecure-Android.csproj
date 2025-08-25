@@ -89,7 +89,7 @@
                 <PackageReference Include="Microsoft.JSInterop" Version="9.0.8" />
         </ItemGroup>
         <ItemGroup>
-                <ProjectReference Include="..\NetworkMonitorChatRazorLib\NetworkMonitorChatLib.csproj" />
+                <ProjectReference Include="..\NetworkMonitorChatRazorLib\NetworkMonitorChatRazorLib-Android.csproj" />
 	</ItemGroup>
 	 <ItemGroup>
                 <ProjectReference Include="..\NetworkMonitorMaui\NetworkMonitorMaui-Android.csproj" />

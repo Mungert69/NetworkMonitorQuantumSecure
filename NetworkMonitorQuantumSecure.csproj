@@ -167,7 +167,7 @@
    
     <ItemGroup>
         <ProjectReference Include="..\NetworkMonitorMaui\NetworkMonitorMaui.csproj" />
-        <ProjectReference Include="..\NetworkMonitorChatLib\NetworkMonitorChatLib.csproj" />
+        <ProjectReference Include="..\NetworkMonitorChatRazorLib\NetworkMonitorChatRazorLib.csproj" />
     </ItemGroup>
 
 </Project>
