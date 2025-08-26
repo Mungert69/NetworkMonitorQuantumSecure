@@ -9,14 +9,6 @@
     <FlyoutItem Title="Quantum Network Monitor Assistant">
         <ShellContent Route="Chat" ContentTemplate="{DataTemplate local:ChatPage}" />
     </FlyoutItem>
-    <FlyoutItem Title="Check a Host">
-        <ShellContent Route="Check" Title="Check a Host" ContentTemplate="{DataTemplate local:NetworkMonitorPage}" />
-    </FlyoutItem>
-
-    <FlyoutItem Title="Scan Local Network">
-        <ShellContent Route="Scan" Title="Scan Local Network" ContentTemplate="{DataTemplate local:ScanPage}" />
-    </FlyoutItem>
-
     <FlyoutItem Title="Monitored Hosts">
         <ShellContent Route="Data" Title="Monitored Hosts" ContentTemplate="{DataTemplate local:DataViewPage}" />
     </FlyoutItem>
