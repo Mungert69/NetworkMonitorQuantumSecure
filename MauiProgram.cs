@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.Maui;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using MetroLog.MicrosoftExtensions;
 using Microsoft.JSInterop;
 using NetworkMonitor.Api.Services;
 using NetworkMonitor.Connection;
@@ -55,7 +56,12 @@ namespace QuantumSecure
                     loggingBuilder.SetMinimumLevel(LogLevel.Information); // Set the minimum log level
                     loggingBuilder.AddConsole(); // Console logger (useful for debugging)
                     loggingBuilder.AddDebug();   // Debug output window (useful in Visual Studio)
-
+                    loggingBuilder.AddInMemoryLogger(options =>
+                {
+                    options.MaxLines = 16384;
+                    options.MinLevel = LogLevel.Information;
+                    options.MaxLevel = LogLevel.Critical;
+                });
                     // You can add other logging providers here, such as:
                     // loggingBuilder.AddEventLog(); // Windows Event Log
                     // loggingBuilder.AddFile("app.log"); // File-based logging (requires additional package)
