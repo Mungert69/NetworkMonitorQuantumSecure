@@ -76,7 +76,7 @@
     <AndroidNativeLibrary Include="Platforms/Android/jniLibs/arm64-v8a/libc++_shared.so">
       <Abi>arm64-v8a</Abi>
     </AndroidNativeLibrary>
-    <AndroidNativeLibrary Include="Platforms/Android/jniLibs/arm64-v8a/liboqsprovider.so">
+    <AndroidNativeLibrary Include="Platforms/Android/jniLibs/arm64-v8a/oqsprovider.so">
       <Abi>arm64-v8a</Abi>
     </AndroidNativeLibrary>
     <AndroidNativeLibrary Include="Platforms/Android/jniLibs/arm64-v8a/openssl.so">
