@@ -22,7 +22,7 @@
                 <AndroidSdkDirectory>/usr/lib/android-sdk</AndroidSdkDirectory>
                 <Nullable>enable</Nullable>
                 <NoWarn>CS8618</NoWarn>
-                <RuntimeIdentifiers Condition="$(TargetFramework.Contains('-android'))">android-arm;android-arm64;</RuntimeIdentifiers>
+                <RuntimeIdentifiers Condition="$(TargetFramework.Contains('-android'))">android-arm64;</RuntimeIdentifiers>
                 <AndroidBundleConfigurationFile>BundleConfig.json</AndroidBundleConfigurationFile>
 
         </PropertyGroup>
@@ -84,7 +84,7 @@
       <Abi>arm64-v8a</Abi>
     </AndroidNativeLibrary>
   </ItemGroup>
-
+<!--
   <ItemGroup>
   <AndroidNativeLibrary Include="Platforms/Android/jniLibs/armeabi-v7a/libc++_shared.so">
     <Abi>armeabi-v7a</Abi>
@@ -110,7 +110,7 @@
   <AndroidNativeLibrary Include="Platforms/Android/jniLibs/armeabi-v7a/liboqsprovider.so">
     <Abi>armeabi-v7a</Abi>
   </AndroidNativeLibrary>
-</ItemGroup>
+</ItemGroup>-->
 
 
         <ItemGroup>
