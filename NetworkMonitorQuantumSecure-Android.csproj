@@ -97,9 +97,6 @@
   <AndroidNativeLibrary Include="Platforms/Android/jniLibs/armeabi-v7a/libssl.so">
     <Abi>armeabi-v7a</Abi>
   </AndroidNativeLibrary>
-  <AndroidNativeLibrary Include="Platforms/Android/jniLibs/armeabi-v7a/libssl.so.3">
-    <Abi>armeabi-v7a</Abi>
-  </AndroidNativeLibrary>
   <AndroidNativeLibrary Include="Platforms/Android/jniLibs/armeabi-v7a/libnmap_exec.so">
     <Abi>armeabi-v7a</Abi>
   </AndroidNativeLibrary>
