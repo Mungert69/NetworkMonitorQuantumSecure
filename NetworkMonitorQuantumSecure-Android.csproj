@@ -16,8 +16,8 @@
                 <ApplicationId>click.freenetworkmonitor.quantumsecure</ApplicationId>
                 <ApplicationIdGuid>d4f21b0e-2c97-4c50-b003-dca43bd9a888</ApplicationIdGuid>
                 <!-- Versions -->
-                <ApplicationDisplayVersion>0.5.22</ApplicationDisplayVersion>
-                <ApplicationVersion>522</ApplicationVersion>
+                <ApplicationDisplayVersion>0.5.23</ApplicationDisplayVersion>
+                <ApplicationVersion>523</ApplicationVersion>
                 <SupportedOSPlatformVersion>21.0</SupportedOSPlatformVersion>
                 <AndroidSdkDirectory>/usr/lib/android-sdk</AndroidSdkDirectory>
                 <Nullable>enable</Nullable>
@@ -46,7 +46,7 @@
                 <!-- App Icon -->
                 <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#FFFFFF" />
                 <!-- Splash Screen -->
-                <MauiSplashScreen Include="Resources\Splash\splash-safe.svg"
+                <MauiSplashScreen Include="Resources\Splash\splashsafe.svg"
                   Color="#FFFFFF"
                   BaseSize="432,432" />
                 <!-- Images -->
