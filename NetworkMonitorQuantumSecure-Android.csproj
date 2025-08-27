@@ -16,13 +16,13 @@
                 <ApplicationId>click.freenetworkmonitor.quantumsecure</ApplicationId>
                 <ApplicationIdGuid>d4f21b0e-2c97-4c50-b003-dca43bd9a888</ApplicationIdGuid>
                 <!-- Versions -->
-                <ApplicationDisplayVersion>0.5.21</ApplicationDisplayVersion>
-                <ApplicationVersion>521</ApplicationVersion>
+                <ApplicationDisplayVersion>0.5.22</ApplicationDisplayVersion>
+                <ApplicationVersion>522</ApplicationVersion>
                 <SupportedOSPlatformVersion>21.0</SupportedOSPlatformVersion>
                 <AndroidSdkDirectory>/usr/lib/android-sdk</AndroidSdkDirectory>
                 <Nullable>enable</Nullable>
                 <NoWarn>CS8618</NoWarn>
-                <AndroidSupportedAbis>arm64-v8a;armeabi-v7a</AndroidSupportedAbis>
+                <RuntimeIdentifiers Condition="$(TargetFramework.Contains('-android'))">android-arm;android-arm64;</RuntimeIdentifiers>
                 <AndroidBundleConfigurationFile>BundleConfig.json</AndroidBundleConfigurationFile>
 
         </PropertyGroup>
@@ -77,10 +77,10 @@
     <AndroidNativeLibrary Include="Platforms/Android/jniLibs/arm64-v8a/libc++_shared.so">
       <Abi>arm64-v8a</Abi>
     </AndroidNativeLibrary>
-    <AndroidNativeLibrary Include="Platforms/Android/jniLibs/arm64-v8a/oqsprovider.so">
+    <AndroidNativeLibrary Include="Platforms/Android/jniLibs/arm64-v8a/liboqsprovider.so">
       <Abi>arm64-v8a</Abi>
     </AndroidNativeLibrary>
-    <AndroidNativeLibrary Include="Platforms/Android/jniLibs/arm64-v8a/openssl.so">
+    <AndroidNativeLibrary Include="Platforms/Android/jniLibs/arm64-v8a/libopenssl_lua.so">
       <Abi>arm64-v8a</Abi>
     </AndroidNativeLibrary>
   </ItemGroup>
@@ -92,28 +92,22 @@
   <AndroidNativeLibrary Include="Platforms/Android/jniLibs/armeabi-v7a/libcrypto.so">
     <Abi>armeabi-v7a</Abi>
   </AndroidNativeLibrary>
-  <AndroidNativeLibrary Include="Platforms/Android/jniLibs/armeabi-v7a/libcrypto.so.3">
-    <Abi>armeabi-v7a</Abi>
-  </AndroidNativeLibrary>
   <AndroidNativeLibrary Include="Platforms/Android/jniLibs/armeabi-v7a/libssl.so">
     <Abi>armeabi-v7a</Abi>
   </AndroidNativeLibrary>
   <AndroidNativeLibrary Include="Platforms/Android/jniLibs/armeabi-v7a/libssl.so.3">
     <Abi>armeabi-v7a</Abi>
   </AndroidNativeLibrary>
-  <AndroidNativeLibrary Include="Platforms/Android/jniLibs/armeabi-v7a/nmap">
+  <AndroidNativeLibrary Include="Platforms/Android/jniLibs/armeabi-v7a/libnmap_exec.so">
     <Abi>armeabi-v7a</Abi>
   </AndroidNativeLibrary>
-  <AndroidNativeLibrary Include="Platforms/Android/jniLibs/armeabi-v7a/openssl">
+  <AndroidNativeLibrary Include="Platforms/Android/jniLibs/armeabi-v7a/libopenssl_exec.so">
     <Abi>armeabi-v7a</Abi>
   </AndroidNativeLibrary>
-  <AndroidNativeLibrary Include="Platforms/Android/jniLibs/armeabi-v7a/openssl.so">
+  <AndroidNativeLibrary Include="Platforms/Android/jniLibs/armeabi-v7a/libopenssl_lua.so">
     <Abi>armeabi-v7a</Abi>
   </AndroidNativeLibrary>
-  <AndroidNativeLibrary Include="Platforms/Android/jniLibs/armeabi-v7a/oqsprovider.so">
-    <Abi>armeabi-v7a</Abi>
-  </AndroidNativeLibrary>
-  <AndroidNativeLibrary Include="Platforms/Android/jniLibs/armeabi-v7a/ssl_helper">
+  <AndroidNativeLibrary Include="Platforms/Android/jniLibs/armeabi-v7a/liboqsprovider.so">
     <Abi>armeabi-v7a</Abi>
   </AndroidNativeLibrary>
 </ItemGroup>
