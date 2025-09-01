@@ -363,3 +363,8 @@ FodyWeavers.xsd
 
 /appsettings.json
 .env
+
+# Local Python virtualenvs
+venv/
+.venv/
+
