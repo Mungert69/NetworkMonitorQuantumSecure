@@ -199,7 +199,15 @@ namespace QuantumSecure
         {
 
             builder.Services.AddSingleton<ILaunchHelper, LaunchHelper>();
-            builder.Services.AddSingleton<IBrowserHost, BrowserHost>();
+
+            builder.Services.AddSingleton<IBrowserHost>(provider =>
+            {
+                var launchHelper = provider.GetRequiredService<ILaunchHelper>();
+                var logger = provider.GetRequiredService<ILogger<AuthService>>();
+                var netConfig = provider.GetRequiredService<NetConnectConfig>();
+
+                return new BrowserHost(launchHelper, netConfig, logger, maxConcurrentPages: 1);
+            });
             builder.Services.AddScoped<ILLMService, LLMService>();
             builder.Services.AddScoped<AudioService>(provider =>
               new AudioService(provider.GetService<IJSRuntime>(), provider.GetRequiredService<NetConnectConfig>()));
@@ -315,6 +323,6 @@ namespace QuantumSecure
                 }
             });
         }
-    
+
     }
 }
