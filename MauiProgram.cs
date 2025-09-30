@@ -203,7 +203,7 @@ namespace QuantumSecure
             builder.Services.AddSingleton<IBrowserHost>(provider =>
             {
                 var launchHelper = provider.GetRequiredService<ILaunchHelper>();
-                var logger = provider.GetRequiredService<ILogger<AuthService>>();
+                var logger = provider.GetRequiredService<ILogger<BrowserHost>>();
                 var netConfig = provider.GetRequiredService<NetConnectConfig>();
 
                 return new BrowserHost(launchHelper, netConfig, logger, maxConcurrentPages: 1);
