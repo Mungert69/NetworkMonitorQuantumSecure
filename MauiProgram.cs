@@ -156,11 +156,41 @@ namespace QuantumSecure
         }
         private static void BuildRepoAndConfig(MauiAppBuilder builder)
         {
+            string appDataDirectory = FileSystem.AppDataDirectory;
+            builder.Services.AddSingleton<IFileRepo>(provider =>
+            {
+                try
+                {
+                    bool isRunningOnMauiAndroid = true;
+                    var fileRepo = new FileRepo(isRunningOnMauiAndroid, appDataDirectory);
+                    return fileRepo;
+                }
+                catch (Exception ex)
+                {
+                    ExceptionHelper.HandleGlobalException(ex, "Error : initializing FileRepo");
+                    return new FileRepo();
+                }
+            });
+            envPath = Path.Combine(appDataDirectory, ".env");
+            builder.Services.AddSingleton<EnvFileStore>(provider =>
+            {
+                var logger = provider.GetRequiredService<ILogger<EnvFileStore>>();
+                var envStore = new EnvFileStore(envPath, logger);
+                envStore.LoadIntoProcess();
+                return new EnvFileStore(envPath, logger);
+            });
+            builder.Services.AddSingleton<ProtectedConfigManager>(provider =>
+            {
+                var configuration = provider.GetRequiredService<IConfiguration>();
+                var envStore = provider.GetRequiredService<EnvFileStore>();
+                var fileRepo = provider.GetRequiredService<IFileRepo>();
+                var logger = provider.GetRequiredService<ILogger<ProtectedConfigManager>>();
+                return new ProtectedConfigManager(configuration, envStore, fileRepo, logger);
+            });
             builder.Services.AddSingleton<NetConnectConfig>(provider =>
                {
                    // Assuming Configuration is properly set up
                    var configuration = provider.GetRequiredService<IConfiguration>();
-                   string appDataDirectory = FileSystem.AppDataDirectory;
                    string nativeLibDir = string.Empty;
 #if ANDROID
                 nativeLibDir = Android.App.Application.Context.ApplicationInfo.NativeLibraryDir; 
@@ -172,21 +202,7 @@ namespace QuantumSecure
                 {
                     return new LocalProcessorStates();
                 });
-            builder.Services.AddSingleton<IFileRepo>(provider =>
-                {
-                    try
-                    {
-                        bool isRunningOnMauiAndroid = true;
-                        string prefixPath = FileSystem.AppDataDirectory;
-                        var fileRepo = new FileRepo(isRunningOnMauiAndroid, prefixPath);
-                        return fileRepo;
-                    }
-                    catch (Exception ex)
-                    {
-                        ExceptionHelper.HandleGlobalException(ex, "Error : initializing FileRepo");
-                        return new FileRepo();
-                    }
-                });
+
             builder.Services.AddSingleton<IRabbitRepo>(provider =>
                 {
                     var logger = provider.GetRequiredService<ILogger<RabbitRepo>>();
@@ -234,7 +250,7 @@ namespace QuantumSecure
                     var configuration = provider.GetRequiredService<IConfiguration>();
                     string appDataDirectory = FileSystem.AppDataDirectory;
                     string nativeLibDir = string.Empty;
-                    var browserHost= provider.GetRequiredService<IBrowserHost>();
+                    var browserHost = provider.GetRequiredService<IBrowserHost>();
 #if ANDROID
                     nativeLibDir = Android.App.Application.Context.ApplicationInfo.NativeLibraryDir; 
 #endif
