@@ -14,6 +14,7 @@ using NetworkMonitor.Objects;
 using NetworkMonitor.Objects.Repository;
 using NetworkMonitor.Processor.Services;
 using NetworkMonitor.Utils.Helpers;
+using NetworkMonitor.Security;
 using NetworkMonitorChat;
 using System.Text.Json;
 using System.Xml;
@@ -112,12 +113,19 @@ namespace QuantumSecure
                 if (config != null)
                     Task.Run(async () =>
                     {
-                        string output = "";
-                        string opensslVersion = config["OpensslVersion"];
-                        string versionStr = opensslVersion;
-                        if (!string.IsNullOrEmpty(os)) versionStr = $"{opensslVersion}-{os}";
-                        output = await CopyAssetsHelper.CopyAssetsToLocalStorage(versionStr, "cs-assets", "dlls");
-                        RootNamespaceProvider.AssetsReady = true;
+                        try
+                        {
+                            string output = "";
+                            string opensslVersion = config["OpensslVersion"];
+                            string versionStr = opensslVersion;
+                            if (!string.IsNullOrEmpty(os)) versionStr = $"{opensslVersion}-{os}";
+                            output = await CopyAssetsHelper.CopyAssetsToLocalStorage(versionStr, "cs-assets", "dlls");
+                            RootNamespaceProvider.AssetsReady = true;
+                        }
+                        catch (Exception ex)
+                        {
+                            ExceptionHelper.HandleGlobalException(ex, "Error in asset loading task");
+                        }
                     });
                 else ExceptionHelper.HandleGlobalException(new Exception(), "Config is null");
             }
@@ -171,14 +179,14 @@ namespace QuantumSecure
                     return new FileRepo();
                 }
             });
-            envPath = Path.Combine(appDataDirectory, ".env");
             builder.Services.AddSingleton<EnvFileStore>(provider =>
-            {
-                var logger = provider.GetRequiredService<ILogger<EnvFileStore>>();
-                var envStore = new EnvFileStore(envPath, logger);
-                envStore.LoadIntoProcess();
-                return new EnvFileStore(envPath, logger);
-            });
+           {
+               var envPath = Path.Combine(appDataDirectory, ".env");
+               var logger = provider.GetRequiredService<ILogger<EnvFileStore>>();
+               var envStore = new EnvFileStore(envPath, logger);
+               envStore.LoadIntoProcess();
+               return new EnvFileStore(envPath, logger);
+           });
             builder.Services.AddSingleton<ProtectedConfigManager>(provider =>
             {
                 var configuration = provider.GetRequiredService<IConfiguration>();
@@ -188,20 +196,19 @@ namespace QuantumSecure
                 return new ProtectedConfigManager(configuration, envStore, fileRepo, logger);
             });
             builder.Services.AddSingleton<NetConnectConfig>(provider =>
-               {
-                   // Assuming Configuration is properly set up
-                   var configuration = provider.GetRequiredService<IConfiguration>();
-                   string nativeLibDir = string.Empty;
+            {
+                // Assuming Configuration is properly set up
+                var configuration = provider.GetRequiredService<IConfiguration>();
+                string nativeLibDir = string.Empty;
 #if ANDROID
                 nativeLibDir = Android.App.Application.Context.ApplicationInfo.NativeLibraryDir; 
 #endif
-
-                   return new NetConnectConfig(configuration, appDataDirectory, nativeLibDir);
-               });
+                return new NetConnectConfig(configuration, appDataDirectory, nativeLibDir);
+            });
             builder.Services.AddSingleton<LocalProcessorStates>(provider =>
-                {
-                    return new LocalProcessorStates();
-                });
+            {
+                return new LocalProcessorStates();
+            });
 
             builder.Services.AddSingleton<IRabbitRepo>(provider =>
                 {
