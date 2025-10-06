@@ -179,18 +179,18 @@ namespace QuantumSecure
                     return new FileRepo();
                 }
             });
-            builder.Services.AddSingleton<EnvFileStore>(provider =>
+            builder.Services.AddSingleton<IEnvironmentStore>(provider =>
            {
                var envPath = Path.Combine(appDataDirectory, ".env");
                var logger = provider.GetRequiredService<ILogger<EnvFileStore>>();
                var envStore = new EnvFileStore(envPath, logger);
                envStore.LoadIntoProcess();
-               return new EnvFileStore(envPath, logger);
+               return envStore;
            });
-            builder.Services.AddSingleton<ProtectedConfigManager>(provider =>
+            builder.Services.AddSingleton<IProtectedConfigManager>(provider =>
             {
                 var configuration = provider.GetRequiredService<IConfiguration>();
-                var envStore = provider.GetRequiredService<EnvFileStore>();
+                var envStore = provider.GetRequiredService<IEnvironmentStore>();
                 var fileRepo = provider.GetRequiredService<IFileRepo>();
                 var logger = provider.GetRequiredService<ILogger<ProtectedConfigManager>>();
                 return new ProtectedConfigManager(configuration, envStore, fileRepo, logger);
