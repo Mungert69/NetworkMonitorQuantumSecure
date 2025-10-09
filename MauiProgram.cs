@@ -312,7 +312,8 @@ namespace QuantumSecure
                     var cmdProcessorProvider = provider.GetRequiredService<ICmdProcessorProvider>();
                     var monitorPingInfoView = provider.GetRequiredService<IMonitorPingInfoView>();
                     var browserHost = provider.GetRequiredService<IBrowserHost>();
-                    return new BackgroundService(logger, netConfig, loggerFactory, rabbitRepo, fileRepo, processorStates, monitorPingInfoView, cmdProcessorProvider, browserHost);
+                    var protectedConfigManager = provider.GetRequiredService<IProtectedConfigManager>();
+                    return new BackgroundService(logger, netConfig, loggerFactory, rabbitRepo, fileRepo, processorStates, monitorPingInfoView, cmdProcessorProvider, browserHost,protectedConfigManager);
                 });
 #endif
         }
