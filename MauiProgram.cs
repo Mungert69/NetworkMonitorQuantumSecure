@@ -186,7 +186,7 @@ namespace QuantumSecure
                var envStore = new EnvFileStore(envPath, logger);
                envStore.LoadIntoProcess();
                return envStore;
-           });
+            });
             builder.Services.AddSingleton<IProtectedConfigManager>(provider =>
             {
                 var configuration = provider.GetRequiredService<IConfiguration>();
@@ -199,6 +199,8 @@ namespace QuantumSecure
             {
                 // Assuming Configuration is properly set up
                 var configuration = provider.GetRequiredService<IConfiguration>();
+                // Ensure the .env file is loaded before we read any configuration values.
+                _ = provider.GetRequiredService<IEnvironmentStore>();
                 string nativeLibDir = string.Empty;
 #if ANDROID
                 nativeLibDir = Android.App.Application.Context.ApplicationInfo.NativeLibraryDir; 
