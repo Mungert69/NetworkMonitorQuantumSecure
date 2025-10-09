@@ -46,6 +46,12 @@
                 Title="Logs Viewer"
                 ContentTemplate="{DataTemplate local:LogsPage}"/>
     </FlyoutItem>
+
+    <FlyoutItem Title="Exit Agent">
+        <ShellContent Route="Exit"
+                Title="Exit Agent"
+                ContentTemplate="{DataTemplate local:ExitPage}"/>
+    </FlyoutItem>
     <!-- Optional: Additional routes that aren't in the main flyout menu -->
     <ShellContent Route="DetailsPage"
             ContentTemplate="{DataTemplate local:DetailsPage}"/>

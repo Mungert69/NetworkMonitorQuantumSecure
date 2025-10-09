@@ -201,11 +201,17 @@ namespace QuantumSecure
                 var configuration = provider.GetRequiredService<IConfiguration>();
                 // Ensure the .env file is loaded before we read any configuration values.
                 _ = provider.GetRequiredService<IEnvironmentStore>();
+                var protectedConfigManager = provider.GetRequiredService<IProtectedConfigManager>();
                 string nativeLibDir = string.Empty;
 #if ANDROID
                 nativeLibDir = Android.App.Application.Context.ApplicationInfo.NativeLibraryDir; 
 #endif
-                return new NetConnectConfig(configuration, appDataDirectory, nativeLibDir);
+                var netConfig = new NetConnectConfig(configuration, appDataDirectory, nativeLibDir);
+                protectedConfigManager
+                    .SynchronizeSensitiveValuesAsync(netConfig, ProtectedConfigurationParameters.All)
+                    .GetAwaiter()
+                    .GetResult();
+                return netConfig;
             });
             builder.Services.AddSingleton<LocalProcessorStates>(provider =>
             {
@@ -224,6 +230,7 @@ namespace QuantumSecure
         {
 
             builder.Services.AddSingleton<ILaunchHelper, LaunchHelper>();
+            builder.Services.AddSingleton<IDialogService, DialogService>();
 
             builder.Services.AddSingleton<IBrowserHost>(provider =>
             {
@@ -323,6 +330,7 @@ namespace QuantumSecure
             builder.Services.AddSingleton<ScanProcessorStatesViewModel>();
             builder.Services.AddSingleton<MainPageViewModel>();
             builder.Services.AddSingleton<ConfigPageViewModel>();
+            builder.Services.AddSingleton<ExitPageViewModel>();
         }
         private static void BuildPages(MauiAppBuilder builder)
         {
@@ -332,6 +340,7 @@ namespace QuantumSecure
             builder.Services.AddSingleton<ConfigPage>();
             builder.Services.AddSingleton<DataViewPage>();
             builder.Services.AddSingleton<ChatPage>();
+            builder.Services.AddSingleton<ExitPage>();
         }
         private static void ShowAlertBlocking(string title, string? message)
         {
