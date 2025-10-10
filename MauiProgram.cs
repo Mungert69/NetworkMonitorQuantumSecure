@@ -18,7 +18,6 @@ using NetworkMonitor.Security;
 using NetworkMonitorChat;
 using System.Text.Json;
 using System.Xml;
-using QuantumSecure.Platforms.Windows;
 
 namespace QuantumSecure
 {
@@ -29,7 +28,7 @@ namespace QuantumSecure
         {
 #if WINDOWS
             // Ensure WebView2 runtime present (non-blocking fire-and-forget allowed; adjust to await if you prefer)
-            _ = Task.Run(async () => await WebView2Installer.EnsureWebView2Async());
+            //_ = Task.Run(async () => await WebView2Installer.EnsureWebView2Async());
 #endif
 
             // Global exception handlers
