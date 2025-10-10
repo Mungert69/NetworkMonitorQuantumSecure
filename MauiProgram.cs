@@ -26,6 +26,11 @@ namespace QuantumSecure
         public static IServiceProvider ServiceProvider { get; private set; }
         public static MauiApp CreateMauiApp()
         {
+#if WINDOWS
+            // Ensure WebView2 runtime present (non-blocking fire-and-forget allowed; adjust to await if you prefer)
+            //_ = Task.Run(async () => await WebView2Installer.EnsureWebView2Async());
+#endif
+
             // Global exception handlers
             AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
             {
@@ -201,11 +206,17 @@ namespace QuantumSecure
                 var configuration = provider.GetRequiredService<IConfiguration>();
                 // Ensure the .env file is loaded before we read any configuration values.
                 _ = provider.GetRequiredService<IEnvironmentStore>();
+                var protectedConfigManager = provider.GetRequiredService<IProtectedConfigManager>();
                 string nativeLibDir = string.Empty;
 #if ANDROID
                 nativeLibDir = Android.App.Application.Context.ApplicationInfo.NativeLibraryDir; 
 #endif
-                return new NetConnectConfig(configuration, appDataDirectory, nativeLibDir);
+                var netConfig = new NetConnectConfig(configuration, appDataDirectory, nativeLibDir);
+                protectedConfigManager
+                    .SynchronizeSensitiveValuesAsync(netConfig, ProtectedConfigurationParameters.All)
+                    .GetAwaiter()
+                    .GetResult();
+                return netConfig;
             });
             builder.Services.AddSingleton<LocalProcessorStates>(provider =>
             {
@@ -224,6 +235,7 @@ namespace QuantumSecure
         {
 
             builder.Services.AddSingleton<ILaunchHelper, LaunchHelper>();
+            builder.Services.AddSingleton<IDialogService, DialogService>();
 
             builder.Services.AddSingleton<IBrowserHost>(provider =>
             {
@@ -312,7 +324,8 @@ namespace QuantumSecure
                     var cmdProcessorProvider = provider.GetRequiredService<ICmdProcessorProvider>();
                     var monitorPingInfoView = provider.GetRequiredService<IMonitorPingInfoView>();
                     var browserHost = provider.GetRequiredService<IBrowserHost>();
-                    return new BackgroundService(logger, netConfig, loggerFactory, rabbitRepo, fileRepo, processorStates, monitorPingInfoView, cmdProcessorProvider, browserHost);
+                    var protectedConfigManager = provider.GetRequiredService<IProtectedConfigManager>();
+                    return new BackgroundService(logger, netConfig, loggerFactory, rabbitRepo, fileRepo, processorStates, monitorPingInfoView, cmdProcessorProvider, browserHost,protectedConfigManager);
                 });
 #endif
         }
@@ -322,6 +335,7 @@ namespace QuantumSecure
             builder.Services.AddSingleton<ScanProcessorStatesViewModel>();
             builder.Services.AddSingleton<MainPageViewModel>();
             builder.Services.AddSingleton<ConfigPageViewModel>();
+            builder.Services.AddSingleton<ExitPageViewModel>();
         }
         private static void BuildPages(MauiAppBuilder builder)
         {
@@ -331,6 +345,7 @@ namespace QuantumSecure
             builder.Services.AddSingleton<ConfigPage>();
             builder.Services.AddSingleton<DataViewPage>();
             builder.Services.AddSingleton<ChatPage>();
+            builder.Services.AddSingleton<ExitPage>();
         }
         private static void ShowAlertBlocking(string title, string? message)
         {

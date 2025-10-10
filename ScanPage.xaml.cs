@@ -2,30 +2,34 @@ using NetworkMonitor.Maui.Services;
 using NetworkMonitor.Maui.ViewModels;
 using Microsoft.Extensions.Logging;
 using NetworkMonitor.Objects;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace QuantumSecure;
 
 public partial class ScanPage : ContentPage
 {
-    private readonly ILogger _logger;
-    private readonly ScanProcessorStatesViewModel _scanProcessorStatesViewModel;
+    private readonly ILogger<ScanPage> _logger;
+    private ScanProcessorStatesViewModel? _scanProcessorStatesViewModel;
     private readonly IUiDispatcher _dispatcher;
     public string FrontendUrl => AppConstants.FrontendUrl;
     private readonly IPlatformService _platformService;
+    private readonly IServiceProvider _services;
 
-    public ScanPage(ILogger<ScanPage> logger, ScanProcessorStatesViewModel scanProcessorStatesViewModel, IPlatformService platformService)
+    // Guards to avoid double initialization / double subscription
+    private bool _viewModelInitialized = false;
+    private bool _endpointHandlerAdded = false;
+
+    public ScanPage(ILogger<ScanPage> logger, IServiceProvider services, IPlatformService platformService)
     {
         try
         {
             InitializeComponent();
-            _scanProcessorStatesViewModel = scanProcessorStatesViewModel;
             _logger = logger;
+            _services = services;
             _platformService = platformService;
             _dispatcher = ServiceInitializer.Dispatcher;
-            CustomPopupView.BindingContext = scanProcessorStatesViewModel;
-            BindingContext = scanProcessorStatesViewModel;
-            EndpointTypePicker.SelectedIndexChanged += OnEndpointTypePickerSelectedIndexChanged;
 
+            // Do not resolve ViewModel here. Resolve it lazily when authorised.
             UpdateVisibility();
         }
         catch (Exception ex)
@@ -37,7 +41,6 @@ public partial class ScanPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
-        // Update _isAgentEnabled when the page appears
         UpdateVisibility();
     }
 
@@ -45,15 +48,56 @@ public partial class ScanPage : ContentPage
     {
         try
         {
+            // Use a synchronous dispatch to avoid async-lambda warnings.
             _dispatcher.Dispatch(() =>
             {
-                ScanView.IsVisible = _platformService.IsAuthorised;
-                AgentDisabledMessage.IsVisible = !_platformService.IsAuthorised;
+                bool isAuth = _platformService?.IsAuthorised ?? false;
+
+                // Show/hide UI sections
+                ScanView.IsVisible = isAuth;
+                AgentDisabledMessage.IsVisible = !isAuth;
+
+                // If authorised and ViewModel not set, resolve it now (after singletons should be ready)
+                if (isAuth && _scanProcessorStatesViewModel == null)
+                {
+                    try
+                    {
+                        // Resolve the singleton VM and initialize it once.
+                        _scanProcessorStatesViewModel = _services.GetService<ScanProcessorStatesViewModel>()
+                                                       ?? _services.GetRequiredService<ScanProcessorStatesViewModel>();
+
+                        if (!_viewModelInitialized)
+                        {
+                            try
+                            {
+                                _scanProcessorStatesViewModel.Initialize();
+                            }
+                            catch (Exception initEx)
+                            {
+                                _logger?.LogError(initEx, "Error initializing ScanProcessorStatesViewModel from ScanPage");
+                            }
+                            _viewModelInitialized = true;
+                        }
+
+                        BindingContext = _scanProcessorStatesViewModel;
+                        CustomPopupView.BindingContext = _scanProcessorStatesViewModel;
+
+                        if (!_endpointHandlerAdded)
+                        {
+                            EndpointTypePicker.SelectedIndexChanged += OnEndpointTypePickerSelectedIndexChanged;
+                            _endpointHandlerAdded = true;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, $" Error resolving ScanProcessorStatesViewModel: {ex.Message}");
+                    }
+                }
             });
         }
         catch (Exception ex)
         {
-            _logger?.LogError($" Error : in UpdateVisibility on ScanPage. Error was: {ex.Message}");
+            _logger?.LogError(ex, $" Error : in UpdateVisibility on ScanPage. Error was: {ex.Message}");
         }
     }
 
@@ -61,6 +105,12 @@ public partial class ScanPage : ContentPage
     {
         try
         {
+            if (_scanProcessorStatesViewModel == null)
+            {
+                _logger?.LogWarning("Endpoint type changed but ViewModel is not initialized.");
+                return;
+            }
+
             if (EndpointTypePicker.SelectedItem is string selectedEndpointType)
             {
                 _scanProcessorStatesViewModel.DefaultEndpointType = selectedEndpointType;
@@ -68,7 +118,7 @@ public partial class ScanPage : ContentPage
         }
         catch (Exception ex)
         {
-            _logger?.LogError($" Error : in OnEndpointTypePickerSelectedIndexChanged on ScanPage. Error was: {ex.Message}");
+            _logger?.LogError(ex, $" Error : in OnEndpointTypePickerSelectedIndexChanged on ScanPage. Error was: {ex.Message}");
         }
     }
 
@@ -82,7 +132,7 @@ public partial class ScanPage : ContentPage
         {
             // Handle any exceptions
             await DisplayAlert("Error", $"Could not open browser . Error was : {ex.Message}", "OK");
-            _logger?.LogError($"Could not open browser. Error was : {ex}");
+            _logger?.LogError(ex, $"Could not open browser. Error was : {ex}");
         }
     }
 
@@ -90,6 +140,12 @@ public partial class ScanPage : ContentPage
     {
         try
         {
+            if (_scanProcessorStatesViewModel == null)
+            {
+                await DisplayAlert("Agent not ready", "Agent not authorised or ViewModel not initialized yet.", "OK");
+                return;
+            }
+
             ScanSection.IsVisible = false;
             LoadingSection.IsVisible = true;
             ResultsSection.IsVisible = false;
@@ -114,7 +170,7 @@ public partial class ScanPage : ContentPage
             LoadingSection.IsVisible = false;
             ScanSection.IsVisible = true;
             await DisplayAlert("Error", $"Could not scan local hosts. Error was: {ex.Message}", "OK");
-            _logger?.LogError($"Could not scan local hosts. Error was: {ex}");
+            _logger?.LogError(ex, $"Could not scan local hosts. Error was: {ex}");
         }
     }
 
@@ -122,13 +178,19 @@ public partial class ScanPage : ContentPage
     {
         try
         {
+            if (_scanProcessorStatesViewModel == null)
+            {
+                await DisplayAlert("Agent not ready", "Agent not authorised or ViewModel not initialized yet.", "OK");
+                return;
+            }
+
             await _scanProcessorStatesViewModel.AddServices();
             await DisplayAlert("Success", $"Added {_scanProcessorStatesViewModel.SelectedDevices.Count} services to be monitored. You will receive alerts if any of these servers are down. View host monitoring details under the Monitored Hosts tab. Alternatively you can manage and view more detailed host data at https://{AppConstants.AppDomain}/dashboard. Login using the same email you registerd this agent with.", "OK");
         }
         catch (Exception ex)
         {
             await DisplayAlert("Error", $"Could not add services. Error was: {ex.Message}", "OK");
-            _logger?.LogError($"Could not add services. Error was: {ex}");
+            _logger?.LogError(ex, $"Could not add services. Error was: {ex}");
         }
     }
 
@@ -143,7 +205,7 @@ public partial class ScanPage : ContentPage
         catch (Exception ex)
         {
             await DisplayAlert("Error", $"Could not clear services. Error was: {ex.Message}", "OK");
-            _logger?.LogError($"Could not clear services. Error was: {ex}");
+            _logger?.LogError(ex, $"Could not clear services. Error was: {ex}");
         }
     }
 
@@ -151,6 +213,12 @@ public partial class ScanPage : ContentPage
     {
         try
         {
+            if (_scanProcessorStatesViewModel == null)
+            {
+                await DisplayAlert("Agent not ready", "Agent not authorised or ViewModel not initialized yet.", "OK");
+                return;
+            }
+
             LoadingSection.IsVisible = true;
             ResultsSection.IsVisible = false;
             await _scanProcessorStatesViewModel.CheckServices();
@@ -161,7 +229,7 @@ public partial class ScanPage : ContentPage
         catch (Exception ex)
         {
             await DisplayAlert("Error", $"Could not check services. Error was: {ex.Message}", "OK");
-            _logger?.LogError($"Could not check services. Error was: {ex.Message}");
+            _logger?.LogError(ex, $"Could not check services. Error was: {ex.Message}");
         }
     }
 
@@ -169,6 +237,12 @@ public partial class ScanPage : ContentPage
     {
         try
         {
+            if (_scanProcessorStatesViewModel == null)
+            {
+                await DisplayAlert("Agent not ready", "Agent not authorised or ViewModel not initialized yet.", "OK");
+                return;
+            }
+
             await _scanProcessorStatesViewModel.Cancel();
             LoadingSection.IsVisible = false;
             ScanSection.IsVisible = true;
@@ -176,7 +250,7 @@ public partial class ScanPage : ContentPage
         catch (Exception ex)
         {
             await DisplayAlert("Error", $"Could not complete Cancel click. Error was: {ex.Message}", "OK");
-            _logger?.LogError($"Could not complete Cancel click. Error was: {ex}");
+            _logger?.LogError(ex, $"Could not complete Cancel click. Error was: {ex}");
         }
     }
 
@@ -184,6 +258,8 @@ public partial class ScanPage : ContentPage
     {
         try
         {
+            if (_scanProcessorStatesViewModel == null) return;
+
             var selectedHosts = e.CurrentSelection.Cast<MonitorIP>().ToList();
             if (selectedHosts != null && selectedHosts.Count > 0)
             {
@@ -192,7 +268,7 @@ public partial class ScanPage : ContentPage
         }
         catch (Exception ex)
         {
-            _logger?.LogError($" Error : in OnHostsSelectionChanged on ScanPage. Error was: {ex.Message}");
+            _logger?.LogError(ex, $" Error : in OnHostsSelectionChanged on ScanPage. Error was: {ex.Message}");
         }
     }
 
@@ -204,7 +280,7 @@ public partial class ScanPage : ContentPage
         }
         catch (Exception ex)
         {
-            _logger?.LogError($" Error : in OnGoHomeClicked on LogsPage. Error was: {ex.Message}");
+            _logger?.LogError(ex, $" Error : in OnGoHomeClicked on LogsPage. Error was: {ex.Message}");
         }
     }
 }

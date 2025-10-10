@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="QuantumSecure.ExitPage"
+             BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Gray900}}">
+  <ScrollView>
+    <VerticalStackLayout Padding="20" Spacing="16" HorizontalOptions="Center" VerticalOptions="Center">
+      <Label x:Name="InfoLabel"
+             Text="Exit"
+             FontSize="18"
+             HorizontalOptions="Center"
+             TextColor="{DynamicResource Secondary}"/>
+
+      <Label x:Name="DetailLabel"
+             Text="Choose what should happen when you close the app."
+             FontSize="14"
+             HorizontalOptions="Center"
+             TextColor="{DynamicResource Secondary}" />
+
+      <!-- Status and spinner bound to the ViewModel -->
+      <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HorizontalOptions="Center" />
+      <Label x:Name="StatusLabel"
+             Text="{Binding StatusMessage}"
+             FontSize="14"
+             HorizontalOptions="Center"
+             TextColor="{DynamicResource Secondary}" />
+
+      <Button x:Name="PrimaryButton"
+              Text="Primary"
+              Command="{Binding ExitUiCommand}"
+              HorizontalOptions="Fill"
+              WidthRequest="320" />
+
+      <Button x:Name="SecondaryButton"
+              Text="Secondary"
+              Command="{Binding DisableAndExitCommand}"
+              HorizontalOptions="Fill"
+              WidthRequest="320" />
+
+    </VerticalStackLayout>
+  </ScrollView>
+</ContentPage>
