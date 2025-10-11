@@ -1,8 +1,10 @@
+using Microsoft.Maui.Controls;
 using NetworkMonitor.Maui.Services;
 using NetworkMonitor.Maui.ViewModels;
 using Microsoft.Extensions.Logging;
 using NetworkMonitor.Objects;
 using Microsoft.Extensions.DependencyInjection;
+using System.Threading.Tasks;
 
 namespace QuantumSecure;
 
@@ -226,10 +228,17 @@ public partial class ScanPage : ContentPage
             LoadingSection.IsVisible = true;
             ResultsSection.IsVisible = false;
             await _scanProcessorStatesViewModel.CheckServices();
-            await DisplayAlert("Success", $"Checked {_scanProcessorStatesViewModel.SelectedDevices.Count} Services. Check the Result Output for the status of each service checked.", "OK");
             LoadingSection.IsVisible = false;
             ResultsSection.IsVisible = true;
             _scanProcessorStatesViewModel.IsPopupVisible = false;
+
+            var checkedCount = _scanProcessorStatesViewModel.SelectedDevices.Count;
+            var message = checkedCount > 0
+                ? $"Checked {checkedCount} services. Review the latest status in the result output below."
+                : "Service checks completed. Review the result output below.";
+
+            await DisplayAlert("Checks complete", message, "Show results");
+            await BringResultsIntoViewAsync();
         }
         catch (Exception ex)
         {
@@ -260,6 +269,24 @@ public partial class ScanPage : ContentPage
         {
             await DisplayAlert("Error", $"Could not complete Cancel click. Error was: {ex.Message}", "OK");
             _logger?.LogError(ex, $"Could not complete Cancel click. Error was: {ex}");
+        }
+    }
+
+    private async Task BringResultsIntoViewAsync()
+    {
+        try
+        {
+            await Task.Delay(100);
+            OutputScrollView?.Focus();
+
+            if (CompletedMessageLabel != null && OutputScrollView != null)
+            {
+                await OutputScrollView.ScrollToAsync(CompletedMessageLabel, ScrollToPosition.End, true);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to bring scan results into view.");
         }
     }
 

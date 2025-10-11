@@ -268,8 +268,10 @@
                                     <Border.StrokeShape>
                                         <shapes:RoundRectangle CornerRadius="12"/>
                                     </Border.StrokeShape>
-                                    <ScrollView HeightRequest="160">
-                                        <Label Text="{Binding CompletedMessage}"
+                                    <ScrollView x:Name="OutputScrollView"
+                                                HeightRequest="160">
+                                        <Label x:Name="CompletedMessageLabel"
+                                               Text="{Binding CompletedMessage}"
                                                TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray200}}"
                                                LineBreakMode="WordWrap"/>
                                     </ScrollView>
