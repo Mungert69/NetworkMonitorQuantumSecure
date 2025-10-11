@@ -153,6 +153,10 @@ public partial class ScanPage : ContentPage
             var detectedHosts = await _scanProcessorStatesViewModel.ScanForHosts();
 
             LoadingSection.IsVisible = false;
+            if (_scanProcessorStatesViewModel != null)
+            {
+                _scanProcessorStatesViewModel.IsPopupVisible = false;
+            }
 
             if (detectedHosts != null && detectedHosts.Count > 0)
             {
@@ -246,6 +250,10 @@ public partial class ScanPage : ContentPage
             await _scanProcessorStatesViewModel.Cancel();
             LoadingSection.IsVisible = false;
             ScanSection.IsVisible = true;
+            if (_scanProcessorStatesViewModel != null)
+            {
+                _scanProcessorStatesViewModel.IsPopupVisible = false;
+            }
         }
         catch (Exception ex)
         {
