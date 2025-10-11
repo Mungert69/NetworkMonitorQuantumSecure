@@ -255,6 +255,26 @@
                                     </CollectionView.ItemTemplate>
                                 </CollectionView>
 
+                                <Label Text="Result output"
+                                       Style="{StaticResource SectionCaptionStyle}"
+                                       FontAttributes="Bold"
+                                       Margin="0,4,0,0"/>
+
+                                <Border StrokeThickness="1"
+                                        Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}"
+                                        Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
+                                        Padding="12"
+                                        Margin="0,0,0,4">
+                                    <Border.StrokeShape>
+                                        <shapes:RoundRectangle CornerRadius="12"/>
+                                    </Border.StrokeShape>
+                                    <ScrollView HeightRequest="160">
+                                        <Label Text="{Binding CompletedMessage}"
+                                               TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray200}}"
+                                               LineBreakMode="WordWrap"/>
+                                    </ScrollView>
+                                </Border>
+
                                 <Grid ColumnSpacing="12"
                                       RowSpacing="12">
                                     <Grid.ColumnDefinitions>

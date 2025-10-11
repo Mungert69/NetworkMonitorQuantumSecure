@@ -229,6 +229,7 @@ public partial class ScanPage : ContentPage
             await DisplayAlert("Success", $"Checked {_scanProcessorStatesViewModel.SelectedDevices.Count} Services. Check the Result Output for the status of each service checked.", "OK");
             LoadingSection.IsVisible = false;
             ResultsSection.IsVisible = true;
+            _scanProcessorStatesViewModel.IsPopupVisible = false;
         }
         catch (Exception ex)
         {
