@@ -1,0 +1,2 @@
+# note the Target is taken from the adb devices list
+sudo dotnet build NetworkMonitorQuantumSecure-Android.csproj   -t:Install -f net9.0-android   -p:AndroidFastDeploymentType=None   -p:AdbTarget="-s TA93008CH3"   -bl:/mnt/data/xa.binlog
