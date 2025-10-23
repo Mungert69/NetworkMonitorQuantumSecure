@@ -14,6 +14,9 @@
 		},
 		{
 			"path": "../FreeNetworkMonitorAgent"
+		},
+		{
+			"path": "../NetworkMonitorChatRazorLib"
 		}
 	],
 	"settings": {}
