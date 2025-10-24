@@ -4,6 +4,7 @@
              xmlns:shapes="clr-namespace:Microsoft.Maui.Controls.Shapes;assembly=Microsoft.Maui.Controls"
              xmlns:view="clr-namespace:QuantumSecure.Views"
              xmlns:vm="clr-namespace:NetworkMonitor.Maui.ViewModels;assembly=NetworkMonitorMaui"
+             xmlns:obj="clr-namespace:NetworkMonitor.Objects;assembly=NetworkMonitor"
              x:Class="QuantumSecure.ScanPage"
              x:DataType="vm:ScanProcessorStatesViewModel"
              BackgroundColor="{AppThemeBinding Light={StaticResource LightBackground}, Dark={StaticResource DarkBackground}}">
@@ -201,7 +202,7 @@
                                                Margin="12"/>
                                     </CollectionView.EmptyView>
                                     <CollectionView.ItemTemplate>
-                                        <DataTemplate>
+                                        <DataTemplate x:DataType="obj:MonitorIP">
                                             <Border StrokeThickness="1"
                                                     Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}"
                                                     Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"

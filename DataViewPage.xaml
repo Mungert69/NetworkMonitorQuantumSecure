@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:controls="clr-namespace:NetworkMonitor.Maui.Controls;assembly=NetworkMonitorMaui"
              xmlns:shapes="clr-namespace:Microsoft.Maui.Controls.Shapes;assembly=Microsoft.Maui.Controls"
-             xmlns:dto="clr-namespace:NetworkMonitor.DTOs;assembly=NetworkMonitor-Maui-Android"
+             xmlns:dto="clr-namespace:NetworkMonitor.DTOs;assembly=NetworkMonitor"
              x:Class="QuantumSecure.DataViewPage"
              x:Name="ThisPage"
              x:DataType="dto:IMonitorPingInfoView"
