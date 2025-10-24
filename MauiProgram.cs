@@ -60,7 +60,7 @@ namespace QuantumSecure
                 builder.Services.AddLogging(loggingBuilder =>
                 {
                     loggingBuilder.ClearProviders(); // Optional: Clears default providers if necessary
-                    loggingBuilder.SetMinimumLevel(LogLevel.Information); // Set the minimum log level
+                    loggingBuilder.SetMinimumLevel(LogLevel.Debug); // Set the minimum log level
                     loggingBuilder.AddConsole(); // Console logger (useful for debugging)
                     loggingBuilder.AddDebug();   // Debug output window (useful in Visual Studio)
                     loggingBuilder.AddInMemoryLogger(options =>
