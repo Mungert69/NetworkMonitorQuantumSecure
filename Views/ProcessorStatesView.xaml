@@ -4,7 +4,7 @@
              xmlns:controls="clr-namespace:NetworkMonitor.Maui.Controls;assembly=NetworkMonitorMaui"
              xmlns:view="clr-namespace:QuantumSecure.Views"
              x:Class="QuantumSecure.Views.ProcessorStatesView"
-             >
+             x:DataType="vm:ProcessorStatesViewModel">
 
  
     <Frame Padding="10" CornerRadius="10" HorizontalOptions="Center" VerticalOptions="Center" BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Gray950}}">

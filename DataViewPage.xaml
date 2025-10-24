@@ -3,8 +3,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:controls="clr-namespace:NetworkMonitor.Maui.Controls;assembly=NetworkMonitorMaui"
              xmlns:shapes="clr-namespace:Microsoft.Maui.Controls.Shapes;assembly=Microsoft.Maui.Controls"
+             xmlns:dto="clr-namespace:NetworkMonitor.DTOs;assembly=NetworkMonitor-Maui-Android"
              x:Class="QuantumSecure.DataViewPage"
              x:Name="ThisPage"
+             x:DataType="dto:IMonitorPingInfoView"
              BackgroundColor="{AppThemeBinding Light={StaticResource LightBackground}, Dark={StaticResource DarkBackground}}">
 
     <ContentPage.Resources>
@@ -105,7 +107,7 @@
                                         HorizontalOptions="Center"
                                         BindableLayout.ItemsSource="{Binding MPIndicators}">
                             <BindableLayout.ItemTemplate>
-                                <DataTemplate>
+                                <DataTemplate x:DataType="dto:MPIndicator">
                                     <AbsoluteLayout WidthRequest="{Binding DiameterPixels, Converter={StaticResource MinTapSizeConverter}}"
                                                     HeightRequest="{Binding DiameterPixels, Converter={StaticResource MinTapSizeConverter}}"
                                                     AbsoluteLayout.LayoutBounds="{Binding ., Converter={StaticResource BoundsConverter}}"

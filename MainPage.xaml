@@ -5,6 +5,7 @@
              xmlns:view="clr-namespace:QuantumSecure.Views"
              xmlns:vm="clr-namespace:NetworkMonitor.Maui.ViewModels;assembly=NetworkMonitorMaui"
              x:Class="QuantumSecure.MainPage"
+             x:DataType="vm:MainPageViewModel"
              BackgroundColor="{AppThemeBinding Light={StaticResource LightBackground}, Dark={StaticResource DarkBackground}}">
 
     <ContentPage.Resources>
