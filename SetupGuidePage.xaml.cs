@@ -7,7 +7,10 @@ namespace QuantumSecure
         public SetupGuidePage()
         {
             InitializeComponent();
+            BindingContext = this;
         }
+
+        public string FrontendUrl => AppConstants.FrontendUrl;
 
         private async void OnDownloadLinkClicked(object sender, EventArgs e)
         {

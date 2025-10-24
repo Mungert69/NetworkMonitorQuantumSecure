@@ -4,7 +4,9 @@
              xmlns:controls="clr-namespace:NetworkMonitor.Maui.Controls;assembly=NetworkMonitorMaui"
              xmlns:view="clr-namespace:NetworkMonitor.Maui.Views;assembly=NetworkMonitorMaui"
              xmlns:vm="clr-namespace:NetworkMonitor.Maui.ViewModels;assembly=NetworkMonitorMaui"
+             xmlns:local="clr-namespace:QuantumSecure"
              x:Class="QuantumSecure.SetupGuidePage"
+             x:DataType="local:SetupGuidePage"
              BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Gray900}}">
 
 
