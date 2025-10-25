@@ -28,7 +28,7 @@ namespace QuantumSecure
                     var nativeDir = ApplicationInfo?.NativeLibraryDir;
                     if (!string.IsNullOrEmpty(nativeDir))
                     {
-                        var current = Environment.GetEnvironmentVariable("LD_LIBRARY_PATH") ?? string.Empty;
+                        var current = System.Environment.GetEnvironmentVariable("LD_LIBRARY_PATH") ?? string.Empty;
                         var segments = current
                             .Split(':', StringSplitOptions.RemoveEmptyEntries)
                             .ToHashSet(StringComparer.Ordinal);
@@ -38,7 +38,7 @@ namespace QuantumSecure
                             var merged = segments.Count == 1
                                 ? nativeDir
                                 : string.Join(":", segments.Prepend(nativeDir));
-                            Environment.SetEnvironmentVariable("LD_LIBRARY_PATH", merged);
+                            System.Environment.SetEnvironmentVariable("LD_LIBRARY_PATH", merged);
                             Log.Debug("QuantumSecure", $"Primed LD_LIBRARY_PATH with {nativeDir}");
                         }
                     }
