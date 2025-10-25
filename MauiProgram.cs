@@ -210,8 +210,7 @@ namespace QuantumSecure
                 var protectedConfigManager = provider.GetRequiredService<IProtectedConfigManager>();
                 string nativeLibDir = string.Empty;
 #if ANDROID
-                var defaultNativeDir = Android.App.Application.Context.ApplicationInfo.NativeLibraryDir;
-                nativeLibDir = LegacyNativeLibraryManager.GetPreferredDirectory(defaultNativeDir);
+                nativeLibDir = Android.App.Application.Context.ApplicationInfo.NativeLibraryDir; 
 #endif
                 var netConfig = new NetConnectConfig(configuration, appDataDirectory, nativeLibDir);
 #if ANDROID
@@ -296,8 +295,7 @@ namespace QuantumSecure
                     string nativeLibDir = string.Empty;
                     var browserHost = provider.GetRequiredService<IBrowserHost>();
 #if ANDROID
-                    var defaultNativeDir = Android.App.Application.Context.ApplicationInfo.NativeLibraryDir;
-                    nativeLibDir = LegacyNativeLibraryManager.GetPreferredDirectory(defaultNativeDir);
+                    nativeLibDir = Android.App.Application.Context.ApplicationInfo.NativeLibraryDir; 
 #endif
                     var cmdProcessorProvider = provider.GetRequiredService<ICmdProcessorProvider>();
                     return new ApiService(loggerFactory, configuration, cmdProcessorProvider, appDataDirectory, nativeLibDir, browserHost);
