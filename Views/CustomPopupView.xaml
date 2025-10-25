@@ -3,7 +3,7 @@
              xmlns:vm="clr-namespace:NetworkMonitor.Maui.ViewModels;assembly=NetworkMonitorMaui"
              x:Class="QuantumSecure.Views.CustomPopupView"
              x:DataType="vm:BasePopupViewModel"
-             IsVisible="{Binding IsPopupVisible}"
+             IsVisible="{Binding IsPopupVisible, FallbackValue=False, TargetNullValue=False}"
              BackgroundColor="#80212121">
 
     <Grid Padding="24"
