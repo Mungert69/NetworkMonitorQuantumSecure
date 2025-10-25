@@ -27,6 +27,7 @@
         <WindowsPackageType>MSIX</WindowsPackageType>
           <LinkerBehavior>None</LinkerBehavior>
         <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+        <DefaultItemExcludes>$(DefaultItemExcludes);Tests\**</DefaultItemExcludes>
 
     </PropertyGroup>
 

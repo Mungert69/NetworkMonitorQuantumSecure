@@ -1,9 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
         <PropertyGroup>
-                <TargetFrameworks>net9.0-android</TargetFrameworks>
+                <TargetFramework>net9.0-android</TargetFramework>
                 <AcceptAndroidSDKLicenses>true</AcceptAndroidSDKLicenses>
                 <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
-                <TargetFrameworks>net9.0-android</TargetFrameworks>
                 <OutputType>Exe</OutputType>
                 <RootNamespace>QuantumSecure</RootNamespace>
                 <UseMaui>true</UseMaui>
@@ -24,6 +23,7 @@
                 <NoWarn>CS8618</NoWarn>
                 <RuntimeIdentifiers Condition="$(TargetFramework.Contains('-android'))">android-arm;android-arm64;</RuntimeIdentifiers>
                 <AndroidBundleConfigurationFile>BundleConfig.json</AndroidBundleConfigurationFile>
+                <DefaultItemExcludes>$(DefaultItemExcludes);Tests\**</DefaultItemExcludes>
 
         </PropertyGroup>
         <PropertyGroup Condition="'$(Configuration)'=='Release-Dev'">
@@ -140,6 +140,4 @@
         <PropertyGroup>
                 <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
         </PropertyGroup>
-
 </Project>
-
