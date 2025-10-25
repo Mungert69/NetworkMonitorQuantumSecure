@@ -13,40 +13,41 @@ public class ResourceKeyTests
 
     private static readonly string SolutionRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
 
-    private static readonly string[] ResourceDictionaries =
-    {
-        Path.Combine(SolutionRoot, "App.xaml"),
-        Path.Combine(SolutionRoot, "Resources", "Styles", "Colors.xaml"),
-        Path.Combine(SolutionRoot, "Resources", "Styles", "Styles.xaml"),
-    };
+    public static IEnumerable<object[]> PageXamlFiles =>
+        new[]
+        {
+            "AppShell.xaml",
+            "ChatPage.xaml",
+            "ConfigPage.xaml",
+            "DataViewPage.xaml",
+            "DetailsPage.xaml",
+            "ExitPage.xaml",
+            "LogsPage.xaml",
+            "MainPage.xaml",
+            "NetworkMonitorPage.xaml",
+            "ScanPage.xaml",
+            "SetupGuidePage.xaml",
+            Path.Combine("Views", "CustomPopupView.xaml"),
+            Path.Combine("Views", "ProcessorStatesView.xaml"),
+            Path.Combine("Views", "ShowDetailsPopup.xaml"),
+        }.Select(path => new object[] { path });
 
-    [Fact]
-    public void DataViewPage_ReferencesExistingResources()
+    [Theory]
+    [MemberData(nameof(PageXamlFiles))]
+    public void Page_ReferencesExistingResources(string relativePath)
     {
         var keys = LoadDefinedResourceKeys();
-        var referencedKeys = ExtractReferencedResourceKeys(
-            Path.Combine(SolutionRoot, "DataViewPage.xaml"),
-            out var localKeys);
+        var fullPath = Path.Combine(SolutionRoot, relativePath);
+        var referencedKeys = ExtractReferencedResourceKeys(fullPath, out var localKeys);
 
-        AssertMissingKeys(referencedKeys, keys, localKeys, "DataViewPage.xaml");
-    }
-
-    [Fact]
-    public void StatusDetailsPopup_ReferencesExistingResources()
-    {
-        var keys = LoadDefinedResourceKeys();
-        var referencedKeys = ExtractReferencedResourceKeys(
-            Path.Combine(SolutionRoot, "Views", "ShowDetailsPopup.xaml"),
-            out var localKeys);
-
-        AssertMissingKeys(referencedKeys, keys, localKeys, "Views/ShowDetailsPopup.xaml");
+        AssertMissingKeys(referencedKeys, keys, localKeys, relativePath.Replace(Path.DirectorySeparatorChar, '/'));
     }
 
     private static HashSet<string> LoadDefinedResourceKeys()
     {
         var keys = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var path in ResourceDictionaries)
+        foreach (var path in EnumerateResourceDictionaries())
         {
             if (!File.Exists(path))
             {
@@ -65,6 +66,20 @@ public class ResourceKeyTests
         }
 
         return keys;
+    }
+
+    private static IEnumerable<string> EnumerateResourceDictionaries()
+    {
+        yield return Path.Combine(SolutionRoot, "App.xaml");
+
+        var resourcesDirectory = Path.Combine(SolutionRoot, "Resources");
+        if (Directory.Exists(resourcesDirectory))
+        {
+            foreach (var path in Directory.EnumerateFiles(resourcesDirectory, "*.xaml", SearchOption.AllDirectories))
+            {
+                yield return path;
+            }
+        }
     }
 
     private static HashSet<string> ExtractReferencedResourceKeys(string xamlPath, out HashSet<string> localKeys)
