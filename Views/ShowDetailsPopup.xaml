@@ -5,7 +5,7 @@
                x:Class="QuantumSecure.Views.StatusDetailsPopup"
                x:DataType="dto:MonitorPingInfo"
                Color="#80212121"
-               CanBeDismissedByTappingOutside="True">
+               CanBeDismissedByTappingOutsideOfPopup="True">
 
     <toolkit:Popup.Resources>
         <Style x:Key="SectionTitleStyle" TargetType="Label">
