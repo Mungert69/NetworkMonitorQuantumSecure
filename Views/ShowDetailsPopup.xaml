@@ -4,98 +4,93 @@
                xmlns:dto="clr-namespace:NetworkMonitor.Objects;assembly=NetworkMonitor"
                x:Class="QuantumSecure.Views.StatusDetailsPopup"
                x:DataType="dto:MonitorPingInfo"
-               Color="#80212121"
-               CanBeDismissedByTappingOutsideOfPopup="True">
-
-    <toolkit:Popup.Resources>
-        <Style x:Key="SectionTitleStyle" TargetType="Label">
-            <Setter Property="FontSize" Value="20"/>
-            <Setter Property="FontAttributes" Value="Bold"/>
-            <Setter Property="TextColor" Value="{DynamicResource Secondary}"/>
-        </Style>
-
-        <Style x:Key="CaptionLabelStyle" TargetType="Label">
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray300}}"/>
-        </Style>
-
-        <Style x:Key="KeyLabelStyle" TargetType="Label">
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="FontAttributes" Value="Bold"/>
-            <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray700}, Dark={StaticResource Gray200}}"/>
-        </Style>
-
-        <Style x:Key="ValueLabelStyle" TargetType="Label">
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
-            <Setter Property="LineBreakMode" Value="WordWrap"/>
-        </Style>
-    </toolkit:Popup.Resources>
+               Color="#80212121">
 
     <Grid Padding="24"
-          HorizontalOptions="Center"
-          VerticalOptions="Center">
+          HorizontalOptions="Fill"
+          VerticalOptions="Fill">
         <Frame BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Gray900}}"
                BorderColor="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}"
                HasShadow="True"
                CornerRadius="16"
                Padding="24"
-               WidthRequest="340">
-            <VerticalStackLayout Spacing="18">
+               HorizontalOptions="Center"
+               VerticalOptions="Center"
+               MaximumWidthRequest="420">
+            <StackLayout Spacing="18">
                 <Label Text="Host status"
-                       Style="{StaticResource SectionTitleStyle}"/>
+                       FontSize="20"
+                       FontAttributes="Bold"
+                       TextColor="{DynamicResource Secondary}"/>
 
                 <Border StrokeThickness="1"
                         Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
                         Background="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}"
                         Padding="12">
-                    <VerticalStackLayout Spacing="4">
+                    <StackLayout Spacing="4">
                         <Label Text="{Binding Address}"
                                FontSize="18"
                                FontAttributes="Bold"
                                TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"/>
                         <Label Text="{Binding Status}"
-                               Style="{StaticResource CaptionLabelStyle}"
-                               FontSize="13"/>
-                    </VerticalStackLayout>
+                               FontSize="13"
+                               TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray300}}"/>
+                    </StackLayout>
                 </Border>
 
                 <Grid ColumnDefinitions="Auto,*"
                       RowSpacing="12"
                       ColumnSpacing="12">
                     <Label Text="Port"
-                           Style="{StaticResource KeyLabelStyle}"/>
+                           FontSize="14"
+                           FontAttributes="Bold"
+                           TextColor="{AppThemeBinding Light={StaticResource Gray700}, Dark={StaticResource Gray200}}"/>
                     <Label Grid.Column="1"
                            Text="{Binding Port}"
-                           Style="{StaticResource ValueLabelStyle}"/>
+                           FontSize="14"
+                           TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"
+                           LineBreakMode="WordWrap"/>
 
                     <Label Grid.Row="1"
                            Text="Endpoint"
-                           Style="{StaticResource KeyLabelStyle}"/>
+                           FontSize="14"
+                           FontAttributes="Bold"
+                           TextColor="{AppThemeBinding Light={StaticResource Gray700}, Dark={StaticResource Gray200}}"/>
                     <Label Grid.Row="1"
                            Grid.Column="1"
                            Text="{Binding EndPointType}"
-                           Style="{StaticResource ValueLabelStyle}"/>
+                           FontSize="14"
+                           TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"
+                           LineBreakMode="WordWrap"/>
 
                     <Label Grid.Row="2"
                            Text="Packet loss"
-                           Style="{StaticResource KeyLabelStyle}"/>
+                           FontSize="14"
+                           FontAttributes="Bold"
+                           TextColor="{AppThemeBinding Light={StaticResource Gray700}, Dark={StaticResource Gray200}}"/>
                     <Label Grid.Row="2"
                            Grid.Column="1"
                            Text="{Binding PacketsLostPercentage, StringFormat='{0:F2}%'}"
-                           Style="{StaticResource ValueLabelStyle}"/>
+                           FontSize="14"
+                           TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"
+                           LineBreakMode="WordWrap"/>
 
                     <Label Grid.Row="3"
                            Text="Avg. round-trip"
-                           Style="{StaticResource KeyLabelStyle}"/>
+                           FontSize="14"
+                           FontAttributes="Bold"
+                           TextColor="{AppThemeBinding Light={StaticResource Gray700}, Dark={StaticResource Gray200}}"/>
                     <Label Grid.Row="3"
                            Grid.Column="1"
                            Text="{Binding RoundTripTimeAverage, StringFormat='{0} ms'}"
-                           Style="{StaticResource ValueLabelStyle}"/>
+                           FontSize="14"
+                           TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"
+                           LineBreakMode="WordWrap"/>
                 </Grid>
 
-                <Label Text="Tap outside this card or use a button below to continue."
-                       Style="{StaticResource CaptionLabelStyle}"
+                <Label Text="Use the buttons below to continue."
+                       FontSize="12"
+                       TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray300}}"
                        HorizontalTextAlignment="Center"/>
 
                 <Grid ColumnDefinitions="*,*"
@@ -108,7 +103,7 @@
                             Clicked="OnDetailsButtonClicked"
                             HorizontalOptions="Fill"/>
                 </Grid>
-            </VerticalStackLayout>
+            </StackLayout>
         </Frame>
     </Grid>
 </toolkit:Popup>
