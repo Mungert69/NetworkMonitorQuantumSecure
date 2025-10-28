@@ -33,6 +33,13 @@ fi
 
 dotnet clean NetworkMonitorQuantumSecure-Android.csproj
 
+dotnet publish "$HOME/code/NetworkMonitorLib/NetworkMonitor-Maui-Android.csproj" \
+  -c Release -r android --self-contained true
+
+cp --no-clobber \
+  "$HOME/code/NetworkMonitorLib/bin/Release/net9.0-android/android/NetworkMonitor.dll" \
+  "$HOME/code/NetworkMonitorQuantumSecure/Resources/Raw/dlls/NetworkMonitor.dll"
+
 
 cp ./Resources/Raw/appsettings-live.json ./Resources/Raw/appsettings.json
 
