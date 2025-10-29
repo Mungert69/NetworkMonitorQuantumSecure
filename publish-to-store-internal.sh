@@ -18,7 +18,7 @@ if [[ -z "${VIRTUAL_ENV:-}" ]]; then
   echo "❌ No Python virtual environment is active."
   echo "   Run:  source /path/to/venv/bin/activate"
   # If you prefer auto-activation, replace the two lines above with:
-  # source "$HOME/code/venvs/publish/bin/activate"
+  # source "venv/bin/activate"
   exit 1
 fi
 
