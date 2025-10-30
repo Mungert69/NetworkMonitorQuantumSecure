@@ -18,7 +18,7 @@ if [[ -z "${VIRTUAL_ENV:-}" ]]; then
   echo "❌ No Python virtual environment is active."
   echo "   Run:  source /path/to/venv/bin/activate"
   # If you prefer auto-activation, replace the two lines above with:
-  # source "$HOME/code/venvs/publish/bin/activate"
+  # source "venv/bin/activate"
   exit 1
 fi
 
@@ -30,15 +30,14 @@ fi
 # 2. .NET build pipeline                #
 ########################################
 
-
 dotnet clean NetworkMonitorQuantumSecure-Android.csproj
 
-dotnet publish "$HOME/code/NetworkMonitorLib/NetworkMonitor-Maui-Android.csproj" \
-  -c Release -r android --self-contained true
-
-cp --no-clobber \
-  "$HOME/code/NetworkMonitorLib/bin/Release/net9.0-android/android/NetworkMonitor.dll" \
-  "$HOME/code/NetworkMonitorQuantumSecure/Resources/Raw/dlls/NetworkMonitor.dll"
+# Build and stage DLLs (run in its own directory so script_debug.log is in the right place)
+MAKE_DIR="$HOME/code/NetworkMonitorLib"
+if ! ( cd "$MAKE_DIR" && ./make-dlls ); then
+  echo "make-dlls failed — check $MAKE_DIR/script_debug.log" >&2
+  exit 1
+fi
 
 cp ./Resources/Raw/appsettings-live.json ./Resources/Raw/appsettings.json
 
