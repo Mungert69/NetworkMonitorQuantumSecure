@@ -1,0 +1,1 @@
+ powershell -ExecutionPolicy Bypass -File .\Fix-MSB3030-Here.ps1
