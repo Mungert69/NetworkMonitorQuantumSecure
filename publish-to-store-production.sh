@@ -41,7 +41,7 @@ fi
 
 cp ./Resources/Raw/appsettings-live.json ./Resources/Raw/appsettings.json
 
-dotnet build -c Release -f net9.0-android NetworkMonitorQuantumSecure-Android.csproj
+dotnet build -c Release -f net10.0-android NetworkMonitorQuantumSecure-Android.csproj
 
 ########################################
 # 3. Upload to Google Play              #
@@ -50,6 +50,6 @@ dotnet build -c Release -f net9.0-android NetworkMonitorQuantumSecure-Android.cs
 python3 publish_to_store.py \
   --service-account-file "$HOME/code/securefiles/gaccount.json" \
   --package-name click.freenetworkmonitor.quantumsecure \
-  --aab "$HOME/code/NetworkMonitorQuantumSecure/bin/Release/net9.0-android/click.freenetworkmonitor.quantumsecure-Signed.aab" \
+  --aab "$HOME/code/NetworkMonitorQuantumSecure/bin/Release/net10.0-android/click.freenetworkmonitor.quantumsecure-Signed.aab" \
   --track production
 

@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
         <PropertyGroup>
-                <TargetFramework>net10.0-android</TargetFramework>
+		<TargetFramework>net10.0-android</TargetFramework>
+		 <RollForward>Minor</RollForward>
                 <AcceptAndroidSDKLicenses>true</AcceptAndroidSDKLicenses>
                 <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
                 <OutputType>Exe</OutputType>
