@@ -24,21 +24,23 @@
             <Frame.GestureRecognizers>
                 <TapGestureRecognizer Command="{Binding ClosePopupCommand}"/>
             </Frame.GestureRecognizers>
+            <ScrollView>
 
-            <VerticalStackLayout Spacing="12">
-                <Label Text="Scan status"
-                       FontSize="18"
-                       FontAttributes="Bold"
-                       TextColor="{DynamicResource Secondary}"/>
-                <Label Text="{Binding PopupMessage}"
-                       FontSize="14"
-                       LineBreakMode="WordWrap"
-                       TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray200}}"/>
-                <Label Text="Tap anywhere to dismiss"
-                       FontSize="12"
-                       TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"
-                       HorizontalTextAlignment="Center"/>
-            </VerticalStackLayout>
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="Scan status"
+                           FontSize="18"
+                           FontAttributes="Bold"
+                           TextColor="{DynamicResource Secondary}"/>
+                    <Label Text="{Binding PopupMessage}"
+                           FontSize="14"
+                           LineBreakMode="WordWrap"
+                           TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray200}}"/>
+                    <Label Text="Tap anywhere to dismiss"
+                           FontSize="12"
+                           TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"
+                           HorizontalTextAlignment="Center"/>
+                </VerticalStackLayout>
+            </ScrollView>
         </Frame>
     </Grid>
 </ContentView>

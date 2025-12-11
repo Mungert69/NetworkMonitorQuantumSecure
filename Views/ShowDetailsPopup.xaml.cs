@@ -1,8 +1,9 @@
 using CommunityToolkit.Maui.Views;
+using System;
 
 namespace QuantumSecure.Views
 {
-    // Change from 'Popup' to 'Popup<bool>'
+    // Keep Popup<bool> so ShowPopupAsync<bool> returns a typed result
     public partial class StatusDetailsPopup : Popup<bool>
     {
         public StatusDetailsPopup()
@@ -14,8 +15,6 @@ namespace QuantumSecure.Views
         {
             try
             {
-                var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-                // Pass the result directly to CloseAsync
                 await CloseAsync(true);
             }
             catch { }
@@ -25,11 +24,19 @@ namespace QuantumSecure.Views
         {
             try
             {
-                var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-                // Pass the result directly to CloseAsync
                 await CloseAsync(false);
             }
             catch { }
         }
+
+        // New: allow tapping the popup card itself to act like "More details"
+        public async void OnFrameTapped(object? sender, EventArgs e)
+        {
+            try
+            {
+                await CloseAsync(true);
+            }
+            catch { }
+        }
     }
-}   
+}

@@ -48,7 +48,8 @@
         <MauiImage Update="Resources\Images\dotneplaceholder.png" Resize="True" BaseSize="300,185" />
 
         <!-- Custom Fonts -->
-        <MauiFont Include="Resources\Fonts\*" />
+        <MauiFont Include="Resources/Fonts/OpenSans-Regular.ttf" Alias="OpenSansRegular" />
+        <MauiFont Include="Resources/Fonts/OpenSans-Semibold.ttf" Alias="OpenSansSemibold" />
 
         <MauiAsset Include="Resources\Raw\appsettings.json" />
         <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
@@ -58,23 +59,23 @@
 
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.250916003" />
+        <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.251106002" />
         <PackageReference Include="MetroLog.Maui" Version="2.1.0" />
-        <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="10.0.0-rc.2.25504.7" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0-rc.2.25502.107" />
-        <PackageReference Include="CommunityToolkit.Maui" Version="11.2.0" />
+        <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="10.0.11" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.1" />
+        <PackageReference Include="CommunityToolkit.Maui" Version="13.0.0" />
         <PackageReference Include="Microsoft.Toolkit.Mvvm" Version="7.1.2" />
-        <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.0-rc.2.25504.7" />
-        <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="10.0.0-rc.2.25504.7" />
-        <PackageReference Include="Microsoft.Maui.Core" Version="10.0.0-rc.2.25504.7" />
-        <PackageReference Include="Microsoft.Maui.Essentials" Version="10.0.0-rc.2.25504.7" />
-        <PackageReference Include="Microsoft.Maui.Graphics" Version="10.0.0-rc.2.25504.7" />
-        <PackageReference Include="Syncfusion.Maui.Toolkit" Version="1.0.7" />
+        <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.11" />
+        <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="10.0.11" />
+        <PackageReference Include="Microsoft.Maui.Core" Version="10.0.11" />
+        <PackageReference Include="Microsoft.Maui.Essentials" Version="10.0.11" />
+        <PackageReference Include="Microsoft.Maui.Graphics" Version="10.0.11" />
+        <PackageReference Include="Syncfusion.Maui.Toolkit" Version="1.0.8" />
         <PackageReference Include="MatBlazor" Version="2.10.0" />
-        <PackageReference Include="Microsoft.AspNetCore.Components" Version="10.0.0-rc.2.25502.107" />
-        <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.0-rc.2.25502.107" />
-        <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.0-rc.2.25502.107" />
-        <PackageReference Include="Microsoft.JSInterop" Version="10.0.0-rc.2.25502.107" />
+        <PackageReference Include="Microsoft.AspNetCore.Components" Version="10.0.1" />
+        <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.1" />
+        <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.1" />
+        <PackageReference Include="Microsoft.JSInterop" Version="10.0.1" />
         <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3590-prerelease" />
 
     </ItemGroup>
