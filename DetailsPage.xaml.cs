@@ -7,19 +7,18 @@ public partial class DetailsPage : ContentPage
 
 
     private readonly ILogger _logger;
-    public DetailsPage(ILogger logger,IMonitorPingInfoView monitorPingInfoView)
+    public DetailsPage(IMonitorPingInfoView monitorPingInfoView)
     {
         try
         {
             InitializeComponent();
-            _logger=logger;
+
             BindingContext = monitorPingInfoView;
 
         }
         catch (Exception ex)
         {
-             _logger?.LogError($" Error : Unable to load DetailsPage. Error was: {ex.Message}");
-        }
+              }
     }
 
     private async void OnBackButton_Clicked(object sender, EventArgs e)
@@ -29,7 +28,6 @@ public partial class DetailsPage : ContentPage
         await Shell.Current.Navigation.PopAsync();}
          catch (Exception ex)
         {
-            _logger?.LogError($" Error : in OnBackButton_Clicked on DetailsPage. Error was: {ex.Message}");
         }
     }
 
